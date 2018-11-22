@@ -10,8 +10,14 @@
 #include <stdint.h>
 #include "nrf.h"
 
+#ifdef NRF52840_XXAA
+#define NVIC_NUM_VECTORS      (16 + 48)   // CORE + MCU Peripherals
+#else
 #define NVIC_NUM_VECTORS      (16 + 38)   // CORE + MCU Peripherals
+#endif
+
 #define NVIC_USER_IRQ_OFFSET  16
+
 
 #ifdef __cplusplus
 extern "C" {
