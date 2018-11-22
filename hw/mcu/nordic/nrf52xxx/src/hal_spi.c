@@ -46,7 +46,7 @@ typedef void (*nrf52_spi_irq_handler_t)(void);
  */
 
 /* The maximum number of SPI interfaces we will allow */
-#define NRF52_HAL_SPI_MAX (3)
+#define NRF52_HAL_SPI_MAX (4)
 
 /* Used to disable all interrupts */
 #define NRF_SPI_IRQ_DISABLE_ALL 0xFFFFFFFF
@@ -100,6 +100,9 @@ struct nrf52_hal_spi nrf52_hal_spi1;
 #if MYNEWT_VAL(SPI_2_MASTER)  || MYNEWT_VAL(SPI_2_SLAVE)
 struct nrf52_hal_spi nrf52_hal_spi2;
 #endif
+#if MYNEWT_VAL(SPI_3_MASTER)  /* SPI3 can only be master */
+struct nrf52_hal_spi nrf52_hal_spi3;
+#endif
 
 static const struct nrf52_hal_spi *nrf52_hal_spis[NRF52_HAL_SPI_MAX] = {
 #if MYNEWT_VAL(SPI_0_MASTER) || MYNEWT_VAL(SPI_0_SLAVE)
@@ -117,6 +120,11 @@ static const struct nrf52_hal_spi *nrf52_hal_spis[NRF52_HAL_SPI_MAX] = {
 #else
     NULL,
 #endif
+#if MYNEWT_VAL(SPI_3_MASTER)
+    &nrf52_hal_spi3,
+#else
+    NULL,
+#endif
 };
 
 #define NRF52_HAL_SPI_RESOLVE(__n, __v)                     \
@@ -130,7 +138,7 @@ static const struct nrf52_hal_spi *nrf52_hal_spis[NRF52_HAL_SPI_MAX] = {
         goto err;                                           \
     }
 
-#if (MYNEWT_VAL(SPI_0_MASTER) || MYNEWT_VAL(SPI_1_MASTER) || MYNEWT_VAL(SPI_2_MASTER))
+#if (MYNEWT_VAL(SPI_0_MASTER) || MYNEWT_VAL(SPI_1_MASTER) || MYNEWT_VAL(SPI_2_MASTER) || MYNEWT_VAL(SPI_3_MASTER))
 static void
 nrf52_irqm_handler(struct nrf52_hal_spi *spi)
 {
@@ -299,6 +307,16 @@ nrf52_spi2_irq_handler(void)
         nrf52_irqs_handler(&nrf52_hal_spi2);
 #endif
     }
+    os_trace_isr_exit();
+}
+#endif
+
+#if MYNEWT_VAL(SPI_3_MASTER)
+void
+nrf52_spi3_irq_handler(void)
+{
+    os_trace_isr_enter();
+    nrf52_irqm_handler(&nrf52_hal_spi3);
     os_trace_isr_exit();
 }
 #endif
@@ -487,6 +505,7 @@ hal_spi_init_master(struct nrf52_hal_spi *spi,
     spim->PSEL.MISO = cfg->miso_pin;
 
     spim->INTENCLR = NRF_SPI_IRQ_DISABLE_ALL;
+    // this is the place
     NVIC_SetVector(spi->irq_num, (uint32_t)handler);
     NVIC_SetPriority(spi->irq_num, (1 << __NVIC_PRIO_BITS) - 1);
     NVIC_ClearPendingIRQ(spi->irq_num);
@@ -642,6 +661,14 @@ hal_spi_init(int spi_num, void *cfg, uint8_t spi_type)
             assert(0);
 #endif
         }
+#else
+        goto err;
+#endif
+    } else if (spi_num == 3) {
+#if MYNEWT_VAL(SPI_3_MASTER)
+        spi->irq_num = SPIM3_IRQn;
+        irq_handler = nrf52_spi3_irq_handler;
+        spi->nhs_spi.spim = NRF_SPIM3; 
 #else
         goto err;
 #endif
