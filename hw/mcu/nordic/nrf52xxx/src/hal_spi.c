@@ -32,8 +32,10 @@
 
 #ifdef NRF52840_XXAA
 #define SPIM_TXD_MAXCNT_MAX             65535
+#define NRF52_HAL_SPI_MAX (4)
 #else
 #define SPIM_TXD_MAXCNT_MAX             255
+#define NRF52_HAL_SPI_MAX (3)
 #endif
 
 /* IRQ handler type */
@@ -45,8 +47,6 @@ typedef void (*nrf52_spi_irq_handler_t)(void);
  * 3) Dont think I need dummy_rx as I can set master RX maxcnt to zero.
  */
 
-/* The maximum number of SPI interfaces we will allow */
-#define NRF52_HAL_SPI_MAX (4)
 
 /* Used to disable all interrupts */
 #define NRF_SPI_IRQ_DISABLE_ALL 0xFFFFFFFF
@@ -100,7 +100,7 @@ struct nrf52_hal_spi nrf52_hal_spi1;
 #if MYNEWT_VAL(SPI_2_MASTER)  || MYNEWT_VAL(SPI_2_SLAVE)
 struct nrf52_hal_spi nrf52_hal_spi2;
 #endif
-#if MYNEWT_VAL(SPI_3_MASTER)  /* SPI3 can only be master */
+#if MYNEWT_VAL(SPI_3_MASTER)  /* SPI3 can only be used as SPIM */
 struct nrf52_hal_spi nrf52_hal_spi3;
 #endif
 
@@ -311,7 +311,7 @@ nrf52_spi2_irq_handler(void)
 }
 #endif
 
-#if MYNEWT_VAL(SPI_3_MASTER)
+#if MYNEWT_VAL(SPI_3_MASTER) /* SPI3 can only be used as SPIM */
 void
 nrf52_spi3_irq_handler(void)
 {
@@ -330,7 +330,8 @@ hal_spi_stop_transfer(NRF_SPIM_Type *spim)
 }
 
 static int
-hal_spi_config_master(struct nrf52_hal_spi *spi,
+hal_spi_config_master(int spi_num,
+                      struct nrf52_hal_spi *spi,
                       struct hal_spi_settings *settings)
 {
     int rc;
@@ -402,6 +403,18 @@ hal_spi_config_master(struct nrf52_hal_spi *spi,
         case 8000:
             frequency = SPIM_FREQUENCY_FREQUENCY_M8;
             break;
+        case 16000:
+            /* only available for SPIM3 */
+            if (spi_num == 3) {
+                frequency = SPIM_FREQUENCY_FREQUENCY_M16;
+                break;
+            }
+        case 32000:
+            /* only available for SPIM3 */
+            if (spi_num == 3) {
+                frequency = SPIM_FREQUENCY_FREQUENCY_M32;
+                break;
+            }
         default:
             frequency = 0;
             rc = EINVAL;
@@ -413,12 +426,19 @@ hal_spi_config_master(struct nrf52_hal_spi *spi,
 }
 
 static int
-hal_spi_config_slave(struct nrf52_hal_spi *spi,
+hal_spi_config_slave(int spi_num,
+                     struct nrf52_hal_spi *spi,
                      struct hal_spi_settings *settings)
 {
     int rc;
     uint32_t nrf_config;
     NRF_SPIS_Type *spis;
+
+    
+    if (spi_num == 3) {
+        /* SPI3 can only be used as SPIM */
+        return EINVAL;
+    }
 
     spis = spi->nhs_spi.spis;
 
@@ -721,9 +741,9 @@ hal_spi_config(int spi_num, struct hal_spi_settings *settings)
     }
 
     if (spi->spi_type  == HAL_SPI_TYPE_MASTER) {
-        rc = hal_spi_config_master(spi, settings);
+        rc = hal_spi_config_master(spi_num, spi, settings);
     } else {
-        rc = hal_spi_config_slave(spi, settings);
+        rc = hal_spi_config_slave(spi_num, spi, settings);
     }
 
 err:
@@ -749,7 +769,11 @@ hal_spi_enable(int spi_num)
 
     NRF52_HAL_SPI_RESOLVE(spi_num, spi);
 
-    if (spi->spi_type  == HAL_SPI_TYPE_MASTER) {
+    if (spi_num == 3) {
+        /* SPI3 can only be used as SPIM */
+        nrf_spi = (NRF_SPI_Type *)spi->nhs_spi.spim;
+        nrf_spi->ENABLE = (SPIM_ENABLE_ENABLE_Enabled << SPIM_ENABLE_ENABLE_Pos);
+    } else if (spi->spi_type  == HAL_SPI_TYPE_MASTER) {
         /* For now, enable this in normal SPI mode (not spim) */
         nrf_spi = (NRF_SPI_Type *)spi->nhs_spi.spim;
         nrf_spi->ENABLE = (SPI_ENABLE_ENABLE_Enabled << SPI_ENABLE_ENABLE_Pos);
@@ -837,6 +861,12 @@ uint16_t hal_spi_tx_val(int spi_num, uint16_t val)
     uint16_t retval;
     NRF_SPI_Type *spi;
     struct nrf52_hal_spi *hal_spi;
+
+    rc = EINVAL;
+    if (spi_num == 3) {
+        /* use only noblock SPIM calls with SPI3 */
+        goto err;
+    }
 
     NRF52_HAL_SPI_RESOLVE(spi_num, hal_spi);
 
@@ -936,6 +966,11 @@ hal_spi_txrx(int spi_num, void *txbuf, void *rxbuf, int len)
 
     rc = EINVAL;
     if (!len) {
+        goto err;
+    }
+
+    if (spi_num == 3) {
+        /* use only noblock SPIM calls with SPI3 */
         goto err;
     }
 
