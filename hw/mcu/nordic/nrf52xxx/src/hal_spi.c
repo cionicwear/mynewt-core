@@ -525,7 +525,6 @@ hal_spi_init_master(struct nrf52_hal_spi *spi,
     spim->PSEL.MISO = cfg->miso_pin;
 
     spim->INTENCLR = NRF_SPI_IRQ_DISABLE_ALL;
-    // this is the place
     NVIC_SetVector(spi->irq_num, (uint32_t)handler);
     NVIC_SetPriority(spi->irq_num, (1 << __NVIC_PRIO_BITS) - 1);
     NVIC_ClearPendingIRQ(spi->irq_num);
