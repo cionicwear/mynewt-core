@@ -366,10 +366,10 @@ hal_i2c_master_write(uint8_t i2c_num, struct hal_i2c_master_data *pdata,
     rc = 0;
 
 err:
+    regs->TASKS_STOP = 1;
 
     if (regs->EVENTS_ERROR) {
         nrf_status = regs->ERRORSRC;
-        regs->TASKS_STOP = 1;
         regs->ERRORSRC = nrf_status;
         rc = hal_i2c_convert_status(nrf_status);
     } else if (rc == HAL_I2C_ERR_TIMEOUT) {
@@ -379,7 +379,6 @@ err:
          * A clear operation is performed in case one of the devices on
          * the bus is in a bad state.
          */
-        regs->TASKS_STOP = 1;
         regs->ENABLE = TWI_ENABLE_ENABLE_Disabled;
         hal_i2c_clear_bus(regs->PSELSCL, regs->PSELSDA);
         regs->ENABLE = TWI_ENABLE_ENABLE_Enabled;
@@ -451,9 +450,11 @@ hal_i2c_master_read(uint8_t i2c_num, struct hal_i2c_master_data *pdata,
     return (0);
 
 err:
+    regs->TASKS_STOP = 1;
+    regs->SHORTS = TWI_SHORTS_BB_STOP_Msk;
+
     if (regs->EVENTS_ERROR) {
         nrf_status = regs->ERRORSRC;
-        regs->TASKS_STOP = 1;
         regs->ERRORSRC = nrf_status;
         rc = hal_i2c_convert_status(nrf_status);
     } else if (rc == HAL_I2C_ERR_TIMEOUT) {
@@ -463,8 +464,6 @@ err:
         * A clear operation is performed in case one of the devices on
         * the bus is in a bad state.
         */
-        regs->TASKS_STOP = 1;
-        regs->SHORTS = TWI_SHORTS_BB_STOP_Msk;
         regs->ENABLE = TWI_ENABLE_ENABLE_Disabled;
         hal_i2c_clear_bus(regs->PSELSCL, regs->PSELSDA);
         regs->ENABLE = TWI_ENABLE_ENABLE_Enabled;
