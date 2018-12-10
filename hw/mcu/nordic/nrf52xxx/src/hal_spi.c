@@ -120,10 +120,12 @@ static const struct nrf52_hal_spi *nrf52_hal_spis[NRF52_HAL_SPI_MAX] = {
 #else
     NULL,
 #endif
+#ifdef NRF52840_XXAA 
 #if MYNEWT_VAL(SPI_3_MASTER)
     &nrf52_hal_spi3,
 #else
     NULL,
+#endif
 #endif
 };
 
@@ -403,6 +405,7 @@ hal_spi_config_master(int spi_num,
         case 8000:
             frequency = SPIM_FREQUENCY_FREQUENCY_M8;
             break;
+#ifdef NRF52840_XXAA
         case 16000:
             /* only available for SPIM3 */
             if (spi_num == 3) {
@@ -415,6 +418,7 @@ hal_spi_config_master(int spi_num,
                 frequency = SPIM_FREQUENCY_FREQUENCY_M32;
                 break;
             }
+#endif
         default:
             frequency = 0;
             rc = EINVAL;
