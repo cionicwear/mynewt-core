@@ -489,12 +489,12 @@ static int g_imgr_sector_id = -1;
 static uint32_t g_imgr_sector_end = 0;
 
 /**
- * Erases a flash sector as image upload crosses a sector boundary
- * Erasing the entire flash size at one time can take significant time 
- * causing a bluetooth disconnect or significant battery sag.
+ * Erases a flash sector as image upload crosses a sector boundary.
+ * Erasing the entire flash size at one time can take significant time,
+ *   causing a bluetooth disconnect or significant battery sag.
  * Instead we will erase immediately prior to crossing a sector.
  * We could check for empty to increase efficiency, but instead we always erase
- * for consistency and simplicity
+ *   for consistency and simplicity.
  *
  * @param fa       Flash area being traversed
  * @param off      Offset that is about to be written
@@ -783,11 +783,6 @@ imgr_upload(struct mgmt_cbuf *cb)
 #endif
 
 #ifndef LAZY_FLASH_ERASE
-        /*
-         * erasing the entire req.size at one time can take significant time 
-         * causing a bluetooth disconnect or significant battery sag
-         * instead of erasing here we will erase a sector at a time as we go
-         */
         if (action.erase) {
             rc = flash_area_erase(fa, 0, req.size);
             if (rc != 0) {
@@ -810,16 +805,13 @@ imgr_upload(struct mgmt_cbuf *cb)
         if (flash_area_write(fa, req.off, req.img_data, action.write_bytes) != 0) {
             rc = MGMT_ERR_EUNKNOWN;
             errstr = imgmgr_err_str_flash_write_failed;
-        }
-#ifdef LAZY_FLASH_ERASE
-        else {
+        } else {
             imgr_state.off += action.write_bytes;
             if (imgr_state.off == imgr_state.size) {
                 /* Done */
                 imgr_state.area_id = -1;
             }
         }
-#endif
     }
 
     flash_area_close(fa);
