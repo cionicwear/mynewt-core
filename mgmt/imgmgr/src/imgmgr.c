@@ -127,6 +127,11 @@ static struct {
     /** Hash of image data; used for resumption of a partial upload. */
     uint8_t data_sha_len;
     uint8_t data_sha[IMGMGR_DATA_SHA_LEN];
+#if MYNEWT_VAL(IMGMGR_LAZY_ERASE)
+    int sector_id;
+    uint32_t sector_end;
+#endif
+
 } imgr_state;
 
 static imgr_upload_fn *imgr_upload_cb;
@@ -484,9 +489,7 @@ imgr_erase_state(struct mgmt_cbuf *cb)
     return 0;
 }
 
-#ifdef LAZY_FLASH_ERASE
-static int g_imgr_sector_id = -1;
-static uint32_t g_imgr_sector_end = 0;
+#if MYNEWT_VAL(IMGMGR_LAZY_ERASE)
 
 /**
  * Erases a flash sector as image upload crosses a sector boundary.
@@ -509,8 +512,8 @@ imgr_erase_if_needed(const struct flash_area *fa, uint32_t off, uint32_t len)
     int rc = 0;
     struct flash_area sector;
 
-    while ((fa->fa_off + off + len) > g_imgr_sector_end) {
-        rc = flash_area_getnext_sector(fa->fa_id, &g_imgr_sector_id, &sector);
+    while ((fa->fa_off + off + len) > imgr_state.sector_end) {
+        rc = flash_area_getnext_sector(fa->fa_id, &imgr_state.sector_id, &sector);
         if (rc) {
             return rc;
         }
@@ -518,7 +521,7 @@ imgr_erase_if_needed(const struct flash_area *fa, uint32_t off, uint32_t len)
         if (rc) {
             return rc;
         }
-        g_imgr_sector_end = sector.fa_off + sector.fa_size;
+        imgr_state.sector_end = sector.fa_off + sector.fa_size;
     }
     return 0;
 }
@@ -557,11 +560,6 @@ imgr_upload_inspect(const struct imgr_upload_req *req,
 
     if (req->off == 0) {
         /* First upload chunk. */
-#ifdef LAZY_FLASH_ERASE
-        g_imgr_sector_id = -1;
-        g_imgr_sector_end = 0;
-#endif
-
         if (req->data_len < sizeof(struct image_header)) {
             /*
              * Image header is the first thing in the image.
@@ -604,7 +602,7 @@ imgr_upload_inspect(const struct imgr_upload_req *req,
             return MGMT_ERR_ENOMEM;
         }
 
-#ifndef LAZY_FLASH_ERASE
+#if MYNEWT_VAL(IMGMGR_LAZY_ERASE) == 0
         rc = flash_area_open(action->area_id, &fa);
         if (rc) {
             *errstr = imgmgr_err_str_flash_open_failed;
@@ -782,7 +780,12 @@ imgr_upload(struct mgmt_cbuf *cb)
         }
 #endif
 
-#ifndef LAZY_FLASH_ERASE
+#if MYNEWT_VAL(IMGMGR_LAZY_ERASE)
+        /* setup for lazy sector by sector erase */
+        imgr_state.sector_id = -1;
+        imgr_state.sector_end = 0;
+#else
+        /* erase the entire req.size all at once */
         if (action.erase) {
             rc = flash_area_erase(fa, 0, req.size);
             if (rc != 0) {
@@ -795,7 +798,7 @@ imgr_upload(struct mgmt_cbuf *cb)
 
     /* Write the image data to flash. */
     if (rc == 0 && req.data_len != 0) {
-#ifdef LAZY_FLASH_ERASE
+#if MYNEWT_VAL(IMGMGR_LAZY_ERASE)
         /* erase as we cross sector boundaries */
         if (imgr_erase_if_needed(fa, req.off, action.write_bytes) != 0) {
             rc = MGMT_ERR_EUNKNOWN;
