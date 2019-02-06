@@ -155,6 +155,10 @@ jlink_debug() {
             echo "mon reset" >> $GDB_CMD_FILE
             echo "si" >> $GDB_CMD_FILE
         fi
+        # Whether to continue immediately
+        if [ ! -z "$CONTINUE" ]; then
+            echo "continue" >> $GDB_CMD_FILE
+        fi
         echo "$EXTRA_GDB_CMDS" >> $GDB_CMD_FILE
 
 	if [ $WINDOWS -eq 1 ]; then

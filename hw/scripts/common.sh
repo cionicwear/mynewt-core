@@ -67,6 +67,10 @@ parse_extra_jtag_cmd() {
                 NEW_EXTRA_JTAG_CMD="$NEW_EXTRA_JTAG_CMD $ADDITIONAL_CHARS"
                 shift
                 ;;
+            -continue)
+                CONTINUE=true
+                shift
+                ;;
             *)
                 NEW_EXTRA_JTAG_CMD="$NEW_EXTRA_JTAG_CMD $1"
                 shift
