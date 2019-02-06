@@ -64,6 +64,16 @@ parse_extra_jtag_cmd() {
 		shift
 		;;
 	esac
+	case $1 in
+	    -continue)
+		CONTINUE=true
+		shift
+		;;
+	    *)
+		NEW_EXTRA_JTAG_CMD="$NEW_EXTRA_JTAG_CMD $1"
+		shift
+		;;
+	esac
     done
     echo $NEW_EXTRA_JTAG_CMD
     EXTRA_JTAG_CMD=$NEW_EXTRA_JTAG_CMD
