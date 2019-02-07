@@ -59,12 +59,6 @@ parse_extra_jtag_cmd() {
 		PORT=$1
 		shift
 		;;
-	    *)
-		NEW_EXTRA_JTAG_CMD="$NEW_EXTRA_JTAG_CMD $1"
-		shift
-		;;
-	esac
-	case $1 in
 	    -continue)
 		CONTINUE=true
 		shift
