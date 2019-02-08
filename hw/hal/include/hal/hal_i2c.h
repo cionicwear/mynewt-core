@@ -130,6 +130,8 @@ int hal_i2c_init(uint8_t i2c_num, void *cfg);
 int hal_i2c_master_write(uint8_t i2c_num, struct hal_i2c_master_data *pdata,
                          uint32_t timeout, uint8_t last_op);
 
+
+int hal_i2c_reset(uint8_t i2c_num);
 /**
  * Sends a start condition and reads <len> bytes of data on the i2c bus.
  * This API does NOT issue a stop condition unless `last_op` is set to `1`.

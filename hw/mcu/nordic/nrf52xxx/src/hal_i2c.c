@@ -307,6 +307,22 @@ err:
     return (rc);
 }
 
+int hal_i2c_reset(uint8_t i2c_num)
+{
+    struct nrf52_hal_i2c *i2c;
+    NRF_TWI_Type *regs;
+    int rc = 0;
+    rc = hal_i2c_resolve(i2c_num, &i2c);
+    if (rc != 0) {
+        return rc;
+    }
+    regs = i2c->nhi_regs;
+    regs->ENABLE = TWI_ENABLE_ENABLE_Disabled;
+    hal_i2c_clear_bus(regs->PSELSCL, regs->PSELSDA);
+    regs->ENABLE = TWI_ENABLE_ENABLE_Enabled;
+    return 0;
+}
+
 int
 hal_i2c_master_write(uint8_t i2c_num, struct hal_i2c_master_data *pdata,
                      uint32_t timo, uint8_t last_op)
