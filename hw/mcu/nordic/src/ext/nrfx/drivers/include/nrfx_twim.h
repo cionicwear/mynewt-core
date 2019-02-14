@@ -296,6 +296,33 @@ nrfx_err_t nrfx_twim_rx(nrfx_twim_t const * p_instance,
                         size_t              length);
 
 /**
+ * @brief Function for writing then reading data to/from a TWI slave.
+ *
+ * The transmission will be stopped when an error occurs. If a transfer is ongoing,
+ * the function returns the error code @ref NRFX_ERROR_BUSY.
+ *
+ * @param[in] p_instance Pointer to the driver instance structure.
+ * @param[in] address    Address of a specific slave device (only 7 LSB).
+ * @param[in] p_data_tx     Pointer to a transmit buffer.
+ * @param[in] length_tx     Number of bytes to be sent. Maximum possible length
+ *                       is dependent on the used SoC (see the MAXCNT register
+ *                       description in the Product Specification). The driver
+ *                       checks it with assertion.
+ * @param[in] p_data_rx     Pointer to a receive buffer.
+ * @param[in] length_rx     Number of bytes to be received. 
+ * @retval NRFX_SUCCESS                    If the procedure was successful.
+ * @retval NRFX_ERROR_BUSY                 If the driver is not ready for a new transfer.
+ * @retval NRFX_ERROR_INTERNAL             If an error was detected by hardware.
+ * @retval NRFX_ERROR_DRV_TWI_ERR_ANACK    If NACK received after sending the address in polling mode.
+ * @retval NRFX_ERROR_DRV_TWI_ERR_DNACK    If NACK received after sending a data byte in polling mode.
+ */
+nrfx_err_t nrfx_twim_txrx(nrfx_twim_t const * p_instance,
+                        uint8_t             address,
+                        uint8_t *           p_data_tx,
+                        size_t              length_tx,
+                        uint8_t *           p_data_rx,
+                        size_t              length_rx);
+/**
  * @brief Function for preparing a TWI transfer.
  *
  * The following transfer types can be configured (@ref nrfx_twim_xfer_desc_t::type):
