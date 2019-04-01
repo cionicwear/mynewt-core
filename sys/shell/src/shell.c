@@ -436,7 +436,7 @@ shell_exec(int argc, char **argv, struct streamer *streamer)
     return rc;
 }
 
-static void
+void
 shell_process_command(char *line, struct streamer *streamer)
 {
     char *argv[MYNEWT_VAL(SHELL_CMD_ARGC_MAX) + 1];
