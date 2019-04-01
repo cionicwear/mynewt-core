@@ -165,6 +165,13 @@ void shell_evq_set(struct os_eventq *evq);
  */
 int shell_exec(int argc, char **argv, struct streamer *streamer);
 
+/** @brief Process command as though it came from console input
+ *
+ *  @param line ASCIIZ (NUL-terminated) string
+ *  @param streamer              The streamer to send output to.
+ */
+void shell_process_command(char *line, struct streamer *streamer);
+
 #if MYNEWT_VAL(SHELL_NEWTMGR)
 struct os_mbuf;
 typedef int (*shell_nlip_input_func_t)(struct os_mbuf *, void *arg);
