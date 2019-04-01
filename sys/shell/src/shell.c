@@ -370,7 +370,7 @@ get_cb(int argc, char *argv[])
     return NULL;
 }
 
-static void
+void
 shell_process_command(char *line)
 {
     char *argv[MYNEWT_VAL(SHELL_CMD_ARGC_MAX) + 1];

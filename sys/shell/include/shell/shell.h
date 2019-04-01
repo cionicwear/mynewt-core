@@ -101,6 +101,12 @@ void shell_register_default_module(const char *name);
  */
 void shell_evq_set(struct os_eventq *evq);
 
+/** @brief Process command as though it came from console input
+ *
+ *  @param line ASCIIZ (NUL-terminated) string
+ */
+void shell_process_command(char *line);
+
 #if MYNEWT_VAL(SHELL_NEWTMGR)
 struct os_mbuf;
 typedef int (*shell_nlip_input_func_t)(struct os_mbuf *, void *arg);
