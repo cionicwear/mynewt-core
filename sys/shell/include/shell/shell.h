@@ -28,6 +28,12 @@ extern "C" {
 
 struct os_eventq;
 
+/** @brief Callback called when line is entered.
+ *
+ *  @param line NUL-terminated line input
+ */
+typedef void (*shell_line_func_t)(char *line);
+
 /** @brief Callback called when command is entered.
  *
  *  @param argc Number of parameters passed.
@@ -76,6 +82,11 @@ int shell_register(const char *shell_name,
  */
 void shell_register_app_cmd_handler(shell_cmd_func_t handler);
 
+/** @brief Optionally register an app default line handler.
+ *
+ *  @param handler To be called for every line input to the shell.
+ */
+void shell_register_app_line_handler(shell_line_func_t handler);
 /** @brief Callback to get the current prompt.
  *
  *  @returns Current prompt string.

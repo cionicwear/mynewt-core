@@ -34,6 +34,9 @@ static size_t num_of_shell_entities;
 static const char *prompt;
 static int default_module = -1;
 
+void shell_process_command(char *line);
+
+static shell_line_func_t app_line_handler = shell_process_command;
 static shell_cmd_func_t app_cmd_handler;
 static shell_prompt_function_t app_prompt_handler;
 
@@ -428,10 +431,10 @@ shell_process_nlip_line(char *shell_line)
                 shell_line[1] == SHELL_NLIP_DATA_START2) {
             shell_nlip_process(&shell_line[2], shell_line_len - 2);
         } else {
-            shell_process_command(shell_line);
+            app_line_handler(shell_line);
         }
     } else {
-        shell_process_command(shell_line);
+        app_line_handler(shell_line);
     }
 }
 #endif
@@ -455,7 +458,7 @@ shell(struct os_event *ev)
 #if MYNEWT_VAL(SHELL_NEWTMGR)
     shell_process_nlip_line(cmd->line);
 #else
-    shell_process_command(cmd->line);
+    app_line_handler(cmd->line);
 #endif
 
     console_line_event_put(ev);
@@ -852,6 +855,12 @@ completion(char *line, console_append_char_cb append_char)
     return;
 }
 #endif /* MYNEWT_VAL(SHELL_COMPLETION) */
+
+void
+shell_register_app_line_handler(shell_line_func_t handler)
+{
+    app_line_handler = handler;
+}
 
 void
 shell_register_app_cmd_handler(shell_cmd_func_t handler)
