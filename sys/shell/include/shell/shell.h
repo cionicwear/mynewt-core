@@ -34,6 +34,13 @@ struct shell_cmd;
 /** Command IDs in the "shell" newtmgr group. */
 #define SHELL_NMGR_OP_EXEC      0
 
+/** @brief Callback called when line is entered.
+ *
+ *  @param line      NUL-terminated line input
+ *  @param streamer  The streamer to write shell output to.
+ */
+typedef void (*shell_line_func_t)(char *line, struct streamer *streamer);
+
 /** @brief Callback called when command is entered.
  *
  *  @param argc Number of parameters passed.
@@ -128,6 +135,11 @@ int shell_register(const char *shell_name,
  */
 void shell_register_app_cmd_handler(shell_cmd_func_t handler);
 
+/** @brief Optionally register an app default line handler.
+ *
+ *  @param handler To be called for every line input to the shell.
+ */
+void shell_register_app_line_handler(shell_line_func_t handler);
 /** @brief Callback to get the current prompt.
  *
  *  @returns Current prompt string.
