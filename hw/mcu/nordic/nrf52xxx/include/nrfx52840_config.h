@@ -45,7 +45,9 @@
 #endif
 #define NRFX_TWIS_ENABLED 0
 #define NRFX_TWI_ENABLED 0
+#ifndef NRFX_UARTE_ENABLED
 #define NRFX_UARTE_ENABLED 0
+#endif
 #define NRFX_UART_ENABLED 0
 #define NRFX_WDT_ENABLED 0
 
