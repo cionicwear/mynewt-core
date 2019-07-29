@@ -43,7 +43,9 @@
 #ifndef NRFX_TWIM_ENABLED
 #define NRFX_TWIM_ENABLED 0
 #endif
+#ifndef NRFX_TWIS_ENABLED
 #define NRFX_TWIS_ENABLED 0
+#endif
 #define NRFX_TWI_ENABLED 0
 #ifndef NRFX_UARTE_ENABLED
 #define NRFX_UARTE_ENABLED 0
