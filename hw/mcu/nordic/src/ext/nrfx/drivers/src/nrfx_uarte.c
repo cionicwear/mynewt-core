@@ -488,6 +488,14 @@ void nrfx_uarte_tx_abort(nrfx_uarte_t const * p_instance)
 
 void nrfx_uarte_rx_abort(nrfx_uarte_t const * p_instance)
 {
+    uarte_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
+
+    // When using double-buffered RX, we must disable the short before aborting. Otherwise,
+    // we will never receive the RXTO event
+    if (p_cb->rx_secondary_buffer_length) {
+        nrf_uarte_shorts_disable(p_instance->p_reg, NRF_UARTE_SHORT_ENDRX_STARTRX);
+    }
+
     nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPRX);
     NRFX_LOG_INFO("RX transaction aborted.");
 }
@@ -544,6 +552,12 @@ static void uarte_irq_handler(NRF_UARTE_Type *        p_uarte,
         {
             p_cb->rx_buffer_length = 0;
             rx_done_event(p_cb, nrf_uarte_rx_amount_get(p_uarte), p_cb->p_rx_buffer);
+        }
+
+        // When using double-buffered RX, we must clear both receive counts. Otherwise, the next
+        // time we try to do a double-buffered receive the driver will throw an error
+        if (p_cb->rx_secondary_buffer_length != 0) {
+          p_cb->rx_secondary_buffer_length = 0;
         }
     }
 
