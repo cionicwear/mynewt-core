@@ -561,6 +561,20 @@ disk_write(BYTE pdrv, const BYTE* buff, DWORD sector, UINT count)
 DRESULT
 disk_ioctl(BYTE pdrv, BYTE cmd, void* buff)
 {
+    int rc;
+    struct disk_ops *dops;
+
+    dops = dops_from_handle(pdrv);
+    if (dops == NULL) {
+        return STA_NOINIT;
+    }
+
+    rc = dops->ioctl(pdrv, cmd, buff);
+
+    if (rc < 0) {
+        return STA_NOINIT;
+    }
+
     return RES_OK;
 }
 
