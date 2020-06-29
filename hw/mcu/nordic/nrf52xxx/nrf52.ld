@@ -85,7 +85,15 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-
+    .task_stats :
+    {
+        _stask_stats = .;
+        . = ALIGN(4);
+        KEEP(*(.task_stats))
+        . = ALIGN(4);
+        _etask_stats = .;
+    } > FLASH
+    
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
