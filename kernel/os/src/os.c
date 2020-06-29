@@ -26,6 +26,8 @@
 #include "hal/hal_bsp.h"
 #include "hal/hal_watchdog.h"
 
+#include "cionic/task_stats.h"
+
 #if MYNEWT_VAL(RTT)
 #include "rtt/SEGGER_RTT.h"
 #endif
@@ -41,6 +43,10 @@
 
 struct os_task g_idle_task;
 OS_TASK_STACK_DEFINE(g_idle_task_stack, OS_IDLE_STACK_SIZE);
+
+#if MYNEWT_VAL(OS_TASK_STATS)
+static stats_ctx_t idle_stats;
+#endif
 
 uint32_t g_os_idle_ctr;
 
@@ -93,7 +99,9 @@ os_idle_task(void *arg)
 
     sanity_itvl_ticks = (MYNEWT_VAL(SANITY_INTERVAL) * OS_TICKS_PER_SEC) / 1000;
     sanity_last = 0;
-
+#if MYNEWT_VAL(OS_TASK_STATS)
+    idle_stats.is_idle = true;
+#endif
     hal_watchdog_tickle();
 #if MYNEWT_VAL(OS_WATCHDOG_MONITOR)
     os_cputime_timer_stop(&os_wdog_monitor);
@@ -136,11 +144,17 @@ os_idle_task(void *arg)
          * for 'n' ticks.
          */
 
+#if MYNEWT_VAL(OS_TASK_STATS)
+        task_stats_refresh(&g_idle_task, &idle_stats);
+#endif
         os_trace_idle();
         os_tick_idle(iticks);
         OS_EXIT_CRITICAL(sr);
     }
 }
+#if MYNEWT_VAL(OS_TASK_STATS)
+TASK_STATS_REG(cpu, &g_idle_task, &idle_stats)
+#endif
 
 /**
  * Has the operating system started.
