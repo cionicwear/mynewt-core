@@ -85,15 +85,6 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-    .task_stats :
-    {
-        _stask_stats = .;
-        . = ALIGN(4);
-        KEEP(*(.task_stats))
-        . = ALIGN(4);
-        _etask_stats = .;
-    } > FLASH
-    
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
@@ -180,10 +171,17 @@ SECTIONS
     {
         . = ALIGN(4);
         __bss_start__ = .;
-        *(.bss*)
-        *(COMMON)
+
+        _sflog = .;
+        *(.bss.flog)
+        _eflog = .;
         . = ALIGN(4);
+
+        *(.bss.*)
+        *(COMMON)
+
         __bss_end__ = .;
+        . = ALIGN(4);
     } > RAM
 
     /* Heap starts after BSS */
