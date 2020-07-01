@@ -28,6 +28,7 @@ struct os_task *g_current_task;
 
 extern os_time_t g_os_time;
 os_time_t g_os_last_ctx_sw_time;
+uint64_t g_os_high_res_sw_time;
 
 /**
  * os sched insert
@@ -86,6 +87,8 @@ os_sched_ctx_sw_hook(struct os_task *next_t)
     next_t->t_ctx_sw_cnt++;
     g_current_task->t_run_time += g_os_time - g_os_last_ctx_sw_time;
     g_os_last_ctx_sw_time = g_os_time;
+    g_current_task->t_run_time_hr += (hal_dwt_cyccnt_get() - g_os_high_res_sw_time);
+    g_os_high_res_sw_time = hal_dwt_cyccnt_get();
 }
 
 struct os_task *

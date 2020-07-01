@@ -214,6 +214,9 @@ os_init(int (*main_fn)(int argc, char **arg))
 {
     os_error_t err;
 
+    hal_dwt_cyccnt_init();
+    hal_dwt_cyccnt_start();
+
 #if MYNEWT_VAL(RTT)
     memset(&_SEGGER_RTT, 0, sizeof(_SEGGER_RTT));
     SEGGER_RTT_Init();
