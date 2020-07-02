@@ -12,6 +12,7 @@ int hal_dwt_cyccnt_start(void);
 int hal_dwt_cyccnt_stop(void);
 int hal_dwt_cyccnt_reset(void);
 uint64_t hal_dwt_cyccnt_get(void);
+uint64_t hal_dwt_cyccnt_get_us(void);
 
 #ifdef __cplusplus
 }

@@ -20,6 +20,7 @@
 #include <assert.h>
 #include "os/mynewt.h"
 #include "os_priv.h"
+#include "hal/hal_dwt.h"
 
 struct os_task_list g_os_run_list = TAILQ_HEAD_INITIALIZER(g_os_run_list);
 struct os_task_list g_os_sleep_list = TAILQ_HEAD_INITIALIZER(g_os_sleep_list);
@@ -87,8 +88,8 @@ os_sched_ctx_sw_hook(struct os_task *next_t)
     next_t->t_ctx_sw_cnt++;
     g_current_task->t_run_time += g_os_time - g_os_last_ctx_sw_time;
     g_os_last_ctx_sw_time = g_os_time;
-    g_current_task->t_run_time_hr += (hal_dwt_cyccnt_get() - g_os_high_res_sw_time);
-    g_os_high_res_sw_time = hal_dwt_cyccnt_get();
+    g_current_task->t_run_time_hr += hal_dwt_cyccnt_get_us() - g_os_high_res_sw_time;
+    g_os_high_res_sw_time = hal_dwt_cyccnt_get_us();
 }
 
 struct os_task *

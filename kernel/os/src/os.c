@@ -25,6 +25,7 @@
 #include "hal/hal_os_tick.h"
 #include "hal/hal_bsp.h"
 #include "hal/hal_watchdog.h"
+#include "hal/hal_dwt.h"
 
 #if MYNEWT_VAL(RTT)
 #include "rtt/SEGGER_RTT.h"
