@@ -53,9 +53,9 @@ uint64_t hal_dwt_cyccnt_get(void)
     return g_tot_ccnt;
 }
 
-uint64_t hal_dwt_cyccnt_get_us(void)
+uint32_t hal_dwt_cyccnt_get_us(void)
 {
-    uint64_t us = hal_dwt_cyccnt_get() / 64;
+    uint32_t us = hal_dwt_cyccnt_get() / 64;
 
     return us;
 }

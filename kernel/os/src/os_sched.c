@@ -29,7 +29,7 @@ struct os_task *g_current_task;
 
 extern os_time_t g_os_time;
 os_time_t g_os_last_ctx_sw_time;
-uint64_t g_os_high_res_sw_time;
+uint32_t g_os_high_res_sw_time;
 
 /**
  * os sched insert
