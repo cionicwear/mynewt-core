@@ -30,7 +30,9 @@
 #include "rtt/SEGGER_RTT.h"
 #endif
 
+#if MYNEWT_VAL(OS_TASK_STATS)
 #include "cionic/fastlog.h"
+#endif
 
 /**
  * @defgroup OSKernel Operating System Kernel
@@ -137,9 +139,9 @@ os_idle_task(void *arg)
         /* Tell the architecture specific support to put the processor to sleep
          * for 'n' ticks.
          */
-
+#if MYNEWT_VAL(OS_TASK_STATS)
         FASTLOG_TASK(idle, &g_idle_task);
-
+#endif
         os_trace_idle();
         os_tick_idle(iticks);
         OS_EXIT_CRITICAL(sr);
