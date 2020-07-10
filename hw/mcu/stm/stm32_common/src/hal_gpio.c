@@ -829,7 +829,7 @@ hal_gpio_irq_enable(int pin)
     mask = GPIO_MASK(pin);
 
     __HAL_DISABLE_INTERRUPTS(ctx);
-#if MYNEWT_VAL(MCU_STM32L4)
+#if MYNEWT_VAL(MCU_STM32L4) | MYNEWT_VAL(MCU_STM32H7)
     EXTI->IMR1 |= mask;
 #else
     EXTI->IMR |= mask;
@@ -851,8 +851,8 @@ hal_gpio_irq_disable(int pin)
 
     mask = GPIO_MASK(pin);
     __HAL_DISABLE_INTERRUPTS(ctx);
-#if MYNEWT_VAL(MCU_STM32L4)
-    EXTI->IMR1 |= mask;
+#if MYNEWT_VAL(MCU_STM32L4) | MYNEWT_VAL(MCU_STM32H7)
+    EXTI->IMR1 &= ~mask;
 #else
     EXTI->IMR &= ~mask;
 #endif

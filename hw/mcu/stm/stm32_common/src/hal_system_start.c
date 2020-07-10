@@ -45,8 +45,9 @@ hal_system_start(void *img_start)
     jump_addr = base0entry;
     fn = (jump_fn *)jump_addr;
 
+#if !MYNEWT_VAL(MCU_STM32H7)
     STM32_HAL_FLASH_REMAP();
-
+#endif
     /* Jump to image. */
     fn();
 }

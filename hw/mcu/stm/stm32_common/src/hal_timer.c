@@ -52,6 +52,16 @@ struct stm32_hal_tmr stm32_tmr1;
 struct stm32_hal_tmr stm32_tmr2;
 #endif
 
+#if MYNEWT_VAL(MCU_STM32H7)
+#  define TIM15_IT_NUM  TIM15_IRQn
+#  define TIM16_IT_NUM  TIM16_IRQn
+#  define TIM17_IT_NUM  TIM17_IRQn
+#else
+#  define TIM15_IT_NUM  TIM1_BRK_TIM15_IRQn
+#  define TIM16_IT_NUM  TIM1_UP_TIM16_IRQn
+#  define TIM17_IT_NUM  TIM1_TRG_COM_TIM17_IRQn
+#endif
+
 static struct stm32_hal_tmr *stm32_tmr_devs[STM32_HAL_TIMER_MAX] = {
 #if MYNEWT_VAL(TIMER_0)
     &stm32_tmr0,
@@ -264,19 +274,19 @@ stm32_hw_setup(int num, TIM_TypeDef *regs)
 #endif
 #ifdef TIM15
     if (regs == TIM15) {
-        stm32_tmr_reg_irq(TIM1_BRK_TIM15_IRQn, func);
+        stm32_tmr_reg_irq(TIM15_IT_NUM, func);
         __HAL_RCC_TIM15_CLK_ENABLE();
     }
 #endif
 #ifdef TIM16
     if (regs == TIM16) {
-        stm32_tmr_reg_irq(TIM1_UP_TIM16_IRQn, func);
+        stm32_tmr_reg_irq(TIM16_IT_NUM, func);
         __HAL_RCC_TIM16_CLK_ENABLE();
     }
 #endif
 #ifdef TIM17
     if (regs == TIM17) {
-        stm32_tmr_reg_irq(TIM1_TRG_COM_TIM17_IRQn, func);
+        stm32_tmr_reg_irq(TIM16_IT_NUM, func);
         __HAL_RCC_TIM17_CLK_ENABLE();
     }
 #endif

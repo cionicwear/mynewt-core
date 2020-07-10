@@ -16,11 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 #include "hal/hal_watchdog.h"
 #include "mcu/stm32_hal.h"
+#include "os/mynewt.h"
 
 IWDG_HandleTypeDef g_wdt_cfg;
+
+#if MYNEWT_VAL(MCU_STM32H7)
+#  define INSTANCE      IWDG1
+#  define FREEZE        __HAL_DBGMCU_FREEZE_IWDG1
+#else
+#  define INSTANCE      IWDG
+#  define FREEZE        __HAL_DBGMCU_FREEZE_IWDG
+#endif
 
 int
 hal_watchdog_init(uint32_t expire_msecs)
@@ -36,7 +44,7 @@ hal_watchdog_init(uint32_t expire_msecs)
         return -1;
     }
 
-    g_wdt_cfg.Instance = IWDG;
+    g_wdt_cfg.Instance = INSTANCE;
     g_wdt_cfg.Init.Prescaler = IWDG_PRESCALER_256;
     g_wdt_cfg.Init.Reload = reload;
     STM32_HAL_WATCHDOG_CUSTOM_INIT(&g_wdt_cfg);
@@ -47,7 +55,7 @@ hal_watchdog_init(uint32_t expire_msecs)
 void
 hal_watchdog_enable(void)
 {
-    __HAL_DBGMCU_FREEZE_IWDG();
+    FREEZE();
     HAL_IWDG_Init(&g_wdt_cfg);
 }
 
