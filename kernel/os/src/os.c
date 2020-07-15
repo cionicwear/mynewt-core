@@ -25,10 +25,13 @@
 #include "hal/hal_os_tick.h"
 #include "hal/hal_bsp.h"
 #include "hal/hal_watchdog.h"
+#include "hal/hal_dwt.h"
 
 #if MYNEWT_VAL(RTT)
 #include "rtt/SEGGER_RTT.h"
 #endif
+
+#include "cionic/fastlog.h"
 
 /**
  * @defgroup OSKernel Operating System Kernel
@@ -44,7 +47,7 @@ OS_TASK_STACK_DEFINE(g_idle_task_stack, OS_IDLE_STACK_SIZE);
 
 uint32_t g_os_idle_ctr;
 
-static struct os_task os_main_task;
+struct os_task os_main_task;
 OS_TASK_STACK_DEFINE(os_main_stack, OS_MAIN_STACK_SIZE);
 
 #if MYNEWT_VAL(OS_WATCHDOG_MONITOR)
@@ -136,6 +139,8 @@ os_idle_task(void *arg)
          * for 'n' ticks.
          */
 
+        FASTLOG_TASK(idle, &g_idle_task);
+
         os_trace_idle();
         os_tick_idle(iticks);
         OS_EXIT_CRITICAL(sr);
@@ -209,6 +214,9 @@ void
 os_init(int (*main_fn)(int argc, char **arg))
 {
     os_error_t err;
+
+    hal_dwt_cyccnt_init();
+    hal_dwt_cyccnt_start();
 
 #if MYNEWT_VAL(RTT)
     memset(&_SEGGER_RTT, 0, sizeof(_SEGGER_RTT));

@@ -118,6 +118,8 @@ struct os_task {
     os_time_t t_next_wakeup;
     /** Total task run time */
     os_time_t t_run_time;
+    /** Total task run time high resolution */
+    uint32_t t_run_time_hr;
     /**
      * Total number of times this task has been context switched during
      * execution.

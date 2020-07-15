@@ -172,10 +172,17 @@ SECTIONS
     {
         . = ALIGN(4);
         __bss_start__ = .;
-        *(.bss*)
-        *(COMMON)
+
+        _sflog = .;
+        *(.bss.flog)
+        _eflog = .;
         . = ALIGN(4);
+
+        *(.bss.*)
+        *(COMMON)
+
         __bss_end__ = .;
+        . = ALIGN(4);
     } > RAM
 
     /* Heap starts after BSS */
