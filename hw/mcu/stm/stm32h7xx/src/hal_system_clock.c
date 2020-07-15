@@ -29,6 +29,11 @@ hal_system_clock_start(void)
     RCC_OscInitTypeDef osc;
     RCC_ClkInitTypeDef clk;
 
+    // Disable Instruction and Data cache for now, 
+    // as it doesn't seem to be properly handled by mynewt. 
+    SCB_DisableICache();
+    SCB_DisableDCache();
+
     /*!< Supply configuration update enable */
     HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
 
