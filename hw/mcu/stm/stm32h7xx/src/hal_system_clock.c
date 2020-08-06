@@ -83,12 +83,12 @@ hal_system_clock_start(void)
 
     assert(HAL_OK == HAL_RCC_ClockConfig(&clk, FLASH_LATENCY_4));
 
-    periph.PeriphClockSelection = RCC_PERIPHCLK_USART6 | RCC_PERIPHCLK_UART8;
-    periph.PLL2.PLL2M = 5;
-    periph.PLL2.PLL2N = 192;
-    periph.PLL2.PLL2P = 2;
-    periph.PLL2.PLL2Q = 2;
-    periph.PLL2.PLL2R = 2;
+    periph.PeriphClockSelection = RCC_PERIPHCLK_USART6 | RCC_PERIPHCLK_UART8 | RCC_PERIPHCLK_SDMMC;
+    periph.PLL2.PLL2M = 2;
+    periph.PLL2.PLL2N = 16;
+    periph.PLL2.PLL2P = 1;
+    periph.PLL2.PLL2Q = 1;
+    periph.PLL2.PLL2R = 1;
     periph.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_2;
     periph.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
     periph.PLL2.PLL2FRACN = 0;
@@ -100,8 +100,9 @@ hal_system_clock_start(void)
     periph.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
     periph.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
     periph.PLL3.PLL3FRACN = 0;
-    periph.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL2;
-    periph.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL2;
+    periph.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL3;
+    periph.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL3;
+    periph.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL2;
 
     assert(HAL_OK == HAL_RCCEx_PeriphCLKConfig(&periph));
 }
