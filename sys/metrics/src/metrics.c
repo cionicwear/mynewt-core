@@ -81,7 +81,11 @@ metrics_event_init(struct metrics_event_hdr *hdr,
 int
 metrics_event_register(struct metrics_event_hdr *hdr)
 {
+#if MYNEWT_VAL(METRICS_CLI)
     return metrics_cli_register_event(hdr);
+#else
+    return SYS_ENOTSUP;
+#endif
 }
 
 int
@@ -117,18 +121,20 @@ metrics_event_end(struct metrics_event_hdr *hdr)
     int ret;
     int i;
 
+    ret = 0;
+
     if (hdr->log) {
         om = metrics_get_mbuf();
         if (om) {
-            os_mbuf_extend(om, sizeof(struct log_entry_hdr));
-            if (!metrics_event_to_cbor(hdr, om)) {
-                log_append_mbuf_typed(hdr->log, hdr->log_module, hdr->log_level,
-                                      LOG_ETYPE_CBOR, om);
+            ret = metrics_event_to_cbor(hdr, om);
+            if (ret == 0) {
+                ret = log_append_mbuf_body(hdr->log, hdr->log_module,
+                                           hdr->log_level, LOG_ETYPE_CBOR, om);
             } else {
-                ret = -1;
+                os_mbuf_free_chain(om);
             }
         } else {
-            ret = -1;
+            ret = SYS_ENOMEM;
         }
     }
 
@@ -246,8 +252,6 @@ metrics_set_value(struct metrics_event_hdr *hdr, uint8_t metric,
     } else {
         return set_single_value(hdr, metric, val);
     }
-
-    return -1;
 }
 
 int
@@ -259,7 +263,7 @@ metrics_set_single_value(struct metrics_event_hdr *hdr, uint8_t metric, uint32_t
 
     def = &hdr->defs[metric];
     if (def->type & METRICS_TYPE_SERIES_MASK) {
-        return -1;
+        return SYS_EINVAL;
     }
 
     if ((hdr->enabled & (1 << metric)) == 0) {
@@ -278,7 +282,7 @@ metrics_set_series_value(struct metrics_event_hdr *hdr, uint8_t metric, uint32_t
 
     def = &hdr->defs[metric];
     if ((def->type & METRICS_TYPE_SERIES_MASK) == 0) {
-        return -1;
+        return SYS_EINVAL;
     }
 
     if ((hdr->enabled & (1 << metric)) == 0) {
@@ -298,7 +302,7 @@ append_series_u8_to_cbor(CborEncoder *encoder, struct os_mbuf *om)
 
         while (ptr < om->om_data + om->om_len) {
             if (cbor_encode_uint(encoder, *ptr)) {
-                return -1;
+                return SYS_EUNKNOWN;
             }
             ptr += sizeof(uint8_t);
         }
@@ -319,7 +323,7 @@ append_series_s8_to_cbor(CborEncoder *encoder, struct os_mbuf *om)
 
         while (ptr < om->om_data + om->om_len) {
             if (cbor_encode_int(encoder, (int8_t)*ptr)) {
-                return -1;
+                return SYS_EUNKNOWN;
             }
             ptr += sizeof(uint8_t);
         }
@@ -343,7 +347,7 @@ append_series_u16_to_cbor(CborEncoder *encoder, struct os_mbuf *om)
             memcpy(&u16, ptr, sizeof(uint16_t));
             u16 = le16toh(u16);
             if (cbor_encode_uint(encoder, u16)) {
-                return -1;
+                return SYS_EUNKNOWN;
             }
             ptr += sizeof(uint16_t);
         }
@@ -367,7 +371,7 @@ append_series_s16_to_cbor(CborEncoder *encoder, struct os_mbuf *om)
             memcpy(&s16, ptr, sizeof(int16_t));
             s16 = le16toh(s16);
             if (cbor_encode_int(encoder, s16)) {
-                return -1;
+                return SYS_EUNKNOWN;
             }
             ptr += sizeof(int16_t);
         }
@@ -391,7 +395,7 @@ append_series_u32_to_cbor(CborEncoder *encoder, struct os_mbuf *om)
             memcpy(&u32, ptr, sizeof(uint32_t));
             u32 = le32toh(u32);
             if (cbor_encode_uint(encoder, u32)) {
-                return -1;
+                return SYS_EUNKNOWN;
             }
             ptr += sizeof(uint32_t);
         }
@@ -415,7 +419,7 @@ append_series_s32_to_cbor(CborEncoder *encoder, struct os_mbuf *om)
             memcpy(&s32, ptr, sizeof(int32_t));
             s32 = le32toh(s32);
             if (cbor_encode_int(encoder, s32)) {
-                return -1;
+                return SYS_EUNKNOWN;
             }
             ptr += sizeof(int32_t);
         }
@@ -444,7 +448,7 @@ metrics_event_to_cbor(struct metrics_event_hdr *hdr, struct os_mbuf *om)
 
     rc = cbor_encoder_create_map(&encoder, &map, CborIndefiniteLength);
     if (rc != 0) {
-        return -1;
+        return SYS_ENOMEM;
     }
 
     cbor_encode_text_stringz(&map, "ev");
@@ -480,7 +484,7 @@ metrics_event_to_cbor(struct metrics_event_hdr *hdr, struct os_mbuf *om)
 
         rc = cbor_encoder_create_array(&map, &arr, CborIndefiniteLength);
         if (rc != 0) {
-            return -1;
+            return SYS_ENOMEM;
         }
 
         switch (def->type) {
@@ -508,7 +512,7 @@ metrics_event_to_cbor(struct metrics_event_hdr *hdr, struct os_mbuf *om)
 
         rc = cbor_encoder_close_container(&map, &arr);
         if (rc != 0) {
-            return -1;
+            return SYS_ENOMEM;
         }
 
         /*
@@ -524,7 +528,7 @@ metrics_event_to_cbor(struct metrics_event_hdr *hdr, struct os_mbuf *om)
 
     rc = cbor_encoder_close_container(&encoder, &map);
     if (rc != 0) {
-        return -1;
+        return SYS_ENOMEM;
     }
 
     return 0;

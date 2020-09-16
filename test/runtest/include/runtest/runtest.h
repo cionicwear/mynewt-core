@@ -25,8 +25,8 @@
 extern "C" {
 #endif
 
-#define RUNTEST_NMGR_OP_TEST    0
-#define RUNTEST_NMGR_OP_LIST    1
+#define RUNTEST_SMP_OP_TEST    0
+#define RUNTEST_SMP_OP_LIST    1
 
 /* Define the prefix to to add to all test log messages.  If the user's syscfg
  * specifies the `RUNTEST_PREFIX` setting, use that value.  Otherwise, generate
@@ -60,11 +60,6 @@ struct os_eventq *runtest_evq_get(void);
  * Designates the event queue that runtest should use.
  */
 void runtest_evq_set(struct os_eventq *evq);
-
-/**
- * Initializes a new task from the runtest task pool.
- */
-struct os_task *runtest_init_task(os_task_func_t task_handler, uint8_t prio);
 
 /**
  * Enqueues a single test for immediate execution.

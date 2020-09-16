@@ -24,8 +24,9 @@ pkg.homepage: "http://mynewt.apache.org/"
 pkg.keywords:
 
 pkg.deps:
-    - "@apache-mynewt-core/sys/sysinit"
     - "@apache-mynewt-core/sys/sys"
+    - "@apache-mynewt-core/sys/sysdown"
+    - "@apache-mynewt-core/sys/sysinit"
     - "@apache-mynewt-core/util/mem"
 
 pkg.req_apis:
@@ -47,4 +48,4 @@ pkg.deps.OS_CRASH_LOG:
     - "@apache-mynewt-core/sys/reboot"
 
 pkg.init:
-    os_pkg_init: 0
+    os_pkg_init: 'MYNEWT_VAL(OS_SYSINIT_STAGE)'

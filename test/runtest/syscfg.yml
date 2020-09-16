@@ -16,8 +16,6 @@
 # under the License.
 #
 
-# Package: test/runtest
-
 syscfg.defs:
     RUNTEST_LOG:
         description: >
@@ -34,6 +32,9 @@ syscfg.defs:
         value: 0
         restrictions:
             - SHELL_TASK
+    RUNTEST_MGMT:
+        description: 'Enable mgmt command to execute tests'
+        value: 1
     RUNTEST_NEWTMGR:
         description: 'Enable newtmgr command to execute tests'
         value: 1
@@ -43,12 +44,6 @@ syscfg.defs:
             prefix is constructed from the legacy C macros `BUILD_TARGET` and
             `BUILD_TEST`.
         value:
-    RUNTEST_NUM_TASKS:
-        description: 'The number of generic tasks available to unit tests.'
-        value: 4
-    RUNTEST_STACK_SIZE:
-        description: 'The stack size, in words, of each generic test task.'
-        value: 256
     RUNTEST_MAX_TEST_NAME_LEN:
         description: 'The maximum length, in characters, of each test name.'
         value: 32
@@ -58,3 +53,10 @@ syscfg.defs:
             test token is specified by the runtest client and is included in
             test result log entries.
         value: 32
+    RUNTEST_SYSINIT_STAGE:
+        description: >
+            Sysinit stage for runtest functionality.
+        value: 500
+
+syscfg.vals.RUNTEST_NEWTMGR:
+        RUNTEST_MGMT: MYNEWT_VAL(RUNTEST_NEWTMGR)

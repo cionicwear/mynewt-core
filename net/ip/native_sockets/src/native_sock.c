@@ -28,6 +28,7 @@
 #include <sys/ioctl.h>
 #include <sys/un.h>
 #include <stdio.h>
+#include <signal.h>
 
 #include "os/mynewt.h"
 #include "mn_socket/mn_socket.h"
@@ -248,6 +249,15 @@ native_sock_addr_to_mn_addr(struct sockaddr *sa, struct mn_sockaddr *ms)
     return 0;
 }
 
+static void
+native_sock_set_nonblocking(struct native_sock *ns)
+{
+    int rc;
+
+    rc = fcntl(ns->ns_fd, F_SETFL, fcntl(ns->ns_fd, F_GETFL, 0) | O_NONBLOCK);
+    assert(rc == 0);
+}
+
 int
 native_sock_create(struct mn_socket **sp, uint8_t domain,
   uint8_t type, uint8_t proto)
@@ -255,7 +265,6 @@ native_sock_create(struct mn_socket **sp, uint8_t domain,
     struct native_sock_state *nss = &native_sock_state;
     struct native_sock *ns;
     int idx;
-    int rc;
 
     switch (domain) {
     case MN_PF_INET:
@@ -293,13 +302,11 @@ native_sock_create(struct mn_socket **sp, uint8_t domain,
     os_sem_init(&ns->ns_sem, 0);
     idx = socket(domain, type, proto);
 
-    /* Make the socket nonblocking. */
-    rc = fcntl(idx, F_SETFL, fcntl(idx, F_GETFL, 0) | O_NONBLOCK);
-    assert(rc == 0);
-
     ns->ns_fd = idx;
     ns->ns_pf = domain;
     ns->ns_type = type;
+    native_sock_set_nonblocking(ns);
+
     os_mutex_release(&nss->mtx);
     if (idx < 0) {
         return MN_ENOBUFS;
@@ -577,7 +584,6 @@ native_sock_recvfrom(struct mn_socket *s, struct os_mbuf **mp,
         return native_sock_err_to_mn_err(errno);
     }
     if (ns->ns_type == SOCK_STREAM && rc == 0) {
-        mn_socket_readable(&ns->ns_sock, MN_ECONNABORTED);
         ns->ns_poll = 0;
         native_sock_poll_rebuild(&native_sock_state);
         return MN_ECONNABORTED;
@@ -604,14 +610,15 @@ native_sock_getsockopt(struct mn_socket *s, uint8_t level, uint8_t name,
 
 int
 native_sock_setsockopt(struct mn_socket *s, uint8_t level, uint8_t name,
-  void *val)
+                       void *val)
 {
     struct native_sock *ns = (struct native_sock *)s;
     int rc;
     uint32_t val32;
-    struct group_req greq;
-    struct sockaddr_in *sin;
-    struct sockaddr_in6 *sin6;
+    struct ip_mreq ip_mreq;
+    struct ipv6_mreq ipv6_mreq;
+    void *opt;
+    int opt_len;
     struct mn_mreq *mreq;
 
     if (level == MN_SO_LEVEL) {
@@ -619,33 +626,37 @@ native_sock_setsockopt(struct mn_socket *s, uint8_t level, uint8_t name,
         case MN_MCAST_JOIN_GROUP:
         case MN_MCAST_LEAVE_GROUP:
             mreq = val;
-            memset(&greq, 0, sizeof(greq));
-            greq.gr_interface = mreq->mm_idx;
             if (mreq->mm_family == MN_AF_INET) {
-                sin = (struct sockaddr_in *)&greq.gr_group;
-#ifndef MN_LINUX
-                sin->sin_len = sizeof(*sin);
-#endif
-                sin->sin_family = AF_INET;
-                memcpy(&sin->sin_addr, &mreq->mm_addr, sizeof(struct in_addr));
+                memset(&ip_mreq, 0, sizeof(ip_mreq));
+                if (native_sock_itf_addr(mreq->mm_idx,
+                                         &ip_mreq.imr_interface.s_addr)) {
+                    return MN_EADDRNOTAVAIL;
+                }
+                ip_mreq.imr_multiaddr.s_addr = mreq->mm_addr.v4.s_addr;
                 level = IPPROTO_IP;
+                if (name == MN_MCAST_JOIN_GROUP) {
+                    name = IP_ADD_MEMBERSHIP;
+                } else {
+                    name = IP_DROP_MEMBERSHIP;
+                }
+                opt = &ip_mreq;
+                opt_len = sizeof(ip_mreq);
             } else {
-                sin6 = (struct sockaddr_in6 *)&greq.gr_group;
-#ifndef MN_LINUX
-                sin6->sin6_len = sizeof(*sin6);
-#endif
-                sin6->sin6_family = AF_INET6;
-                memcpy(&sin6->sin6_addr, &mreq->mm_addr,
-                  sizeof(struct in6_addr));
+                memset(&ipv6_mreq, 0, sizeof(ipv6_mreq));
+                ipv6_mreq.ipv6mr_interface = mreq->mm_idx;
+                memcpy(&ipv6_mreq.ipv6mr_multiaddr, &mreq->mm_addr,
+                       sizeof(struct in6_addr));
                 level = IPPROTO_IPV6;
+                if (name == MN_MCAST_JOIN_GROUP) {
+                    name = IPV6_JOIN_GROUP;
+                } else {
+                    name = IPV6_LEAVE_GROUP;
+                }
+                opt = &ipv6_mreq;
+                opt_len = sizeof(ipv6_mreq);
             }
 
-            if (name == MN_MCAST_JOIN_GROUP) {
-                name = MCAST_JOIN_GROUP;
-            } else {
-                name = MCAST_LEAVE_GROUP;
-            }
-            rc = setsockopt(ns->ns_fd, level, name, &greq, sizeof(greq));
+            rc = setsockopt(ns->ns_fd, level, name, opt, opt_len);
             if (rc) {
                 return native_sock_err_to_mn_err(errno);
             }
@@ -777,6 +788,8 @@ socket_task(void *arg)
                     }
                     new_ns->ns_type = ns->ns_type;
                     new_ns->ns_sock.ms_ops = &native_sock_ops;
+                    native_sock_set_nonblocking(new_ns);
+
                     os_mutex_release(&nss->mtx);
                     if (mn_socket_newconn(&ns->ns_sock, &new_ns->ns_sock)) {
                         /*
@@ -845,6 +858,8 @@ native_sock_init(void)
     if (i) {
         return -1;
     }
+
+    signal(SIGPIPE, SIG_IGN);
 
     return 0;
 }

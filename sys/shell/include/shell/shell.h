@@ -25,14 +25,20 @@ extern "C" {
 #endif
 
 #include "os/mynewt.h"
+#include "streamer/streamer.h"
 
 struct os_eventq;
+struct streamer;
+struct shell_cmd;
+
+/** Command IDs in the "shell" newtmgr group. */
+#define SHELL_NMGR_OP_EXEC      0
 
 /** @brief Callback called when line is entered.
  *
  *  @param line NUL-terminated line input
  */
-typedef void (*shell_line_func_t)(char *line);
+typedef void (*shell_line_func_t)(char *line, struct streamer *streamer);
 
 /** @brief Callback called when command is entered.
  *
@@ -42,6 +48,21 @@ typedef void (*shell_line_func_t)(char *line);
  * @return 0 in case of success or negative value in case of error.
  */
 typedef int (*shell_cmd_func_t)(int argc, char *argv[]);
+
+/**
+ * @brief Callback for "extended" shell commands.
+ *
+ * @param cmd                   The shell command being executed.
+ * @param argc                  Number of arguments passed.
+ * @param argv                  Array of option strings. First option is always
+ *                                  command name.
+ * @param streamer              The streamer to write shell output to.
+ *
+ * @return                      0 on success; SYS_E[...] on failure.
+ */
+typedef int (*shell_cmd_ext_func_t)(const struct shell_cmd *cmd,
+                                    int argc, char *argv[],
+                                    struct streamer *streamer);
 
 struct shell_param {
     const char *param_name;
@@ -55,8 +76,13 @@ struct shell_cmd_help {
 };
 
 struct shell_cmd {
+    uint8_t sc_ext : 1; /* 1 if this is an extended shell comand. */
+    union {
+        shell_cmd_func_t sc_cmd_func;
+        shell_cmd_ext_func_t sc_cmd_ext_func;
+    };
+
     const char *sc_cmd;
-    shell_cmd_func_t sc_cmd_func;
     const struct shell_cmd_help *help;
 };
 
@@ -64,6 +90,32 @@ struct shell_module {
     const char *name;
     const struct shell_cmd *commands;
 };
+
+#if MYNEWT_VAL(SHELL_CMD_HELP)
+#define SHELL_HELP_(help_) (help_)
+#else
+#define SHELL_HELP_(help_) NULL
+#endif
+
+/**
+ * @brief constructs a legacy shell command.
+ */
+#define SHELL_CMD(cmd_, func_, help_) {         \
+    .sc_ext = 0,                                \
+    .sc_cmd_func = func_,                       \
+    .sc_cmd = cmd_,                             \
+    .help = SHELL_HELP_(help_),                 \
+}
+
+/**
+ * @brief constructs an extended shell command.
+ */
+#define SHELL_CMD_EXT(cmd_, func_, help_) {     \
+    .sc_ext = 1,                                \
+    .sc_cmd_ext_func = func_,                   \
+    .sc_cmd = cmd_,                             \
+    .help = SHELL_HELP_(help_),                 \
+}
 
 /** @brief Register a shell_module object
  *
@@ -116,9 +168,22 @@ void shell_evq_set(struct os_eventq *evq);
  *
  *  @param line ASCIIZ (NUL-terminated) string
  */
-void shell_process_command(char *line);
+void shell_process_command(char *line, struct streamer *streamer);
 
 #if MYNEWT_VAL(SHELL_NEWTMGR)
+/**
+ * @brief Processes a set of arguments and executes their corresponding shell
+ * command.
+ *
+ * @param argc                  The argument count (including command name).
+ * @param argv                  The argument list ([0] is command name).
+ * @param streamer              The streamer to send output to.
+ *
+ * @return                      0 on success; SYS_E[...] on failure.
+ */
+int shell_exec(int argc, char **argv, struct streamer *streamer);
+
+#if MYNEWT_VAL(SHELL_MGMT)
 struct os_mbuf;
 typedef int (*shell_nlip_input_func_t)(struct os_mbuf *, void *arg);
 int shell_nlip_input_register(shell_nlip_input_func_t nf, void *arg);

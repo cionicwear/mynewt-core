@@ -159,6 +159,16 @@ os_arch_in_critical(void)
     return !(read_csr(mstatus) & MSTATUS_MIE);
 }
 
+void
+os_arch_task_return_handler(void)
+{
+    /*
+     * If you are stuck here it means that task finished by
+     * simple return which is not supported.
+     */
+    while (1);
+}
+
 /* assumes stack_top will be 8 aligned */
 
 os_stack_t *
@@ -179,6 +189,8 @@ os_arch_task_stack_init(struct os_task *t, os_stack_t *stack_top, int size)
     /* Set remaining portions of stack frame */
     sf->pc = (uint32_t) t->t_func;
     sf->a0 = (uint32_t) t->t_arg;
+    /* Set function to cache returns from tasks. */
+    sf->ra = (os_stack_t)os_arch_task_return_handler;
 
     return (os_stack_t *) sf;
 }
@@ -226,14 +238,6 @@ os_arch_start(void)
 
     /* Get the highest priority ready to run to set the current task */
     t = os_sched_next_task();
-    /*
-     * First time setup fake os_task struct that only has one pointer for SP
-     * Having that will make context switch function work same for first
-     * and every other time.
-     * This fake SP will be used during initial context switch to store SP
-     * that will never be used.
-     */
-    os_sched_set_current_task(&fake_task);
 
     /* Clean software interrupt, and enable it */
     CLINT_REG(CLINT_MSIP) = 0;
@@ -249,6 +253,15 @@ os_arch_start(void)
 
     /* Perform context switch */
     os_arch_ctx_sw(t);
+
+    /*
+     * First time setup fake os_task struct that only has one pointer for SP
+     * Having that will make context switch function work same for first
+     * and every other time.
+     * This fake SP will be used during initial context switch to store SP
+     * that will never be used.
+     */
+    os_sched_set_current_task(&fake_task);
 
     /* Enable interrupts */
     set_csr(mstatus, MSTATUS_MIE);

@@ -46,22 +46,11 @@ extern uint8_t _ccram_start;
 
 /* LED pins */
 #define LED_BLINK_PIN_1   MCU_GPIO_PORTA(5)
-    
+
 #define LED_BLINK_PIN LED_BLINK_PIN_1
-    
+
 /* Buttons */
 #define BTN_USER_1        MCU_GPIO_PORTC(13)
-
-/* UART ports */
-#define UART_CNT (MYNEWT_VAL(UART_0) + MYNEWT_VAL(UART_1))
-#define UART_0_DEV_ID   0
-#define UART_1_DEV_ID   (UART_0_DEV_ID + MYNEWT_VAL(UART_0))
-
-/* PWM */
-#define PWM_CNT (MYNEWT_VAL(PWM_0) + MYNEWT_VAL(PWM_1) + MYNEWT_VAL(PWM_2))
-#define PWM_0_DEV_ID    0
-#define PWM_1_DEV_ID    (PWM_0_DEV_ID + MYNEWT_VAL(PWM_0))
-#define PWM_2_DEV_ID    (PWM_1_DEV_ID + MYNEWT_VAL(PWM_1))
 
 /* This defines the maximum NFFS areas (block) are in the BSPs NFS file 
  * system space.  This in conjunction with flash map determines how 
@@ -70,6 +59,38 @@ extern uint8_t _ccram_start;
  * your max is less than the number of sectors then the NFFS will combine
  * multiple sectors into an NFFS area */
 #define NFFS_AREA_MAX    (8)
+
+/* Arduino pins */
+#define ARDUINO_PIN_D0      MCU_GPIO_PORTA(3)
+#define ARDUINO_PIN_D1      MCU_GPIO_PORTA(2)
+#define ARDUINO_PIN_D2      MCU_GPIO_PORTA(10)
+#define ARDUINO_PIN_D3      MCU_GPIO_PORTB(3)
+#define ARDUINO_PIN_D4      MCU_GPIO_PORTB(5)
+#define ARDUINO_PIN_D5      MCU_GPIO_PORTB(4)
+#define ARDUINO_PIN_D6      MCU_GPIO_PORTB(10)
+#define ARDUINO_PIN_D7      MCU_GPIO_PORTA(8)
+#define ARDUINO_PIN_D8      MCU_GPIO_PORTA(9)
+#define ARDUINO_PIN_D9      MCU_GPIO_PORTC(7)
+#define ARDUINO_PIN_D10     MCU_GPIO_PORTB(6)
+#define ARDUINO_PIN_D11     MCU_GPIO_PORTA(7)
+#define ARDUINO_PIN_D12     MCU_GPIO_PORTA(6)
+#define ARDUINO_PIN_D13     MCU_GPIO_PORTA(5)
+#define ARDUINO_PIN_A0      MCU_GPIO_PORTA(0)
+#define ARDUINO_PIN_A1      MCU_GPIO_PORTA(1)
+#define ARDUINO_PIN_A2      MCU_GPIO_PORTA(4)
+#define ARDUINO_PIN_A3      MCU_GPIO_PORTB(0)
+#define ARDUINO_PIN_A4      MCU_GPIO_PORTC(1)
+#define ARDUINO_PIN_A5      MCU_GPIO_PORTC(0)
+
+#define ARDUINO_PIN_RX      ARDUINO_PIN_D0
+#define ARDUINO_PIN_TX      ARDUINO_PIN_D1
+
+#define ARDUINO_PIN_SCL     MCU_GPIO_PORTB(8)
+#define ARDUINO_PIN_SDA     MCU_GPIO_PORTB(9)
+
+#define ARDUINO_PIN_SCK     ARDUINO_PIN_D13
+#define ARDUINO_PIN_MOSI    ARDUINO_PIN_D11
+#define ARDUINO_PIN_MISO    ARDUINO_PIN_D12
 
 #ifdef __cplusplus
 }

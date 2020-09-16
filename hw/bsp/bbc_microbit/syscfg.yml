@@ -17,8 +17,6 @@
 # under the License.
 #
 
-# Package: hw/bsp/bbc_microbit
-
 syscfg.defs:
     BSP_NRF51:
         description: 'Set to indicate that BSP has NRF51'
@@ -100,7 +98,7 @@ syscfg.defs:
         description: 'Use Segger JLINK OBE firmware'
         value: 0
 
-syscfg.defs.BLE_LP_CLOCK:
+syscfg.defs.BLE_CONTROLLER:
     TIMER_0:
         value: 0
     TIMER_3:
@@ -113,11 +111,11 @@ syscfg.vals:
     COREDUMP_FLASH_AREA: FLASH_AREA_IMAGE_1
     XTAL_32768_SYNTH: 1
 
-syscfg.vals.BLE_LP_CLOCK:
+syscfg.vals.BLE_CONTROLLER:
     OS_CPUTIME_FREQ: 32768
     OS_CPUTIME_TIMER_NUM: 3
     # need to keep HFXO running all the time to have accurate 32k synthesized clock
-    BLE_XTAL_SETTLE_TIME: 0
+    BLE_LL_RFMGMT_ENABLE_TIME: 0
     # synthesized 32k clock has 250ppm accuracy
     BLE_LL_OUR_SCA: 250
     BLE_LL_MASTER_SCA: 1

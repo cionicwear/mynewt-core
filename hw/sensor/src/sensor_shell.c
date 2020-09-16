@@ -37,35 +37,34 @@
 #include "sensor/pressure.h"
 #include "sensor/humidity.h"
 #include "sensor/gyro.h"
+#include "sensor/voltage.h"
+#include "sensor/current.h"
 #include "console/console.h"
 #include "shell/shell.h"
 #include "hal/hal_i2c.h"
 #include "parse/parse.h"
 
-static struct os_event g_sensor_shell_read_ev;
 static int sensor_cmd_exec(int, char **);
 static struct shell_cmd shell_sensor_cmd = {
     .sc_cmd = "sensor",
     .sc_cmd_func = sensor_cmd_exec
 };
 
-struct os_sem g_sensor_shell_sem;
-struct hal_timer g_sensor_shell_timer;
-uint32_t sensor_shell_timer_arg = 0xdeadc0de;
-
 struct sensor_poll_data {
     int spd_nsamples;
     int spd_poll_itvl;
     int spd_poll_duration;
-    int spd_poll_delay;
-    int64_t spd_duration;
-    int64_t spd_start_ts;
+
     struct sensor *spd_sensor;
     sensor_type_t spd_sensor_type;
+
     bool spd_read_in_progress;
+    struct os_event spd_read_ev;
+    struct hal_timer spd_read_timer;
+    uint32_t spd_read_start_ticks;
+    uint32_t spd_read_next_msecs_off;
 };
 
-static int g_sensor_shell_num_entries;
 static struct sensor_poll_data g_spd;
 
 static void
@@ -110,6 +109,8 @@ sensor_cmd_display_type(char **argv)
     int rc;
     struct sensor *sensor;
     unsigned int type;
+
+    rc = 0;
 
     /* Look up sensor by name */
     sensor = sensor_mgr_find_next_bydevname(argv[2], NULL);
@@ -178,6 +179,12 @@ sensor_cmd_display_type(char **argv)
                 break;
             case SENSOR_TYPE_COLOR:
                 console_printf("    color: 0x%x\n", type);
+                break;
+            case SENSOR_TYPE_VOLTAGE:
+                console_printf("    voltage: 0x%x\n", type);
+                break;
+            case SENSOR_TYPE_CURRENT:
+                console_printf("    current: 0x%x\n", type);
                 break;
             case SENSOR_TYPE_USER_DEFINED_1:
                 console_printf("    user defined 1: 0x%x\n", type);
@@ -256,9 +263,9 @@ sensor_shell_read_listener(struct sensor *sensor, void *arg, void *data,
     struct sensor_press_data *spd;
     struct sensor_humid_data *shd;
     struct sensor_gyro_data *sgd;
+    struct sensor_voltage_data *svd;
+    struct sensor_current_data *scud;
     char tmpstr[13];
-
-    ++g_sensor_shell_num_entries;
 
     console_printf("ts: [ secs: %ld usecs: %d cputime: %u ]\n",
                    (long int)sensor->s_sts.st_ostv.tv_sec,
@@ -425,142 +432,168 @@ sensor_shell_read_listener(struct sensor *sensor, void *arg, void *data,
         console_printf("\n");
     }
 
+    if (type == SENSOR_TYPE_VOLTAGE) {
+        svd = (struct sensor_voltage_data *)data;
+        if (svd->svd_voltage_is_valid) {
+            console_printf("voltage = %sV",
+                           sensor_ftostr(svd->svd_voltage, tmpstr, 13));
+        }
+        console_printf("\n");
+    }
+
+    if (type == SENSOR_TYPE_CURRENT) {
+        scud = (struct sensor_current_data *)data;
+        if (scud->scd_current_is_valid) {
+            console_printf("current = %sA",
+                           sensor_ftostr(scud->scd_current, tmpstr, 13));
+        }
+        console_printf("\n");
+    }
+
     return (0);
-}
-
-/* Check for number of samples */
-static int
-sensor_shell_chk_nsamples(struct sensor_poll_data *spd)
-{
-    /* Condition for number of samples */
-    if (spd->spd_nsamples && g_sensor_shell_num_entries >= spd->spd_nsamples) {
-        os_cputime_timer_stop(&g_sensor_shell_timer);
-        return 0;
-    }
-
-    return -1;
-}
-
-/*
- * Incrementing duration based on interval if specified or
- * os_time if interval is not specified and checking duration
- */
-static int
-sensor_shell_polling_done(struct sensor_poll_data *spd, int64_t *duration,
-                          int64_t *start_ts)
-{
-
-    if (spd->spd_poll_duration) {
-        if (spd->spd_poll_itvl) {
-            *duration += spd->spd_poll_itvl * 1000;
-        } else {
-            if (!*start_ts) {
-                *start_ts = os_get_uptime_usec();
-            } else {
-                *duration = os_get_uptime_usec() - *start_ts;
-            }
-        }
-
-        if (*duration >= spd->spd_poll_duration * 1000) {
-            os_cputime_timer_stop(&g_sensor_shell_timer);
-            console_printf("Sensor polling done\n");
-            return 0;
-        }
-    }
-
-    return -1;
 }
 
 static void
 sensor_shell_read_ev_cb(struct os_event *ev)
 {
-    struct sensor_poll_data *spd;
+    uint32_t next_tick;
     int rc;
 
-    if (!ev->ev_arg) {
-        goto done;
-    }
-
-    spd = ev->ev_arg;
-    rc = sensor_read(spd->spd_sensor, spd->spd_sensor_type,
+    rc = sensor_read(g_spd.spd_sensor, g_spd.spd_sensor_type,
                      sensor_shell_read_listener, (void *)SENSOR_IGN_LISTENER,
                      OS_TIMEOUT_NEVER);
     if (rc) {
         console_printf("Cannot read sensor\n");
-        g_spd.spd_read_in_progress = false;
-        goto done;
+        goto stop;
     }
 
-    /* Check number of samples if provided */
-    if (!sensor_shell_chk_nsamples(spd)) {
-        g_spd.spd_read_in_progress = false;
-        goto done;
+    /* If number of samples were provided, check if we should still read */
+    if (g_spd.spd_nsamples && (--g_spd.spd_nsamples == 0)) {
+        goto stop;
     }
 
-    /* Check duration if provided */
-    if (!sensor_shell_polling_done(spd, &spd->spd_start_ts,
-                                   &spd->spd_duration)) {
-        g_spd.spd_read_in_progress = false;
-        goto done;
+    /* Calculate next read time (it should be in future so skip missed ones) */
+    do {
+        g_spd.spd_read_next_msecs_off += g_spd.spd_poll_itvl;
+
+        if (g_spd.spd_poll_duration &&
+            (g_spd.spd_read_next_msecs_off > g_spd.spd_poll_duration)) {
+            goto stop;
+        }
+
+        next_tick = g_spd.spd_read_start_ticks +
+                    os_cputime_usecs_to_ticks(g_spd.spd_read_next_msecs_off * 1000);
+    } while (next_tick <= os_cputime_get32());
+
+    rc = os_cputime_timer_start(&g_spd.spd_read_timer, next_tick);
+    if (!rc) {
+        return;
     }
 
-    os_cputime_timer_relative(&g_sensor_shell_timer, sensor_shell_timer_arg);
+    console_printf("Failed to setup read timer\n");
+    /* fall through */
 
-done:
-    return;
+stop:
+    g_spd.spd_read_in_progress = false;
+    os_cputime_timer_stop(&g_spd.spd_read_timer);
+
+    console_printf("Reading done\n");
 }
 
-void
-sensor_shell_timer_cb(void *arg)
-{
-    g_sensor_shell_read_ev.ev_arg = arg;
-    g_sensor_shell_read_ev.ev_cb  = sensor_shell_read_ev_cb;
-    os_eventq_put(os_eventq_dflt_get(), &g_sensor_shell_read_ev);
-}
-
-/* os cputime timer configuration and initialization */
 static void
-sensor_shell_config_timer(struct sensor_poll_data *spd)
+sensor_shell_read_timer_cb(void *arg)
 {
-    sensor_shell_timer_arg = spd->spd_poll_itvl * 1000;
-
-    os_cputime_timer_init(&g_sensor_shell_timer, sensor_shell_timer_cb,
-                          spd);
-
-    os_cputime_timer_relative(&g_sensor_shell_timer, sensor_shell_timer_arg);
+    os_eventq_put(os_eventq_dflt_get(), &g_spd.spd_read_ev);
 }
 
 static int
-sensor_cmd_read(char *name, sensor_type_t type, struct sensor_poll_data *spd)
+sensor_cmd_read(char **argv, int argc)
 {
-    int rc;
+    char *sensor_name;
+    sensor_type_t type;
+    int i;
 
-    rc = SYS_EOK;
+    if (argc < 2) {
+        /* Need at least sensor name and type */
+        console_printf("Too few arguments: %d\n", argc);
+        goto usage;
+    }
+
+    g_spd.spd_nsamples = 0;
+    g_spd.spd_poll_itvl = 0;
+    g_spd.spd_poll_duration = 0;
+
+    sensor_name = argv[0];
+    type = strtol(argv[1], NULL, 0);
+
+    for (i = 2; i < argc; i++) {
+        if (argv[i][0] != '-' || strlen(argv[i]) != 2) {
+            console_printf("Invalid parameter '%s'\n", argv[i]);
+            goto usage;
+        }
+
+        if (argc - i < 2) {
+            console_printf("Missing parameter for '%s'\n", argv[i]);
+            goto usage;
+        }
+
+        switch (argv[i][1]) {
+        case 'n':
+            g_spd.spd_nsamples = atoi(argv[++i]);
+            break;
+        case 'i':
+            g_spd.spd_poll_itvl = atoi(argv[++i]);
+            break;
+        case 'd':
+            g_spd.spd_poll_duration = atoi(argv[++i]);
+            break;
+        default:
+            console_printf("Unknown option '%s'\n", argv[i]);
+            goto usage;
+        }
+    }
+
+    if (!g_spd.spd_nsamples && !g_spd.spd_poll_itvl && !g_spd.spd_poll_duration) {
+        /* Just read single sample by default */
+        g_spd.spd_nsamples = 1;
+    }
+
+    if ((g_spd.spd_nsamples > 1) && !g_spd.spd_poll_itvl) {
+        console_printf("Need to specify poll interval if num_samples > 0\n");
+        goto usage;
+    }
 
     /* Look up sensor by name */
-    spd->spd_sensor = sensor_mgr_find_next_bydevname(name, NULL);
-    if (!spd->spd_sensor) {
-        console_printf("Sensor %s not found!\n", name);
+    g_spd.spd_sensor = sensor_mgr_find_next_bydevname(sensor_name, NULL);
+    if (!g_spd.spd_sensor) {
+        console_printf("Sensor %s not found!\n", sensor_name);
+        return SYS_ENOENT;
     }
 
-    if (!(type & spd->spd_sensor->s_types)) {
-        rc = SYS_EINVAL;
+    if (!(type & g_spd.spd_sensor->s_types)) {
         /* Directly return without trying to unregister */
-        console_printf("Read req for wrng type 0x%x from selected sensor: %s\n",
-                       (int)type, name);
-        return rc;
+        console_printf("Read request for wrong type 0x%x from selected sensor: %s\n",
+                       (int)type, sensor_name);
+        return SYS_EINVAL;
     }
 
-    spd->spd_sensor_type = type;
-    if (spd->spd_poll_itvl) {
-        sensor_shell_config_timer(spd);
-    }
+    g_spd.spd_sensor_type = type;
 
-    g_sensor_shell_num_entries = 0;
-    return rc;
+    /* Start 1st read immediately */
+    g_spd.spd_read_next_msecs_off = 0;
+    g_spd.spd_read_start_ticks = os_cputime_get32();
+    sensor_shell_read_timer_cb(NULL);
+
+    return 0;
+
+usage:
+    console_printf("Usage: sensor read <sensor_name> <type> "
+                   "[-n num_samples] [-i poll_interval(ms)] [-d poll_duration(ms)]\n");
+
+    return SYS_EINVAL;
 }
 
-int
+static int
 sensor_one_tap_notif(struct sensor *sensor, void *data,
                      sensor_event_type_t type)
 {
@@ -576,7 +609,7 @@ static struct sensor_notifier one_tap = {
     .sn_arg = NULL,
 };
 
-int
+static int
 sensor_double_tap_notif(struct sensor *sensor, void *data,
                         sensor_event_type_t type)
 {
@@ -590,6 +623,160 @@ static struct sensor_notifier double_tap = {
     .sn_func = sensor_double_tap_notif,
     .sn_arg = NULL,
 };
+
+
+static int
+sensor_wakeup_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("wakeup happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier wakeup = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_WAKEUP,
+    .sn_func = sensor_wakeup_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_free_fall_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("free fall happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier free_fall = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_FREE_FALL,
+    .sn_func = sensor_free_fall_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_orient_change_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("orient change happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier orient_change = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_ORIENT_CHANGE,
+    .sn_func = sensor_orient_change_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_sleep_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("sleep happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier sensor_sleep = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_SLEEP,
+    .sn_func = sensor_sleep_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_orient_xl_change_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("orient x l change happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier orient_xl_change = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_ORIENT_X_L_CHANGE,
+    .sn_func = sensor_orient_xl_change_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_orient_yl_change_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("orient y l change happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier orient_yl_change = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_ORIENT_Y_L_CHANGE,
+    .sn_func = sensor_orient_yl_change_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_orient_zl_change_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("orient z l change happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier orient_zl_change = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_ORIENT_Z_L_CHANGE,
+    .sn_func = sensor_orient_zl_change_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_orient_xh_change_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("orient x h change happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier orient_xh_change = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_ORIENT_X_H_CHANGE,
+    .sn_func = sensor_orient_xh_change_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_orient_yh_change_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("orient y h change happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier orient_yh_change = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_ORIENT_Y_H_CHANGE,
+    .sn_func = sensor_orient_yh_change_notif,
+    .sn_arg = NULL,
+};
+
+static int
+sensor_orient_zh_change_notif(struct sensor *sensor, void *data,
+                  sensor_event_type_t type)
+{
+    console_printf("orient z h change happend\n");
+
+    return 0;
+};
+
+static struct sensor_notifier orient_zh_change = {
+    .sn_sensor_event_type = SENSOR_EVENT_TYPE_ORIENT_Z_H_CHANGE,
+    .sn_func = sensor_orient_zh_change_notif,
+    .sn_arg = NULL,
+};
+
+
+
 
 static int
 sensor_cmd_notify(char *name, bool on, char *type_string)
@@ -608,6 +795,26 @@ sensor_cmd_notify(char *name, bool on, char *type_string)
         type = SENSOR_EVENT_TYPE_SINGLE_TAP;
     } else if (!strcmp(type_string, "double")) {
         type = SENSOR_EVENT_TYPE_DOUBLE_TAP;
+    } else if (!strcmp(type_string, "wakeup")) {
+        type = SENSOR_EVENT_TYPE_WAKEUP;
+    } else if (!strcmp(type_string, "freefall")) {
+        type = SENSOR_EVENT_TYPE_FREE_FALL;
+    } else if (!strcmp(type_string, "orient")) {
+        type = SENSOR_EVENT_TYPE_ORIENT_CHANGE;
+    } else if (!strcmp(type_string, "sleep")) {
+        type = SENSOR_EVENT_TYPE_SLEEP;
+    } else if (!strcmp(type_string, "orient_xl")) {
+        type = SENSOR_EVENT_TYPE_ORIENT_X_L_CHANGE;
+    } else if (!strcmp(type_string, "orient_yl")) {
+        type = SENSOR_EVENT_TYPE_ORIENT_Y_L_CHANGE;
+    } else if (!strcmp(type_string, "orient_zl")) {
+        type = SENSOR_EVENT_TYPE_ORIENT_Z_L_CHANGE;
+    } else if (!strcmp(type_string, "orient_xh")) {
+        type = SENSOR_EVENT_TYPE_ORIENT_X_H_CHANGE;
+    } else if (!strcmp(type_string, "orient_yh")) {
+        type = SENSOR_EVENT_TYPE_ORIENT_Y_H_CHANGE;
+    } else if (!strcmp(type_string, "orient_zh")) {
+        type = SENSOR_EVENT_TYPE_ORIENT_Z_H_CHANGE;
     } else {
         return 1;
     }
@@ -627,6 +834,77 @@ sensor_cmd_notify(char *name, bool on, char *type_string)
                  goto done;
             }
         }
+        if (type == SENSOR_EVENT_TYPE_WAKEUP) {
+            rc = sensor_unregister_notifier(sensor, &wakeup);
+            if (rc) {
+                 console_printf("Could not unregister wakeup\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_FREE_FALL) {
+            rc = sensor_unregister_notifier(sensor, &free_fall);
+            if (rc) {
+                 console_printf("Could not unregister free fall\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_ORIENT_CHANGE) {
+            rc = sensor_unregister_notifier(sensor, &orient_change);
+            if (rc) {
+                 console_printf("Could not unregister orient change\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_SLEEP) {
+            rc = sensor_unregister_notifier(sensor, &sensor_sleep);
+            if (rc) {
+                 console_printf("Could not unregister sleep\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_ORIENT_X_H_CHANGE) {
+            rc = sensor_unregister_notifier(sensor, &orient_xh_change);
+            if (rc) {
+                 console_printf("Could not unregister orient change pos x\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_ORIENT_Y_H_CHANGE) {
+            rc = sensor_unregister_notifier(sensor, &orient_yh_change);
+            if (rc) {
+                 console_printf("Could not unregister orient change pos y\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_ORIENT_Z_H_CHANGE) {
+            rc = sensor_unregister_notifier(sensor, &orient_zh_change);
+            if (rc) {
+                 console_printf("Could not unregister orient change pos z\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_ORIENT_X_L_CHANGE) {
+            rc = sensor_unregister_notifier(sensor, &orient_xl_change);
+            if (rc) {
+                 console_printf("Could not unregister orient change neg x\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_ORIENT_Y_L_CHANGE) {
+            rc = sensor_unregister_notifier(sensor, &orient_yl_change);
+            if (rc) {
+                 console_printf("Could not unregister orient change neg y\n");
+                 goto done;
+            }
+        }
+        if (type == SENSOR_EVENT_TYPE_ORIENT_Z_L_CHANGE) {
+            rc = sensor_unregister_notifier(sensor, &orient_zl_change);
+            if (rc) {
+                 console_printf("Could not unregister orient change neg z\n");
+                 goto done;
+            }
+        }
+
         goto done;
     }
 
@@ -646,6 +924,80 @@ sensor_cmd_notify(char *name, bool on, char *type_string)
         }
     }
 
+    if (type == SENSOR_EVENT_TYPE_WAKEUP) {
+        rc = sensor_register_notifier(sensor, &wakeup);
+        if (rc) {
+             console_printf("Could not register wakeup\n");
+             goto done;
+        }
+    }
+
+    if (type == SENSOR_EVENT_TYPE_FREE_FALL) {
+        rc = sensor_register_notifier(sensor, &free_fall);
+        if (rc) {
+             console_printf("Could not register free fall\n");
+             goto done;
+        }
+    }
+
+    if (type == SENSOR_EVENT_TYPE_ORIENT_CHANGE) {
+        rc = sensor_register_notifier(sensor, &orient_change);
+        if (rc) {
+            console_printf("Could not register orient change\n");
+            goto done;
+        }
+    }
+
+    if (type == SENSOR_EVENT_TYPE_SLEEP) {
+        rc = sensor_register_notifier(sensor, &sensor_sleep);
+        if (rc) {
+             console_printf("Could not register sleep\n");
+             goto done;
+        }
+    }
+    if (type == SENSOR_EVENT_TYPE_ORIENT_X_H_CHANGE) {
+        rc = sensor_register_notifier(sensor, &orient_xh_change);
+        if (rc) {
+             console_printf("Could not register orient change pos x\n");
+             goto done;
+        }
+    }
+    if (type == SENSOR_EVENT_TYPE_ORIENT_Y_H_CHANGE) {
+        rc = sensor_register_notifier(sensor, &orient_yh_change);
+        if (rc) {
+             console_printf("Could not register orient change pos y\n");
+             goto done;
+        }
+    }
+    if (type == SENSOR_EVENT_TYPE_ORIENT_Z_H_CHANGE) {
+        rc = sensor_register_notifier(sensor, &orient_zh_change);
+        if (rc) {
+             console_printf("Could not register orient change pos z\n");
+             goto done;
+        }
+    }
+    if (type == SENSOR_EVENT_TYPE_ORIENT_X_L_CHANGE) {
+        rc = sensor_register_notifier(sensor, &orient_xl_change);
+        if (rc) {
+             console_printf("Could not register orient change neg x\n");
+             goto done;
+        }
+    }
+    if (type == SENSOR_EVENT_TYPE_ORIENT_Y_L_CHANGE) {
+        rc = sensor_register_notifier(sensor, &orient_yl_change);
+        if (rc) {
+             console_printf("Could not register orient change neg y\n");
+             goto done;
+        }
+    }
+    if (type == SENSOR_EVENT_TYPE_ORIENT_Z_L_CHANGE) {
+        rc = sensor_register_notifier(sensor, &orient_zl_change);
+        if (rc) {
+             console_printf("Could not register orient change neg z\n");
+             goto done;
+        }
+    }
+
 done:
     return rc;
 }
@@ -655,7 +1007,6 @@ sensor_cmd_exec(int argc, char **argv)
 {
     char *subcmd;
     int rc = 0;
-    int i;
 
     if (argc <= 1) {
         sensor_display_help();
@@ -672,37 +1023,12 @@ sensor_cmd_exec(int argc, char **argv)
             goto done;
         }
 
-        if (argc < 6) {
-            console_printf("Too few arguments: %d\n"
-                           "Usage: sensor read <sensor_name> <type>"
-                           "[-n nsamples] [-i poll_itvl(ms)] [-d poll_duration(ms)]\n",
-                           argc - 2);
-            rc = SYS_EINVAL;
-            goto done;
-        }
-
-        i = 4;
-        memset(&g_spd, 0, sizeof(struct sensor_poll_data));
-        if (argv[i] && !strcmp(argv[i], "-n")) {
-            g_spd.spd_nsamples = atoi(argv[++i]);
-            i++;
-        }
-        if (argv[i] && !strcmp(argv[i], "-i")) {
-            g_spd.spd_poll_itvl = atoi(argv[++i]);
-            i++;
-        }
-        if (argv[i] && !strcmp(argv[i], "-d")) {
-            g_spd.spd_poll_duration = atoi(argv[++i]);
-            i++;
-        }
-
-        rc = sensor_cmd_read(argv[2], (sensor_type_t) strtol(argv[3], NULL, 0), &g_spd);
+        rc = sensor_cmd_read(argv + 2, argc - 2);
         if (rc) {
             goto done;
         }
 
         g_spd.spd_read_in_progress = true;
-
     } else if (!strcmp(argv[1], "type")) {
         rc = sensor_cmd_display_type(argv);
         if (rc) {
@@ -711,7 +1037,8 @@ sensor_cmd_exec(int argc, char **argv)
     } else if (!strcmp(argv[1], "notify")) {
         if (argc < 3) {
             console_printf("Too few arguments: %d\n"
-                           "Usage: sensor notify <sensor_name> <on/off> <single/double>",
+                           "Usage: sensor notify <sensor_name> <on/off> "
+                           "<single/double/wakeup/freefall/orient/sleep/orient_xl/orient_yl/orient_zl/orient_xh/orient_yh/orient_zh>",
                            argc - 2);
             rc = SYS_EINVAL;
             goto done;
@@ -720,14 +1047,20 @@ sensor_cmd_exec(int argc, char **argv)
         rc = sensor_cmd_notify(argv[2], !strcmp(argv[3], "on"), argv[4]);
         if (rc) {
             console_printf("Too few arguments: %d\n"
-                           "Usage: sensor notify <sensor_name> <on/off> <single/double>",
+                           "Usage: sensor notify <sensor_name> <on/off> "
+                           "<single/double/wakeup/freefall/orient/sleep/orient_xl/orient_yl/orient_zl/orient_xh/orient_yh/orient_zh>",
                            argc - 2);
            goto done;
         }
-
     } else if (!strcmp(argv[1], "read_stop")) {
-        os_cputime_timer_stop(&g_sensor_shell_timer);
-        console_printf("Stop read\n");
+        if (!g_spd.spd_read_in_progress) {
+            console_printf("No read in progress\n");
+            rc = SYS_EINVAL;
+            goto done;
+        }
+
+        console_printf("Reading stopped\n");
+        os_cputime_timer_stop(&g_spd.spd_read_timer);
         g_spd.spd_read_in_progress = false;
     } else {
         console_printf("Unknown sensor command %s\n", subcmd);
@@ -743,6 +1076,10 @@ done:
 int
 sensor_shell_register(void)
 {
+    memset(&g_spd, 0, sizeof(g_spd));
+    g_spd.spd_read_ev.ev_cb  = sensor_shell_read_ev_cb;
+    os_cputime_timer_init(&g_spd.spd_read_timer, sensor_shell_read_timer_cb, NULL);
+
     shell_cmd_register((struct shell_cmd *) &shell_sensor_cmd);
 
     return (0);

@@ -30,6 +30,7 @@
 
 /* Indicates whether the previous line of output was completed. */
 int console_is_midline;
+uint8_t g_is_output_nlip;
 
 #define CONSOLE_NLIP_PKT_START1 (6)
 #define CONSOLE_NLIP_PKT_START2 (9)
@@ -56,10 +57,13 @@ static int echo = MYNEWT_VAL(CONSOLE_ECHO);
 static uint8_t cur, end;
 static struct os_eventq *avail_queue;
 static struct os_eventq *lines_queue;
-bool g_silence_console;
+bool g_console_silence;
+bool g_console_silence_non_nlip;
+bool g_console_ignore_non_nlip;
+static struct os_mutex console_write_lock;
 
 int __attribute__((weak))
-console_out(int c)
+console_out_nolock(int c)
 {
     return c;
 }
@@ -70,16 +74,113 @@ console_echo(int on)
     echo = on;
 }
 
+int
+console_lock(int timeout)
+{
+    int rc = OS_OK;
+
+    /* Locking from isr while some task own mutex fails with OS_EBUSY */
+    if (os_arch_in_isr()) {
+        if (os_mutex_get_level(&console_write_lock)) {
+            rc = OS_EBUSY;
+        }
+        goto end;
+    }
+
+    rc = os_mutex_pend(&console_write_lock, timeout);
+    if (rc == OS_NOT_STARTED) {
+        /* No need to block before system start make it OK */
+        rc = OS_OK;
+    }
+
+end:
+    return rc;
+}
+
+int
+console_unlock(void)
+{
+    int rc = OS_OK;
+
+    if (os_arch_in_isr()) {
+        goto end;
+    }
+
+    rc = os_mutex_release(&console_write_lock);
+    assert(rc == OS_OK || rc == OS_NOT_STARTED);
+end:
+    return rc;
+}
+
+int
+console_out(int c)
+{
+    int rc;
+    const os_time_t timeout =
+            os_time_ms_to_ticks32(MYNEWT_VAL(CONSOLE_DEFAULT_LOCK_TIMEOUT));
+
+    if (console_lock(timeout) != OS_OK) {
+        return c;
+    }
+    rc = console_out_nolock(c);
+
+    (void)console_unlock();
+
+    return rc;
+}
+
+void
+console_prompt_set(const char *prompt, const char *line)
+{
+    console_write(prompt, strlen(prompt));
+    if (line) {
+        console_write(line, strlen(line));
+    }
+}
+
 void
 console_write(const char *str, int cnt)
 {
     int i;
+    const os_time_t timeout =
+            os_time_ms_to_ticks32(MYNEWT_VAL(CONSOLE_DEFAULT_LOCK_TIMEOUT));
+
+    if (console_lock(timeout) != OS_OK) {
+        return;
+    }
+
+    if (cnt >= 2 && str[0] == CONSOLE_NLIP_DATA_START1 &&
+        str[1] == CONSOLE_NLIP_DATA_START2) {
+        g_is_output_nlip = 1;
+    }
+
+    /* From the shell the first byte is always \n followed by the
+     * actual pkt start bytes, hence checking byte 1 and 2
+     */
+    if (cnt >= 3 && str[1] == CONSOLE_NLIP_PKT_START1 &&
+        str[2] == CONSOLE_NLIP_PKT_START2) {
+        g_is_output_nlip = 1;
+    }
+
+
+    /* If the byte string is non nlip and we are silencing non nlip bytes,
+     * do not let it go out on the console
+     */ 
+    if (!g_is_output_nlip && g_console_silence_non_nlip) {
+        goto done;
+    }
 
     for (i = 0; i < cnt; i++) {
-        if (console_out((int)str[i]) == EOF) {
+        if (console_out_nolock((int)str[i]) == EOF) {
             break;
         }
     }
+
+done:
+    if (cnt > 0 && str[cnt - 1] == '\n') {
+        g_is_output_nlip = 0;
+    }
+    (void)console_unlock();
 }
 
 #if MYNEWT_VAL(CONSOLE_COMPAT)
@@ -273,7 +374,8 @@ console_handle_char(uint8_t byte)
     }
 
     /* Ignore characters if there's no more buffer space */
-    if (cur + end < sizeof(input->line) - 1) {
+    if ((cur + end < sizeof(input->line) - 1) &&
+        (!g_console_ignore_non_nlip)) {
         insert_char(&input->line[cur], byte, end);
     }
     return 0;

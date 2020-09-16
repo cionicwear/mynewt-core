@@ -16,92 +16,52 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <stddef.h>
 #include <assert.h>
-#include "os/mynewt.h"
 
-#if MYNEWT_VAL(UART_0)
-/*
- * It is necessary to include uart/uart.h before stm32fxx_hal_uart.h gets included
- * due to a name conflict for UART_PARITY_NONE.
- */
-#include <uart/uart.h>
-#include <uart_hal/uart_hal.h>
-#endif
+#include "bsp/bsp.h"
+#include "os/mynewt.h"
 
 #include <hal/hal_bsp.h>
 #include <hal/hal_flash_int.h>
-#include <hal/hal_gpio.h>
-#include <hal/hal_i2c.h>
 #include <hal/hal_system.h>
 
-#if MYNEWT_VAL(SPI_0_MASTER) || MYNEWT_VAL(SPI_0_SLAVE) || \
-    MYNEWT_VAL(SPI_1_MASTER) || MYNEWT_VAL(SPI_1_SLAVE)
-#include <hal/hal_spi.h>
+#include <stm32f3xx.h>
+#include <stm32_common/stm32_hal.h>
+
+#if MYNEWT_VAL(LSM303DLHC_ONB)
+#include "lsm303dlhc/lsm303dlhc.h"
+static struct lsm303dlhc lsm303dlhc;
 #endif
 
-#include <stm32f3xx.h>
-#include <stm32f3xx_hal.h>
-#include "mcu/stm32f3_bsp.h"
-#include "mcu/stm32f3xx_mynewt_hal.h"
-#include "mcu/stm32_hal.h"
-
-#include "bsp/bsp.h"
-#include "mcu/mcu.h"
-#include "os/os_cputime.h"
+#if MYNEWT_VAL(LSM303DLHC_ONB)
+static struct sensor_itf i2c_0_itf = {
+    .si_type = SENSOR_ITF_I2C,
+    .si_num = 0,
+    .si_addr = 0, /* sensor config function sets the addresses */
+};
+#endif
 
 #if MYNEWT_VAL(UART_0)
-static struct uart_dev hal_uart[1];
-
-static const struct stm32_uart_cfg uart_cfg[1] = {
-    {
-        .suc_uart    = USART1,
-        .suc_rcc_reg = &RCC->APB2ENR,
-        .suc_rcc_dev = RCC_APB2ENR_USART1EN,
-        .suc_pin_tx  = MCU_GPIO_PORTA(9),
-        .suc_pin_rx  = MCU_GPIO_PORTA(10),
-        .suc_pin_rts = -1,
-        .suc_pin_cts = -1,
-        .suc_pin_af  = GPIO_AF7_USART1,
-        .suc_irqn    = USART1_IRQn,
-    },
-};
-
-const struct stm32_uart_cfg *
-bsp_uart_config(int port)
-{
-    assert(port == 0);
-    return &uart_cfg[port];
-}
-#endif
-
-#if MYNEWT_VAL(SPI_0_MASTER) || MYNEWT_VAL(SPI_0_SLAVE)
-struct stm32_hal_spi_cfg spi0_cfg = {
-    .ss_pin   = MCU_GPIO_PORTA(4),
-    .sck_pin  = MCU_GPIO_PORTA(5),
-    .miso_pin = MCU_GPIO_PORTA(6),
-    .mosi_pin = MCU_GPIO_PORTA(7),
-    .irq_prio = 2,
-};
-#endif
-
-#if MYNEWT_VAL(SPI_1_MASTER) || MYNEWT_VAL(SPI_1_SLAVE)
-struct stm32_hal_spi_cfg spi1_cfg = {
-    .ss_pin   = MCU_GPIO_PORTB(12),
-    .sck_pin  = MCU_GPIO_PORTB(13),
-    .miso_pin = MCU_GPIO_PORTB(14),
-    .mosi_pin = MCU_GPIO_PORTB(15),
-    .irq_prio = 2,
+const struct stm32_uart_cfg os_bsp_uart0_cfg = {
+    .suc_uart = USART1,
+    .suc_rcc_reg = &RCC->APB2ENR,
+    .suc_rcc_dev = RCC_APB2ENR_USART1EN,
+    .suc_pin_tx = MYNEWT_VAL(UART_0_PIN_TX),
+    .suc_pin_rx = MYNEWT_VAL(UART_0_PIN_RX),
+    .suc_pin_rts = MYNEWT_VAL(UART_0_PIN_RTS),
+    .suc_pin_cts = MYNEWT_VAL(UART_0_PIN_CTS),
+    .suc_pin_af = GPIO_AF7_USART1,
+    .suc_irqn = USART1_IRQn,
 };
 #endif
 
 #if MYNEWT_VAL(I2C_0)
-static struct stm32_hal_i2c_cfg i2c_cfg0 = {
+const struct stm32_hal_i2c_cfg os_bsp_i2c0_cfg = {
     .hic_i2c = I2C1,
     .hic_rcc_reg = &RCC->APB1ENR,
     .hic_rcc_dev = RCC_APB1ENR_I2C1EN,
-    .hic_pin_sda = MCU_GPIO_PORTB(9),
-    .hic_pin_scl = MCU_GPIO_PORTB(8),
+    .hic_pin_sda = MYNEWT_VAL(I2C_0_PIN_SDA),
+    .hic_pin_scl = MYNEWT_VAL(I2C_0_PIN_SCL),
     .hic_pin_af = GPIO_AF4_I2C1,
     .hic_10bit = 0,
     .hic_timingr = 0x10420F13,    /* 100KHz at 8MHz of SysCoreClock */
@@ -119,6 +79,7 @@ static const struct hal_bsp_mem_dump dump_cfg[] = {
     }
 };
 
+extern const struct hal_flash stm32_flash_dev;
 const struct hal_flash *
 hal_bsp_flash_dev(uint8_t id)
 {
@@ -128,7 +89,7 @@ hal_bsp_flash_dev(uint8_t id)
     if (id != 0) {
         return NULL;
     }
-    return stm32f3_flash_dev();
+    return &stm32_flash_dev;
 }
 
 const struct hal_bsp_mem_dump *
@@ -154,63 +115,61 @@ hal_bsp_get_nvic_priority(int irq_num, uint32_t pri)
     return pri;
 }
 
+/**
+ * LSM303DLHC sensor default configuration
+ *
+ * @return 0 on success, non-zero on failure
+ */
+void
+config_lsm303dlhc_sensor(void)
+{
+#if MYNEWT_VAL(LSM303DLHC_ONB)
+    int rc;
+    struct os_dev *dev;
+    struct lsm303dlhc_cfg lsmcfg;
+
+    dev = (struct os_dev *) os_dev_open("lsm303dlhc_0", OS_TIMEOUT_NEVER, NULL);
+    assert(dev != NULL);
+
+    /* read once per sec.  API should take this value in ms. */
+    lsmcfg.accel_rate = LSM303DLHC_ACCEL_RATE_1;
+    lsmcfg.accel_range = LSM303DLHC_ACCEL_RANGE_2;
+    /* Device I2C addr for accelerometer */
+    lsmcfg.acc_addr = LSM303DLHC_ADDR_ACCEL;
+    /* Device I2C addr for magnetometer */
+    lsmcfg.mag_addr = LSM303DLHC_ADDR_MAG;
+    /* Set default mag gain to +/-1.3 gauss */
+    lsmcfg.mag_gain = LSM303DLHC_MAG_GAIN_1_3;
+    /* Set default mag sample rate to 15Hz */
+    lsmcfg.mag_rate = LSM303DLHC_MAG_RATE_15;
+
+    lsmcfg.mask = SENSOR_TYPE_ACCELEROMETER |
+                  SENSOR_TYPE_MAGNETIC_FIELD;
+
+    rc = lsm303dlhc_config((struct lsm303dlhc *)dev, &lsmcfg);
+    assert(rc == 0);
+
+    os_dev_close(dev);
+#endif
+}
+
+static void
+sensor_dev_create(void)
+{
+    int rc;
+    (void)rc;
+
+#if MYNEWT_VAL(LSM303DLHC_ONB)
+    rc = os_dev_create((struct os_dev *)&lsm303dlhc, "lsm303dlhc_0",
+                       OS_DEV_INIT_PRIMARY, 0, lsm303dlhc_init,
+                       (void *)&i2c_0_itf);
+    assert(rc == 0);
+#endif
+}
 
 void
 hal_bsp_init(void)
 {
-    int rc;
-    (void)rc;  /* in case there are no devices declared */
-
-    hal_system_clock_start();
-
-#if MYNEWT_VAL(UART_0)
-    rc = os_dev_create((struct os_dev *)&hal_uart[0], UART_DEV_NAME,
-            OS_DEV_INIT_PRIMARY, 0, uart_hal_init, (void *)&uart_cfg[0]);
-    assert(rc == 0);
-#endif
-
-#if MYNEWT_VAL(I2C_0)
-    rc = hal_i2c_init(0, &i2c_cfg0);
-    assert(rc == 0);
-#endif
-
-#if MYNEWT_VAL(TIMER_0)
-    rc = hal_timer_init(0, TIM15);
-    assert(rc == 0);
-#endif
-
-#if MYNEWT_VAL(TIMER_1)
-    rc = hal_timer_init(1, TIM16);
-    assert(rc == 0);
-#endif
-
-#if MYNEWT_VAL(TIMER_2)
-    rc = hal_timer_init(2, TIM17);
-    assert(rc == 0);
-#endif
-
-#if MYNEWT_VAL(SPI_0_MASTER)
-    rc = hal_spi_init(0, &spi0_cfg, HAL_SPI_TYPE_MASTER);
-    assert(rc == 0);
-#endif
-
-#if MYNEWT_VAL(SPI_0_SLAVE)
-    rc = hal_spi_init(0, &spi0_cfg, HAL_SPI_TYPE_SLAVE);
-    assert(rc == 0);
-#endif
-
-#if MYNEWT_VAL(SPI_1_MASTER)
-    rc = hal_spi_init(1, &spi1_cfg, HAL_SPI_TYPE_MASTER);
-    assert(rc == 0);
-#endif
-
-#if MYNEWT_VAL(SPI_1_SLAVE)
-    rc = hal_spi_init(1, &spi1_cfg, HAL_SPI_TYPE_SLAVE);
-    assert(rc == 0);
-#endif
-
-#if (MYNEWT_VAL(OS_CPUTIME_TIMER_NUM) >= 0)
-    rc = os_cputime_init(MYNEWT_VAL(OS_CPUTIME_FREQ));
-    assert(rc == 0);
-#endif
+    stm32_periph_create();
+    sensor_dev_create();
 }

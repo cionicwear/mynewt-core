@@ -2,7 +2,7 @@
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * resarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
@@ -23,13 +23,19 @@
 
 #include <os/mynewt.h>
 #include <console/console.h>
-#include <hal/hal_i2c.h>
 #include <mcu/nrf52_hal.h>
 #include <hal/hal_gpio.h>
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+#include "bus/drivers/i2c_common.h"
+#else
+#include "hal/hal_i2c.h"
+#include "i2cn/i2cn.h"
+#endif
 #include <adp5061/adp5061.h>
 #include <bsp/bsp.h>
+#if MYNEWT_VAL(ADP5061_USE_CHARGE_CONTROL)
 #include <charge-control/charge_control.h>
-#include <i2cn/i2cn.h>
+#endif
 #include "adp5061_priv.h"
 
 /**
@@ -58,6 +64,7 @@ static const struct adp5061_config default_config = {
     .iend = 0x01,
 };
 
+#if MYNEWT_VAL(ADP5061_USE_CHARGE_CONTROL)
 #if MYNEWT_VAL(ADP5061_INT_PIN) >= 0
 /**
 * ADP5061 interrupt handler CB
@@ -93,6 +100,7 @@ static void
 adp5061_isr(void *arg){
     os_eventq_put(os_eventq_dflt_get(), &interrupt_handler);
 }
+#endif
 #endif
 
 static int
@@ -139,6 +147,7 @@ adp5061_set_config(struct adp5061_dev *dev,
     return rc;
 }
 
+#if !MYNEWT_VAL(BUS_DRIVER_PRESENT)
 /**
  * Lock access to the charge_control_itf specified by cci. Blocks until lock acquired.
  *
@@ -186,11 +195,17 @@ adp5061_itf_unlock(struct charge_control_itf *cci)
 
     os_mutex_release(cci->cci_lock);
 }
+#endif
 
 int
 adp5061_get_reg(struct adp5061_dev *dev, uint8_t addr, uint8_t *value)
 {
-    int rc = 0;
+    int rc;
+
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_node_simple_write_read_transact((struct os_dev *)&dev->a_node,
+                                             &addr, 1, value, 1);
+#else
     uint8_t payload;
     struct hal_i2c_master_data data_struct = {
         .address = dev->a_chg_ctrl.cc_itf.cci_addr,
@@ -219,6 +234,7 @@ adp5061_get_reg(struct adp5061_dev *dev, uint8_t addr, uint8_t *value)
 
 err:
     adp5061_itf_unlock(&dev->a_chg_ctrl.cc_itf);
+#endif
 
     return rc;
 }
@@ -226,8 +242,12 @@ err:
 int
 adp5061_set_reg(struct adp5061_dev *dev, uint8_t addr, uint8_t value)
 {
-    int rc = 0;
+    int rc;
     uint8_t payload[2] = { addr, value };
+
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_node_simple_write((struct os_dev *)&dev->a_node, payload, 2);
+#else
     struct hal_i2c_master_data data_struct = {
         .address = dev->a_chg_ctrl.cc_itf.cci_addr,
         .len = 2,
@@ -243,6 +263,7 @@ adp5061_set_reg(struct adp5061_dev *dev, uint8_t addr, uint8_t value)
             MYNEWT_VAL(ADP5061_I2C_TIMEOUT_TICKS), 1, MYNEWT_VAL(ADP5061_I2C_RETRIES));
 
     adp5061_itf_unlock(&dev->a_chg_ctrl.cc_itf);
+#endif
 
     return rc;
 }
@@ -251,19 +272,23 @@ int
 adp5061_set_regs(struct adp5061_dev *dev, uint8_t addr,
         const uint8_t *values, int count)
 {
-    int rc = 0;
-    int i;
     uint8_t payload[1 + count];
-    struct hal_i2c_master_data data_struct = {
-        .address = dev->a_chg_ctrl.cc_itf.cci_addr,
-        .len = count + 1,
-        .buffer = payload
-    };
+    int i;
+    int rc;
 
     payload[0] = addr;
     for (i = 0; i < count; ++i) {
         payload[i + 1] = values[i];
     }
+
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_node_simple_write((struct os_dev *)&dev->a_node, payload, count + 1);
+#else
+    struct hal_i2c_master_data data_struct = {
+        .address = dev->a_chg_ctrl.cc_itf.cci_addr,
+        .len = count + 1,
+        .buffer = payload
+    };
 
     rc = ad5061_itf_lock(&dev->a_chg_ctrl.cc_itf, OS_TIMEOUT_NEVER);
     if (rc) {
@@ -274,6 +299,7 @@ adp5061_set_regs(struct adp5061_dev *dev, uint8_t addr,
             MYNEWT_VAL(ADP5061_I2C_TIMEOUT_TICKS), 1, MYNEWT_VAL(ADP5061_I2C_RETRIES));
 
     adp5061_itf_unlock(&dev->a_chg_ctrl.cc_itf);
+#endif
 
     return rc;
 }
@@ -404,6 +430,7 @@ adp5061_enable_int(struct adp5061_dev *dev, uint8_t mask)
     return adp5061_set_reg(dev, REG_INT_EN, mask);
 }
 
+#if MYNEWT_VAL(ADP5061_USE_CHARGE_CONTROL)
 static int
 adp5061_chg_ctrl_read(struct charge_control *cc, charge_control_type_t type,
         charge_control_data_func_t data_func, void *data_arg, uint32_t timeout)
@@ -579,13 +606,15 @@ static const struct charge_control_driver g_adp5061_chg_ctrl_driver = {
     .ccd_enable = adp5061_chg_ctrl_enable,
     .ccd_disable = adp5061_chg_ctrl_disable,
 };
+#endif /* ADP5061_USE_CHARGE_CONTROL */
 
 int
 adp5061_init(struct os_dev *dev, void *arg)
 {
     struct adp5061_dev *adp5061 = (struct adp5061_dev *)dev;
+#if MYNEWT_VAL(ADP5061_USE_CHARGE_CONTROL)
     struct charge_control *cc;
-    struct charge_control_itf *cci;
+#endif
     const struct adp5061_config *cfg;
     uint8_t device_id;
     int rc;
@@ -595,16 +624,17 @@ adp5061_init(struct os_dev *dev, void *arg)
         goto err;
     }
 
+#if MYNEWT_VAL(ADP5061_USE_CHARGE_CONTROL)
     cc = &adp5061->a_chg_ctrl;
-
-    cci = (struct charge_control_itf *)arg;
 
     rc = charge_control_init(cc, dev);
     if (rc) {
         goto err;
     }
 
-    charge_control_set_interface(cc, cci);
+#if !MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    charge_control_set_interface(cc, (struct charge_control_itf *)arg);
+#endif
 
     /* Add the driver with all the supported types */
     rc = charge_control_set_driver(cc, CHARGE_CONTROL_TYPE_STATUS,
@@ -615,6 +645,7 @@ adp5061_init(struct os_dev *dev, void *arg)
 
     charge_control_set_type_mask(cc,
             CHARGE_CONTROL_TYPE_STATUS | CHARGE_CONTROL_TYPE_FAULT);
+#endif /* ADP5061_USE_CHARGE_CONTROL */
 
     cfg = &default_config;
 
@@ -637,10 +668,13 @@ adp5061_init(struct os_dev *dev, void *arg)
         goto err;
     }
 
+#if MYNEWT_VAL(ADP5061_USE_CHARGE_CONTROL)
     rc = charge_control_mgr_register(cc);
     if (rc) {
         goto err;
     }
+#endif /* ADP5061_USE_CHARGE_CONTROL */
+
 #if MYNEWT_VAL(ADP5061_CLI)
     adp5061_shell_init(adp5061);
 #endif
@@ -649,3 +683,29 @@ adp5061_init(struct os_dev *dev, void *arg)
 err:
     return rc;
 }
+
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+static void
+init_node_cb(struct bus_node *bnode, void *arg)
+{
+    assert(arg == NULL);
+
+    adp5061_init((struct os_dev *)bnode, NULL);
+}
+
+int
+adp5061_create_i2c_dev(struct bus_i2c_node *node, const char *name,
+                       const struct bus_i2c_node_cfg *cfg)
+{
+    struct bus_node_callbacks cbs = {
+        .init = init_node_cb,
+    };
+    int rc;
+
+    bus_node_set_callbacks((struct os_dev *)node, &cbs);
+
+    rc = bus_i2c_node_create(name, node, cfg, NULL);
+
+    return rc;
+}
+#endif

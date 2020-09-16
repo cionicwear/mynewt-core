@@ -410,6 +410,9 @@ oc_ri_invoke_coap_entity_handler(struct coap_packet_rx *request,
   oc_response_buffer_t response_buffer;
   oc_response_t response_obj;
   struct os_mbuf *m = NULL;
+#ifdef OC_SERVER
+  int rc;
+#endif
 
   response_buffer.buffer = NULL;
   response_buffer.block_offset = offset;
@@ -552,37 +555,38 @@ oc_ri_invoke_coap_entity_handler(struct coap_packet_rx *request,
 
   if (bad_request) {
     if (!m) {
-        OC_LOG(ERROR, "ocri: No bufs\n");
+        OC_LOG_ERROR("ocri: No bufs\n");
         response_buffer.code = oc_status_code(OC_STATUS_SERVICE_UNAVAILABLE);
     } else {
-        OC_LOG(ERROR, "ocri: Bad request\n");
+        OC_LOG_ERROR("ocri: Bad request\n");
         /* Return a 4.00 response */
         response_buffer.code = oc_status_code(OC_STATUS_BAD_REQUEST);
     }
     success = false;
   } else if (!cur_resource) {
-    OC_LOG(ERROR, "ocri: Could not find resource\n");
+    OC_LOG_ERROR("ocri: Could not find resource\n");
     /* Return a 4.04 response if the requested resource was not found */
     response_buffer.response_length = 0;
     response_buffer.code = oc_status_code(OC_STATUS_NOT_FOUND);
     success = false;
   } else if (!method_impl) {
-    OC_LOG(ERROR, "ocri: Could not find method\n");
+    OC_LOG_ERROR("ocri: Could not find method\n");
     /* Return a 4.05 response if the resource does not implement the
      * request method.
      */
     response_buffer.response_length = 0;
     response_buffer.code = oc_status_code(OC_STATUS_METHOD_NOT_ALLOWED);
     success = false;
-  }
-  else if (!authorized) {
-    OC_LOG(ERROR, "ocri: Subject not authorized\n");
+  } else if (!authorized) {
+    OC_LOG_ERROR("ocri: Subject not authorized\n");
     /* If the requestor (subject) does not have access granted via an
      * access control entry in the ACL, then it is not authorized to
      * access the resource. A 4.03 response is sent.
      */
     response_buffer.response_length = 0;
     response_buffer.code = oc_status_code(OC_STATUS_FORBIDDEN);
+    success = false;
+  } else if (response_buffer.code >= BAD_REQUEST_4_00) {
     success = false;
   }
 
@@ -598,35 +602,33 @@ oc_ri_invoke_coap_entity_handler(struct coap_packet_rx *request,
        * requesting client as an observer.
        */
       if (observe == 0) {
-        if (coap_observe_handler(request, response, cur_resource, endpoint) ==
-            0) {
+        rc = coap_observe_handler(request, response, cur_resource, endpoint);
+        if (rc >= 0) {
+          coap_set_header_observe(response, 0);
+        }
+        if (rc == 0) {
           /* If the resource is marked as periodic observable it means
            * it must be polled internally for updates (which would lead to
            * notifications being sent). If so, add the resource to a list of
            * periodic GET callbacks to utilize the framework's internal
            * polling mechanism.
            */
-          bool set_observe_option = true;
           if (cur_resource->properties & OC_PERIODIC) {
-              os_callout_reset(&cur_resource->callout,
+            os_callout_reset(&cur_resource->callout,
                 (cur_resource->observe_period_mseconds * OS_TICKS_PER_SEC)/1000);
           }
-
-          if (set_observe_option) {
-            coap_set_header_observe(response, 0);
-          }
         }
-      }
-      /* If the observe option is set to 1, make an attempt to remove
-       * the requesting client from the list of observers. In addition,
-       * remove the resource from the list periodic GET callbacks if it
-       * is periodic observable.
-       */
-      else if (observe == 1) {
-        if (coap_observe_handler(request, response, cur_resource, endpoint) >
-            0) {
-          if (cur_resource->properties & OC_PERIODIC) {
-              os_callout_stop(&cur_resource->callout);
+      } else if (observe == 1) {
+        /* If the observe option is set to 1, make an attempt to remove
+         * the requesting client from the list of observers. In addition,
+         * remove the resource from the list periodic GET callbacks if it
+         * is periodic observable, and this was the only observer.
+         */
+        rc = coap_observe_handler(request, response, cur_resource, endpoint);
+        if (rc > 0) {
+          if (!cur_resource->num_observers &&
+              cur_resource->properties & OC_PERIODIC) {
+            os_callout_stop(&cur_resource->callout);
           }
         }
       }
@@ -894,7 +896,8 @@ oc_ri_alloc_client_cb(const char *uri, oc_server_handle_t *server,
     cb->discovery = false;
     cb->timestamp = oc_clock_time();
     cb->observe_seq = -1;
-    memcpy(&cb->server, server, sizeof(oc_server_handle_t));
+
+    memcpy(&cb->server, server, oc_endpoint_size(&server->endpoint));
 
     os_callout_init(&cb->callout, oc_evq_get(), oc_ri_remove_cb, cb);
 

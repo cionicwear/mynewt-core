@@ -47,6 +47,8 @@ typedef void (*nrf52_spi_irq_handler_t)(void);
  * 3) Dont think I need dummy_rx as I can set master RX maxcnt to zero.
  */
 
+/* The maximum number of SPI interfaces we will allow */
+#define NRF52_HAL_SPI_MAX (4)
 
 /* Used to disable all interrupts */
 #define NRF_SPI_IRQ_DISABLE_ALL 0xFFFFFFFF
@@ -70,6 +72,8 @@ struct nrf52_hal_spi
     uint8_t spi_xfr_flag;   /* Master only */
     uint8_t dummy_rx;       /* Master only */
     uint8_t slave_state;    /* Slave only */
+    uint16_t nhs_buflen;
+    uint16_t nhs_bytes_txd;
     struct hal_spi_settings spi_cfg; /* Slave and master */
 
     /* Pointer to HW registers */
@@ -81,10 +85,9 @@ struct nrf52_hal_spi
     /* IRQ number */
     IRQn_Type irq_num;
 
-    uint8_t *nhs_txbuf;         /* Pointer to TX buffer */
-    uint8_t *nhs_rxbuf;         /* Pointer to RX buffer */
-    uint16_t nhs_buflen;        /* Length of buffer */
-    uint16_t nhs_bytes_txq;     /* Number of bytes queued for TX */
+    /* Pointers to tx/rx buffers */
+    uint8_t *nhs_txbuf;
+    uint8_t *nhs_rxbuf;
 
     /* Callback and arguments */
     hal_spi_txrx_cb txrx_cb_func;
@@ -100,8 +103,46 @@ struct nrf52_hal_spi nrf52_hal_spi1;
 #if MYNEWT_VAL(SPI_2_MASTER)  || MYNEWT_VAL(SPI_2_SLAVE)
 struct nrf52_hal_spi nrf52_hal_spi2;
 #endif
-#if MYNEWT_VAL(SPI_3_MASTER)  /* SPI3 can only be used as SPIM */
+#if MYNEWT_VAL(SPI_3_MASTER)
 struct nrf52_hal_spi nrf52_hal_spi3;
+
+static uint32_t m_anomaly_198_preserved_value;
+static void
+anomaly_198_enable(uint8_t const * p_buffer, size_t buf_len)
+{
+    uint32_t buffer_end_addr;
+    uint32_t block_addr;
+    uint32_t block_flag;
+    uint32_t occupied_blocks;
+    m_anomaly_198_preserved_value = *((volatile uint32_t *)0x40000E00);
+
+    if (buf_len == 0) {
+        return;
+    }
+    buffer_end_addr = ((uint32_t)p_buffer) + buf_len;
+    block_addr      = ((uint32_t)p_buffer) & ~0x1FFF;
+    block_flag      = (1UL << ((block_addr >> 13) & 0xFFFF));
+    occupied_blocks = 0;
+
+    if (block_addr >= 0x20010000) {
+        occupied_blocks = (1UL << 8);
+    } else {
+        do {
+            occupied_blocks |= block_flag;
+            block_flag <<= 1;
+            block_addr  += 0x2000;
+        } while ((block_addr < buffer_end_addr) && (block_addr < 0x20012000));
+    }
+
+    *((volatile uint32_t *)0x40000E00) = occupied_blocks;
+}
+
+static void
+anomaly_198_disable(void)
+{
+    *((volatile uint32_t *)0x40000E00) = m_anomaly_198_preserved_value;
+}
+
 #endif
 
 static const struct nrf52_hal_spi *nrf52_hal_spis[NRF52_HAL_SPI_MAX] = {
@@ -120,12 +161,10 @@ static const struct nrf52_hal_spi *nrf52_hal_spis[NRF52_HAL_SPI_MAX] = {
 #else
     NULL,
 #endif
-#ifdef NRF52840_XXAA 
 #if MYNEWT_VAL(SPI_3_MASTER)
     &nrf52_hal_spi3,
 #else
     NULL,
-#endif
 #endif
 };
 
@@ -146,59 +185,41 @@ nrf52_irqm_handler(struct nrf52_hal_spi *spi)
 {
     NRF_SPIM_Type *spim;
     uint16_t xfr_bytes;
-    uint16_t next_len;
+    uint16_t len;
 
     spim = spi->nhs_spi.spim;
-
-    /* Should not occur but if no transfer just leave  */
-    if (spi->spi_xfr_flag == 0) {
-        return;
-    }
-
-    if ((spim->EVENTS_STARTED) && (spim->INTENSET & SPIM_INTENSET_STARTED_Msk)) {
-        spim->EVENTS_STARTED = 0;
-
-        xfr_bytes = spim->TXD.MAXCNT;
-        spi->nhs_bytes_txq += xfr_bytes;
-
-        if (spi->nhs_bytes_txq < spi->nhs_buflen) {
-            spi->nhs_txbuf += xfr_bytes;
-
-            next_len = min(SPIM_TXD_MAXCNT_MAX,
-                           spi->nhs_buflen - spi->nhs_bytes_txq);
-
-            spim->TXD.PTR = (uint32_t)spi->nhs_txbuf;
-            spim->TXD.MAXCNT = next_len;
-
-            /* If no RX buffer was provided, we already set it to dummy one */
-            if (spi->nhs_rxbuf) {
-                spi->nhs_rxbuf += xfr_bytes;
-                spim->RXD.PTR = (uint32_t)spi->nhs_rxbuf;
-                spim->RXD.MAXCNT = next_len;
-            }
-
-            spim->SHORTS |= SPIM_SHORTS_END_START_Msk;
-            spim->INTENSET = SPIM_INTENSET_STARTED_Msk;
-            spim->INTENCLR = SPIM_INTENSET_END_Msk;
-        } else {
-            spim->SHORTS &= ~SPIM_SHORTS_END_START_Msk;
-            spim->INTENSET = SPIM_INTENSET_END_Msk;
-            spim->INTENCLR = SPIM_INTENSET_STARTED_Msk;
-        }
-    }
-
     if (spim->EVENTS_END) {
         spim->EVENTS_END = 0;
 
-        if (spim->INTENSET & SPIM_INTENSET_END_Msk) {
+        /* Should not occur but if no transfer just leave  */
+        if (spi->spi_xfr_flag == 0) {
+            return;
+        }
+
+        /* Are there more bytes to send? */
+        xfr_bytes = spim->TXD.AMOUNT;
+        spi->nhs_bytes_txd += xfr_bytes;
+        if (spi->nhs_bytes_txd < spi->nhs_buflen) {
+            spi->nhs_txbuf += xfr_bytes;
+            len = spi->nhs_buflen - spi->nhs_bytes_txd;
+            len = min(SPIM_TXD_MAXCNT_MAX, len);
+            spim->TXD.PTR = (uint32_t)spi->nhs_txbuf;
+            spim->TXD.MAXCNT = len;
+
+            /* If no rxbuf, we need to set rxbuf and maxcnt to 1 */
+            if (spi->nhs_rxbuf) {
+                spi->nhs_rxbuf += xfr_bytes;
+                spim->RXD.PTR    = (uint32_t)spi->nhs_rxbuf;
+                spim->RXD.MAXCNT = len;
+            }
+            spim->TASKS_START = 1;
+        } else {
             if (spi->txrx_cb_func) {
                 spi->txrx_cb_func(spi->txrx_cb_arg, spi->nhs_buflen);
+
             }
-
             spi->spi_xfr_flag = 0;
-
-            spim->SHORTS &= ~SPIM_SHORTS_END_START_Msk;
-            spim->INTENCLR = SPIM_INTENSET_STARTED_Msk | SPIM_INTENSET_END_Msk;
+            spim->INTENCLR = SPIM_INTENSET_END_Msk;
         }
     }
 }
@@ -313,12 +334,17 @@ nrf52_spi2_irq_handler(void)
 }
 #endif
 
-#if MYNEWT_VAL(SPI_3_MASTER) /* SPI3 can only be used as SPIM */
+#if MYNEWT_VAL(SPI_3_MASTER)
 void
 nrf52_spi3_irq_handler(void)
 {
     os_trace_isr_enter();
-    nrf52_irqm_handler(&nrf52_hal_spi3);
+    if (nrf52_hal_spi3.spi_type == HAL_SPI_TYPE_MASTER) {
+        anomaly_198_disable();
+#if MYNEWT_VAL(SPI_3_MASTER)
+        nrf52_irqm_handler(&nrf52_hal_spi3);
+#endif
+    }
     os_trace_isr_exit();
 }
 #endif
@@ -340,9 +366,31 @@ hal_spi_config_master(int spi_num,
     uint32_t nrf_config;
     uint32_t frequency;
     NRF_SPIM_Type *spim;
+    NRF_GPIO_Type *port;
+    uint32_t pin;
 
     spim = spi->nhs_spi.spim;
     memcpy(&spi->spi_cfg, settings, sizeof(*settings));
+
+    /*
+     * Configure SCK. NOTE: this is done here in the config API as the data
+     * mode is not set at init time so we do it here when we configure the SPI.
+     */
+    pin = spim->PSEL.SCK & SPIM_PSEL_SCK_PIN_Msk;
+    port = NRF_P0;
+#ifdef NRF52840_XXAA
+    if (spim->PSEL.SCK & SPIM_PSEL_SCK_PORT_Msk) {
+        port = NRF_P1;
+    }
+#endif
+    if (settings->data_mode <= HAL_SPI_MODE1) {
+        port->OUTCLR = (1UL << pin);
+    } else {
+        port->OUTSET = (1UL << pin);
+    }
+    port->PIN_CNF[pin] =
+        (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos) |
+        (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
     /* Only 8-bit word sizes supported. */
     rc = 0;
@@ -405,19 +453,16 @@ hal_spi_config_master(int spi_num,
         case 8000:
             frequency = SPIM_FREQUENCY_FREQUENCY_M8;
             break;
-#ifdef NRF52840_XXAA
+            /* 16 and 32 MHz is only supported on SPI_3_MASTER */
+#if defined(SPIM_FREQUENCY_FREQUENCY_M16) && MYNEWT_VAL(SPI_3_MASTER)
         case 16000:
-            /* only available for SPIM3 */
-            if (spi_num == 3) {
-                frequency = SPIM_FREQUENCY_FREQUENCY_M16;
-                break;
-            }
+            frequency = SPIM_FREQUENCY_FREQUENCY_M16;
+            break;
+#endif
+#if defined(SPIM_FREQUENCY_FREQUENCY_M32) && MYNEWT_VAL(SPI_3_MASTER)
         case 32000:
-            /* only available for SPIM3 */
-            if (spi_num == 3) {
-                frequency = SPIM_FREQUENCY_FREQUENCY_M32;
-                break;
-            }
+            frequency = SPIM_FREQUENCY_FREQUENCY_M32;
+            break;
 #endif
         default:
             frequency = 0;
@@ -495,18 +540,6 @@ hal_spi_init_master(struct nrf52_hal_spi *spi,
     NRF_SPIM_Type *spim;
     NRF_GPIO_Type *port;
     uint32_t pin;
-
-    /* Configure SCK */
-    port = HAL_GPIO_PORT(cfg->sck_pin);
-    pin = HAL_GPIO_INDEX(cfg->sck_pin);
-    if (spi->spi_cfg.data_mode <= HAL_SPI_MODE1) {
-        port->OUTCLR = (1UL << pin);
-    } else {
-        port->OUTSET = (1UL << pin);
-    }
-    port->PIN_CNF[pin] =
-        (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos) |
-        (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
     /*  Configure MOSI */
     port = HAL_GPIO_PORT(cfg->mosi_pin);
@@ -626,10 +659,19 @@ hal_spi_init(int spi_num, void *cfg, uint8_t spi_type)
     }
 
     irq_handler = NULL;
-    spi->spi_type  = spi_type;
+    spi->spi_type = spi_type;
     if (spi_num == 0) {
 #if MYNEWT_VAL(SPI_0_MASTER) || MYNEWT_VAL(SPI_0_SLAVE)
+
+/* SPI IRQn name is different between MCU variants */
+#if MYNEWT_VAL_CHOICE(MCU_TARGET, nRF52832) || MYNEWT_VAL_CHOICE(MCU_TARGET, nRF52840)
         spi->irq_num = SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn;
+#elif MYNEWT_VAL_CHOICE(MCU_TARGET, nRF52810) || MYNEWT_VAL_CHOICE(MCU_TARGET, nRF52811)
+        spi->irq_num = SPIM0_SPIS0_SPI0_IRQn;
+#else
+#error Unsupported MCU_TARGET
+#endif
+
         irq_handler = nrf52_spi0_irq_handler;
         if (spi_type == HAL_SPI_TYPE_MASTER) {
 #if MYNEWT_VAL(SPI_0_MASTER)
@@ -648,8 +690,17 @@ hal_spi_init(int spi_num, void *cfg, uint8_t spi_type)
         goto err;
 #endif
     } else if (spi_num == 1) {
-#if MYNEWT_VAL(SPI_1_MASTER)  || MYNEWT_VAL(SPI_1_SLAVE)
+#if MYNEWT_VAL(SPI_1_MASTER) || MYNEWT_VAL(SPI_1_SLAVE)
+
+        /* SPI IRQn name is different between MCU variants */
+#if MYNEWT_VAL_CHOICE(MCU_TARGET, nRF52832) || MYNEWT_VAL_CHOICE(MCU_TARGET, nRF52840)
         spi->irq_num = SPIM1_SPIS1_TWIM1_TWIS1_SPI1_TWI1_IRQn;
+#elif MYNEWT_VAL_CHOICE(MCU_TARGET, nRF52811)
+        spi->irq_num = TWIM0_TWIS0_TWI0_SPIM1_SPIS1_SPI1_IRQn;
+#else
+#error Unsupported MCU_TARGET
+#endif
+
         irq_handler = nrf52_spi1_irq_handler;
         if (spi_type == HAL_SPI_TYPE_MASTER) {
 #if MYNEWT_VAL(SPI_1_MASTER)
@@ -691,7 +742,11 @@ hal_spi_init(int spi_num, void *cfg, uint8_t spi_type)
 #if MYNEWT_VAL(SPI_3_MASTER)
         spi->irq_num = SPIM3_IRQn;
         irq_handler = nrf52_spi3_irq_handler;
-        spi->nhs_spi.spim = NRF_SPIM3; 
+        if (spi_type == HAL_SPI_TYPE_MASTER) {
+            spi->nhs_spi.spim = NRF_SPIM3;
+        } else {
+            assert(0);
+        }
 #else
         goto err;
 #endif
@@ -711,6 +766,20 @@ hal_spi_init(int spi_num, void *cfg, uint8_t spi_type)
 
 err:
     return (rc);
+}
+
+int
+hal_spi_init_hw(uint8_t spi_num, uint8_t spi_type,
+                const struct hal_spi_hw_settings *cfg)
+{
+    struct nrf52_hal_spi_cfg hal_cfg;
+
+    hal_cfg.sck_pin = cfg->pin_sck;
+    hal_cfg.mosi_pin = cfg->pin_mosi;
+    hal_cfg.miso_pin = cfg->pin_miso;
+    hal_cfg.ss_pin = cfg->pin_ss;
+
+    return hal_spi_init(spi_num, &hal_cfg, spi_type);
 }
 
 /**
@@ -837,7 +906,7 @@ hal_spi_disable(int spi_num)
     spi->nhs_txbuf = NULL;
     spi->nhs_rxbuf = NULL;
     spi->nhs_buflen = 0;
-    spi->nhs_bytes_txq = 0;
+    spi->nhs_bytes_txd = 0;
 
     rc = 0;
 
@@ -992,9 +1061,7 @@ hal_spi_txrx(int spi_num, void *txbuf, void *rxbuf, int len)
         spim = hal_spi->nhs_spi.spim;
         enabled = spim->ENABLE;
         if (enabled == SPIM_ENABLE_ENABLE_Enabled) {
-            spim->INTENCLR = NRF_SPI_IRQ_DISABLE_ALL;
-            hal_spi_stop_transfer(spim);
-            spim->ENABLE = 0;
+            hal_spi_disable(spi_num);
             enabled = 0;
         }
 
@@ -1079,6 +1146,20 @@ hal_spi_txrx_noblock(int spi_num, void *txbuf, void *rxbuf, int len)
         goto err;
     }
 
+#if MYNEWT_VAL_CHOICE(MCU_TARGET, nRF52832)
+    /* There is a known issue in nRF52832 with sending 1 byte in SPIM mode that
+     * it clocks out additional byte. For this reason, let us use SPI mode
+     * for such a write
+     */
+    if (len == 1) {
+        rc = hal_spi_txrx(spi_num, txbuf, rxbuf, len);
+        if (rc == 0) {
+            spi->txrx_cb_func(spi->txrx_cb_arg, len);
+        }
+        return rc;
+    }
+#endif
+
     if (spi->spi_type  == HAL_SPI_TYPE_MASTER) {
         /* Must have a txbuf for master! */
         if (txbuf == NULL) {
@@ -1091,6 +1172,11 @@ hal_spi_txrx_noblock(int spi_num, void *txbuf, void *rxbuf, int len)
             goto err;
         }
         spim = spi->nhs_spi.spim;
+#if MYNEWT_VAL(SPI_3_MASTER)
+        if (spim == NRF_SPIM3) {
+            anomaly_198_enable(txbuf, len);
+        }
+#endif
         spim->INTENCLR = SPIM_INTENCLR_END_Msk;
         spi->spi_xfr_flag = 1;
 
@@ -1101,7 +1187,7 @@ hal_spi_txrx_noblock(int spi_num, void *txbuf, void *rxbuf, int len)
         }
 
         /* Set internal data structure information */
-        spi->nhs_bytes_txq = 0;
+        spi->nhs_bytes_txd = 0;
         spi->nhs_buflen = len;
         spi->nhs_txbuf = txbuf;
 
@@ -1123,15 +1209,8 @@ hal_spi_txrx_noblock(int spi_num, void *txbuf, void *rxbuf, int len)
 
         spim->EVENTS_END = 0;
         spim->EVENTS_STOPPED = 0;
-        spim->EVENTS_STARTED = 0;
-        if (spi->nhs_buflen < 256) {
-            spim->INTENCLR = SPIM_INTENSET_STARTED_Msk;
-            spim->INTENSET = SPIM_INTENSET_END_Msk;
-        } else {
-            spim->INTENCLR = SPIM_INTENSET_END_Msk;
-            spim->INTENSET = SPIM_INTENSET_STARTED_Msk;
-        }
         spim->TASKS_START = 1;
+        spim->INTENSET = SPIM_INTENSET_END_Msk;
     } else {
         /* Must have txbuf or rxbuf */
         if ((txbuf == NULL) && (rxbuf == NULL)) {

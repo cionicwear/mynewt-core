@@ -64,6 +64,12 @@ oc_ep_serial_size(const struct oc_endpoint *oe)
     return sizeof(struct oc_endpoint_plain);
 }
 
+int
+oc_endpoint_is_serial(const struct oc_endpoint *oe)
+{
+    return oe->ep.oe_type == oc_serial_transport_id;
+}
+
 static int
 oc_serial_in(struct os_mbuf *m, void *arg)
 {
@@ -114,7 +120,7 @@ oc_send_buffer_serial(struct os_mbuf *m)
 {
     /* send over the shell output */
     if (shell_nlip_output(m)) {
-        OC_LOG(ERROR, "oc_transport_serial: nlip output failed\n");
+        OC_LOG_ERROR("oc_transport_serial: nlip output failed\n");
     }
 }
 
@@ -133,7 +139,7 @@ oc_attempt_rx_serial(void)
 
     m = os_msys_get_pkthdr(0, sizeof(struct oc_endpoint_plain));
     if (!m) {
-        OC_LOG(ERROR, "Could not allocate OC message buffer\n");
+        OC_LOG_ERROR("Could not allocate OC message buffer\n");
         goto rx_attempt_err;
     }
     OS_MBUF_PKTHDR(m)->omp_len = OS_MBUF_PKTHDR(n)->omp_len;

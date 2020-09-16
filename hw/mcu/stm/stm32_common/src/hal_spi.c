@@ -448,12 +448,14 @@ stm32_spi_resolve_prescaler(uint8_t spi_num, uint32_t baudrate, uint32_t *presca
      * SPI ports from 0.
      */
     switch (spi_num) {
+#if !MYNEWT_VAL(MCU_STM32F0)
     case 0:
     case 3:
     case 4:
     case 5:
         apbfreq = HAL_RCC_GetPCLK2Freq();
         break;
+#endif
     default:
         apbfreq = HAL_RCC_GetPCLK1Freq();
         break;
@@ -603,7 +605,7 @@ hal_spi_config(int spi_num, struct hal_spi_settings *settings)
     case 0:
         __HAL_RCC_SPI1_CLK_ENABLE();
 #if !MYNEWT_VAL(MCU_STM32F1)
-    #if !MYNEWT_VAL(MCU_STM32L0)
+    #if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
         gpio.Alternate = GPIO_AF5_SPI1;
     #else
         gpio.Alternate = GPIO_AF0_SPI1;
@@ -924,6 +926,7 @@ uint16_t hal_spi_tx_val(int spi_num, uint16_t val)
     }
     __HAL_DISABLE_INTERRUPTS(sr);
     spi_stat.tx++;
+    retval = 0;
     rc = HAL_SPI_TransmitReceive(&spi->handle,(uint8_t *)&val,
                                  (uint8_t *)&retval, len,
                                  STM32_HAL_SPI_TIMEOUT);
@@ -977,9 +980,14 @@ hal_spi_txrx(int spi_num, void *txbuf, void *rxbuf, int len)
     __HAL_DISABLE_INTERRUPTS(sr);
     spi_stat.tx++;
     __HAL_SPI_ENABLE(&spi->handle);
-    rc = HAL_SPI_TransmitReceive(&spi->handle, (uint8_t *)txbuf,
-                                 (uint8_t *)rxbuf, len,
-                                 STM32_HAL_SPI_TIMEOUT);
+    if (rxbuf) {
+        rc = HAL_SPI_TransmitReceive(&spi->handle, (uint8_t *)txbuf,
+                                     (uint8_t *)rxbuf, len,
+                                     STM32_HAL_SPI_TIMEOUT);
+    } else {
+        rc = HAL_SPI_Transmit(&spi->handle, (uint8_t *)txbuf,
+                              len, STM32_HAL_SPI_TIMEOUT);
+    }
     __HAL_ENABLE_INTERRUPTS(sr);
     if (rc != HAL_OK) {
         rc = -1;

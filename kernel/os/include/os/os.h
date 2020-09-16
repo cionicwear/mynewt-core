@@ -81,7 +81,7 @@ int os_started(void);
 #define OS_WAIT_FOREVER (-1)
 
 /**
- * Priority of the IDLE task.  Always the lowest priority task in teh system.
+ * Priority of the IDLE task.  Always the lowest priority task in the system.
  */
 #define OS_IDLE_PRIO (0xff)
 
@@ -106,6 +106,17 @@ void os_init(int (*fn)(int argc, char **argv));
  * Start the OS and begin processing.
  */
 void os_start(void);
+
+/**
+ * Reboots the system.
+ */
+void os_reboot(int reason);
+
+/**
+ * Performs a system reset.  This is typically done at the end of a reboot
+ * procedure.
+ */
+void os_system_reset(void);
 
 #include "os/endian.h"
 #include "os/os_callout.h"

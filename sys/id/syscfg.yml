@@ -16,8 +16,6 @@
 # under the License.
 #
 
-# Package: sys/id
-
 syscfg.defs:
     ID_SERIAL_PRESENT:
         description: 'Device serial number exported as sys/id/serial.'
@@ -25,6 +23,13 @@ syscfg.defs:
     ID_SERIAL_MAX_LEN:
         description: Maximum length of id/serial value
         value: 64
+
+    ID_SERIAL_MFG_PRESENT:
+        description: 'Device manufacturing serial number exported as sys/id/serial_mfg.'
+        value: 0
+    ID_SERIAL_MFG_MAX_LEN:
+        description: Maximum length of id/serial_mfg value
+        value: 32
 
     ID_MANUFACTURER_PRESENT:
         description: 'Device manufacturer string exported as sys/id/mfger.'
@@ -47,3 +52,15 @@ syscfg.defs:
         value: 0
         restrictions:
             - 'ID_MODEL_PRESENT'
+
+    ID_TARGET_PRESENT:
+        description: 'Target name string exported as `id/target`.'
+        value: 0
+        restrictions:
+            # Older versions of newt don't export the target name.
+            - 'TARGET_NAME'
+
+    ID_SYSINIT_STAGE:
+        description: >
+            Sysinit stage for ID functionality.
+        value: 500

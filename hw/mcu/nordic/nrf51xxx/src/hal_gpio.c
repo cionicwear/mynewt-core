@@ -104,6 +104,20 @@ hal_gpio_init_out(int pin, int val)
 }
 
 /**
+ * Deinitialize the specified pin to revert to default configuration
+ *
+ * @param pin Pin number to unset
+ *
+ * @return int  0: no error; -1 otherwise.
+ */
+int
+hal_gpio_deinit(int pin)
+{
+    NRF_GPIO->PIN_CNF[pin] = GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos;
+    return 0;
+}
+
+/**
  * gpio write
  *
  * Write a value (either high or low) to the specified pin.
@@ -289,7 +303,7 @@ hal_gpio_irq_release(int pin)
     if (i < 0) {
         return;
     }
-    hal_gpio_irq_disable(i);
+    hal_gpio_irq_disable(pin);
 
     NRF_GPIOTE->CONFIG[i] = 0;
     NRF_GPIOTE->EVENTS_IN[i] = 0;

@@ -21,6 +21,7 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +42,16 @@ static int inline
 console_is_init(void)
 {
     return 0;
+}
+
+static void inline
+console_deinit(void)
+{
+}
+
+static void inline
+console_reinit(void)
+{
 }
 
 static int inline
@@ -74,6 +85,12 @@ console_non_blocking_mode(void)
 static void inline
 console_echo(int on)
 {
+}
+
+static int inline
+console_vprintf(const char *fmt, va_list ap)
+{
+    return 0;
 }
 
 static int inline console_printf(const char *fmt, ...)
@@ -112,9 +129,36 @@ console_out(int character)
     return 0;
 }
 
+static inline void
+console_prompt_set(const char *prompt, const char *line)
+{
+}
+
 static void inline
 console_silence(bool silent)
 {
+}
+
+static void inline
+console_silence_non_nlip(bool silent)
+{
+}
+
+static void inline
+console_ignore_non_nlip(bool ignore)
+{
+}
+
+static inline int
+console_lock(int timeout)
+{
+    return 0;
+}
+
+static inline int
+console_unlock(void)
+{
+    return 0;
 }
 
 #define console_is_midline  (0)

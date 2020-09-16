@@ -16,14 +16,12 @@
 # under the License.
 #
 
-# Package: sys/reboot
-
 syscfg.defs:
     REBOOT_LOG_FCB:
         description: 'Set reboot log target to be FCB.'
         value: 0
         restrictions:
-            - LOG_FCB
+            - (LOG_FCB || LOG_FCB2)
             - REBOOT_LOG_FLASH_AREA
 
     REBOOT_LOG_CONSOLE:
@@ -46,3 +44,23 @@ syscfg.defs:
             The maximum size, in bytes, of a reboot log entry.  A buffer of
             this size is allocated on the stack each time an entry is written.
         value: 256
+
+    REBOOT_LOG_REBOOT_REASON_SIZE:
+        description: >
+            The maximum size, in bytes, of a reboot reason string entry.  A buffer of
+            this size is allocated on the stack each time an entry is written.
+        value: 32
+
+    REBOOT_SYSINIT_STAGE:
+        description: >
+            Sysinit stage for reboot functionality.
+        value: 200
+
+    REBOOT_LOG_MOD:
+        description: 'Numeric module ID to use for reboot log messages.'
+        value: 6
+
+    LOG_SOFT_RESET:
+        description: >
+            Log soft resets.
+        value: 1

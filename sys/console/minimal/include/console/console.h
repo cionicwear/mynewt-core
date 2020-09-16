@@ -47,6 +47,12 @@ void console_blocking_mode(void);
 void console_non_blocking_mode(void);
 void console_echo(int on);
 
+static int inline
+console_vprintf(const char *fmt, va_list ap)
+{
+    return 0;
+}
+
 static int console_printf(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2)));;
 static int inline
@@ -66,7 +72,15 @@ console_set_completion_cb(uint8_t (*completion)(char *str, uint8_t len))
 /**
  * Global indicating whether console is silent or not
  */
-extern bool g_silence_console;
+extern bool g_console_silence;
+/**
+ * Global indicating whether non nlip console output is silent or not
+ */
+extern bool g_console_silence_non_nlip;
+/**
+ * Global indicating whether non nlip console input is disabled or not
+ */
+extern bool g_console_ignore_non_nlip;
 
 /**
  * Silences console output, input is still active
@@ -77,14 +91,44 @@ extern bool g_silence_console;
 static void inline
 console_silence(bool silent)
 {
-    g_silence_console = silent;
+    g_console_silence = silent;
 }
 
 int console_handle_char(uint8_t byte);
 
+/**
+ * Silences non nlip console output, input is still active
+ *
+ * @param silent Let non nlip console know if it needs to be silent,
+ *        true for silence, false otherwise
+ */
+static void inline
+console_silence_non_nlip(bool silent)
+{
+    g_console_silence_non_nlip = silent;
+}
+
+
+/**
+ * Ignores console input that is non nlip, output is still active
+ *
+ * @param ignore Lets console know if non nlip input should be disabled,
+ *        true for ignore input, false otherwise
+ */
+static void inline
+console_ignore_non_nlip(bool ignore)
+{
+    g_console_ignore_non_nlip = ignore;
+}
+
+
 extern int console_is_midline;
 extern int console_out(int character);
 
+int console_lock(int timeout);
+int console_unlock(void);
+
+void console_prompt_set(const char *prompt, const char *line);
 
 #ifdef __cplusplus
 }

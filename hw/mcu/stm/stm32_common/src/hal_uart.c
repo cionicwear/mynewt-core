@@ -20,7 +20,7 @@
 #include "hal/hal_uart.h"
 #include "hal/hal_gpio.h"
 #include "mcu/cmsis_nvic.h"
-#include "mcu/stm32_hal.h"
+#include "stm32_common/stm32_hal.h"
 #include "bsp/bsp.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -38,13 +38,87 @@ struct hal_uart {
     const struct stm32_uart_cfg *u_cfg;
 };
 static struct hal_uart uarts[UART_CNT];
+static struct hal_uart *
+uart_by_port(int port)
+{
+    int index;
+
+    (void)index;
+    (void)uarts;
+
+    index = 0;
+#if MYNEWT_VAL(UART_0)
+    if (port == 0) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_1)
+    if (port == 1) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_2)
+    if (port == 2) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_3)
+    if (port == 3) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_4)
+    if (port == 4) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_5)
+    if (port == 5) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_6)
+    if (port == 6) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_7)
+    if (port == 7) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_8)
+    if (port == 8) {
+        return &uarts[index];
+    }
+    index++;
+#endif
+#if MYNEWT_VAL(UART_9)
+    if (port == 9) {
+        return &uarts[index];
+    }
+#endif
+    return NULL;
+};
 
 struct hal_uart_irq {
     struct hal_uart *ui_uart;
     volatile uint32_t ui_cnt;
 };
 
-#if defined(UART8_BASE)
+#if defined(UART10_BASE)
+static struct hal_uart_irq uart_irqs[10];
+#elif defined(UART9_BASE)
+static struct hal_uart_irq uart_irqs[9];
+#elif defined(UART8_BASE)
 static struct hal_uart_irq uart_irqs[8];
 #elif defined(UART7_BASE)
 static struct hal_uart_irq uart_irqs[7];
@@ -65,7 +139,11 @@ static struct hal_uart_irq uart_irqs[3];
 #  define TC            USART_ISR_TC
 #  define RXDR(x)       ((x)->RDR)
 #  define TXDR(x)       ((x)->TDR)
+#if MYNEWT_VAL(MCU_STM32WB)
+#  define BAUD(x,y)     UART_DIV_SAMPLING16((x), (y), UART_PRESCALER_DIV1)
+#else
 #  define BAUD(x,y)     UART_DIV_SAMPLING16((x), (y))
+#endif
 #else
 #  define STATUS(x)     ((x)->SR)
 #  define RXNE          USART_SR_RXNE
@@ -82,8 +160,8 @@ hal_uart_init_cbs(int port, hal_uart_tx_char tx_func, hal_uart_tx_done tx_done,
 {
     struct hal_uart *u;
 
-    u = &uarts[port];
-    if (port >= UART_CNT || u->u_open) {
+    u = uart_by_port(port);
+    if (!u || u->u_open) {
         return -1;
     }
     u->u_rx_func = rx_func;
@@ -145,6 +223,11 @@ uart_irq_handler(int num)
     if (isr & USART_ISR_ORE) {
         regs->ICR |= USART_ICR_ORECF;
     }
+#else
+    /* clear overrun */
+    if (isr & USART_SR_ORE) {
+        (void)RXDR(regs);
+    }
 #endif
 }
 
@@ -155,8 +238,8 @@ hal_uart_start_rx(int port)
     int sr;
     int rc;
 
-    u = &uarts[port];
-    if (u->u_rx_stall) {
+    u = uart_by_port(port);
+    if (u && u->u_rx_stall) {
         __HAL_DISABLE_INTERRUPTS(sr);
         rc = u->u_rx_func(u->u_func_arg, u->u_rx_data);
         if (rc == 0) {
@@ -173,12 +256,14 @@ hal_uart_start_tx(int port)
     struct hal_uart *u;
     int sr;
 
-    u = &uarts[port];
-    __HAL_DISABLE_INTERRUPTS(sr);
-    u->u_regs->CR1 &= ~USART_CR1_TCIE;
-    u->u_regs->CR1 |= USART_CR1_TXEIE;
-    u->u_tx_end = 0;
-    __HAL_ENABLE_INTERRUPTS(sr);
+    u = uart_by_port(port);
+    if (u) {
+        __HAL_DISABLE_INTERRUPTS(sr);
+        u->u_regs->CR1 &= ~USART_CR1_TCIE;
+        u->u_regs->CR1 |= USART_CR1_TXEIE;
+        u->u_tx_end = 0;
+        __HAL_ENABLE_INTERRUPTS(sr);
+    }
 }
 
 void
@@ -187,10 +272,11 @@ hal_uart_blocking_tx(int port, uint8_t data)
     struct hal_uart *u;
     USART_TypeDef *regs;
 
-    u = &uarts[port];
-    if (port >= UART_CNT || !u->u_open) {
+    u = uart_by_port(port);
+    if (!u || u->u_open) {
         return;
     }
+
     regs = u->u_regs;
 
     while (!(STATUS(regs) & TXE));
@@ -209,12 +295,13 @@ uart_irq1(void)
     uart_irq_handler(0);
 }
 
+#ifdef USART2_BASE
 static void
 uart_irq2(void)
 {
     uart_irq_handler(1);
-
 }
+#endif
 
 #ifdef USART3_BASE
 static void
@@ -275,15 +362,24 @@ hal_uart_set_nvic(IRQn_Type irqn, struct hal_uart *uart)
         isr = (uint32_t)&uart_irq1;
         ui = &uart_irqs[0];
         break;
+#ifdef USART2_BASE
     case USART2_IRQn:
         isr = (uint32_t)&uart_irq2;
         ui = &uart_irqs[1];
         break;
+#endif
 #ifdef USART3_BASE
+  #if !MYNEWT_VAL(MCU_STM32F0)
     case USART3_IRQn:
         isr = (uint32_t)&uart_irq3;
         ui = &uart_irqs[2];
         break;
+  #else
+    case USART3_4_IRQn:
+        isr = (uint32_t)&uart_irq3;
+        ui = &uart_irqs[2];
+        break;
+  #endif
 #endif
 #ifdef UART4_BASE
     case UART4_IRQn:
@@ -339,12 +435,8 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
     GPIO_InitTypeDef gpio;
 #endif
 
-    if (port >= UART_CNT) {
-        return -1;
-    }
-
-    u = &uarts[port];
-    if (u->u_open) {
+    u = uart_by_port(port);
+    if (!u || u->u_open) {
         return -1;
     }
     cfg = u->u_cfg;
@@ -467,7 +559,12 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
 #else
     if (cfg->suc_uart == USART1) {
 #endif
+#if MYNEWT_VAL(MCU_STM32F0)
+        u->u_regs->BRR = BAUD(HAL_RCC_GetPCLK1Freq(), baudrate);
+#else
         u->u_regs->BRR = BAUD(HAL_RCC_GetPCLK2Freq(), baudrate);
+#endif
+
     } else {
         u->u_regs->BRR = BAUD(HAL_RCC_GetPCLK1Freq(), baudrate);
     }
@@ -487,10 +584,10 @@ hal_uart_init(int port, void *arg)
 {
     struct hal_uart *u;
 
-    if (port >= UART_CNT) {
+    u = uart_by_port(port);
+    if (!u) {
         return -1;
     }
-    u = &uarts[port];
     u->u_cfg = (const struct stm32_uart_cfg *)arg;
 
     return 0;
@@ -501,10 +598,10 @@ hal_uart_close(int port)
 {
     struct hal_uart *u;
 
-    if (port >= UART_CNT) {
+    u = uart_by_port(port);
+    if (!u) {
         return -1;
     }
-    u = &uarts[port];
 
     u->u_open = 0;
     u->u_regs->CR1 = 0;

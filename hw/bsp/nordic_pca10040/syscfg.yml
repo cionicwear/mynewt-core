@@ -16,8 +16,6 @@
 # under the License.
 #
 
-# Package: hw/bsp/nordic_pca10040
-
 syscfg.defs:
     BSP_NRF52:
         description: 'Set to indicate that BSP has NRF52'
@@ -28,20 +26,16 @@ syscfg.defs:
     ENC_FLASH_DEV:
         description: 'Encrypting flash driver over interal flash for testing'
         value: 0
-
     UARTBB_0:
         description: 'Enable bit-banger UART 0'
         value: 0
-    UARTBB_0_PIN_TX:
-        description: 'TX pin for UARTBB0'
-        value: -1
-    UARTBB_0_PIN_RX:
-        description: 'RX pin for UARTBB0'
-        value: -1
+    RAM_RESIDENT:
+        description: 'Compile app to be loaded to RAM'
+        value: 0
 
 syscfg.vals:
     # Enable nRF52832 MCU
-    MCU_NRF52832: 1
+    MCU_TARGET: nRF52832
     # Set default pins for peripherals
     UART_0_PIN_TX: 6
     UART_0_PIN_RX: 8
@@ -62,15 +56,12 @@ syscfg.vals:
     NFFS_FLASH_AREA: FLASH_AREA_NFFS
     COREDUMP_FLASH_AREA: FLASH_AREA_IMAGE_1
     MCU_DCDC_ENABLED: 1
-    XTAL_32768: 1
+    MCU_LFCLK_SOURCE: LFXO
     BOOT_SERIAL_DETECT_PIN: 13  # Button 1
 
-syscfg.vals.BLE_LP_CLOCK:
+syscfg.vals.BLE_CONTROLLER:
     TIMER_0: 0
     TIMER_5: 1
     OS_CPUTIME_FREQ: 32768
     OS_CPUTIME_TIMER_NUM: 5
-    BLE_XTAL_SETTLE_TIME: 1500
-
-syscfg.restrictions:
-    - "!UARTBB_0 || (UARTBB_0_PIN_TX >= 0 && UARTBB_0_PIN_RX >= 0)"
+    BLE_LL_RFMGMT_ENABLE_TIME: 1500

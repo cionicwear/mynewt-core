@@ -36,14 +36,13 @@
 #define OS_MEMPOOL_TRUE_BLOCK_SIZE(mp) OS_MEM_TRUE_BLOCK_SIZE(mp->mp_block_size)
 #endif
 
-STAILQ_HEAD(, os_mempool) g_os_mempool_list =
-    STAILQ_HEAD_INITIALIZER(g_os_mempool_list);
+STAILQ_HEAD(, os_mempool) g_os_mempool_list;
 
 #if MYNEWT_VAL(OS_MEMPOOL_POISON)
 static uint32_t os_mem_poison = 0xde7ec7ed;
 
-_Static_assert(sizeof(struct os_memblock) % 4 == 0, "sizeof(struct os_memblock) shall be aligned to 4");
-_Static_assert(sizeof(os_mem_poison) == 4, "sizeof(os_mem_poison) shall be 4");
+static_assert(sizeof(struct os_memblock) % 4 == 0, "sizeof(struct os_memblock) shall be aligned to 4");
+static_assert(sizeof(os_mem_poison) == 4, "sizeof(os_mem_poison) shall be 4");
 
 static void
 os_mempool_poison(const struct os_mempool *mp, void *start)
@@ -121,11 +120,12 @@ os_mempool_init_internal(struct os_mempool *mp, uint16_t blocks,
                          uint8_t flags)
 {
     int true_block_size;
+    int i;
     uint8_t *block_addr;
     struct os_memblock *block_ptr;
 
     /* Check for valid parameters */
-    if (!mp || (blocks < 0) || (block_size <= 0)) {
+    if (!mp || (block_size == 0)) {
         return OS_INVALID_PARM;
     }
 
@@ -150,26 +150,27 @@ os_mempool_init_internal(struct os_mempool *mp, uint16_t blocks,
     mp->mp_num_blocks = blocks;
     mp->mp_membuf_addr = (uint32_t)membuf;
     mp->name = name;
-    os_mempool_poison(mp, membuf);
-    os_mempool_guard(mp, membuf);
     SLIST_FIRST(mp) = membuf;
 
-    true_block_size = OS_MEMPOOL_TRUE_BLOCK_SIZE(mp);
+    if (blocks > 0) {
+        os_mempool_poison(mp, membuf);
+        os_mempool_guard(mp, membuf);
+        true_block_size = OS_MEMPOOL_TRUE_BLOCK_SIZE(mp);
 
-    /* Chain the memory blocks to the free list */
-    block_addr = (uint8_t *)membuf;
-    block_ptr = (struct os_memblock *)block_addr;
-    while (blocks > 1) {
-        block_addr += true_block_size;
-        os_mempool_poison(mp, block_addr);
-        os_mempool_guard(mp, block_addr);
-        SLIST_NEXT(block_ptr, mb_next) = (struct os_memblock *)block_addr;
+        /* Chain the memory blocks to the free list */
+        block_addr = (uint8_t *)membuf;
         block_ptr = (struct os_memblock *)block_addr;
-        --blocks;
-    }
+        for (i = 1; i < blocks; i++) {
+            block_addr += true_block_size;
+            os_mempool_poison(mp, block_addr);
+            os_mempool_guard(mp, block_addr);
+            SLIST_NEXT(block_ptr, mb_next) = (struct os_memblock *)block_addr;
+            block_ptr = (struct os_memblock *)block_addr;
+        }
 
-    /* Last one in the list should be NULL */
-    SLIST_NEXT(block_ptr, mb_next) = NULL;
+        /* Last one in the list should be NULL */
+        SLIST_NEXT(block_ptr, mb_next) = NULL;
+    }
 
     STAILQ_INSERT_TAIL(&g_os_mempool_list, mp, mp_list);
 
@@ -230,7 +231,7 @@ os_mempool_unregister(struct os_mempool *mp)
     } else {
         next = STAILQ_NEXT(cur, mp_list);
         if (next == NULL) {
-            *g_os_mempool_list.stqh_last = next;
+            g_os_mempool_list.stqh_last = &STAILQ_NEXT(prev, mp_list);
         }
 
         STAILQ_NEXT(prev, mp_list) = next;
@@ -304,8 +305,8 @@ os_memblock_from(const struct os_mempool *mp, const void *block_addr)
     uint32_t baddr32;
     uint32_t end;
 
-    _Static_assert(sizeof block_addr == sizeof baddr32,
-                   "Pointer to void must be 32-bits.");
+    static_assert(sizeof block_addr == sizeof baddr32,
+                  "Pointer to void must be 32-bits.");
 
     baddr32 = (uint32_t)block_addr;
     true_block_size = OS_MEMPOOL_TRUE_BLOCK_SIZE(mp);
@@ -460,9 +461,15 @@ os_mempool_info_get_next(struct os_mempool *mp, struct os_mempool_info *omi)
     omi->omi_num_blocks = cur->mp_num_blocks;
     omi->omi_num_free = cur->mp_num_free;
     omi->omi_min_free = cur->mp_min_free;
-    strncpy(omi->omi_name, cur->name, sizeof(omi->omi_name));
+    omi->omi_name[0] = '\0';
+    strncat(omi->omi_name, cur->name, sizeof(omi->omi_name) - 1);
 
     return (cur);
 }
 
+void
+os_mempool_module_init(void)
+{
+    STAILQ_INIT(&g_os_mempool_list);
+}
 

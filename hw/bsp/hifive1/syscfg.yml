@@ -17,8 +17,6 @@
 # under the License.
 #
 
-# Package: hw/bsp/hifive
-
 syscfg.vals:
     XTAL_32768: 1
     SYS_CLOCK: HFXOSC_PLL_256_MHZ
@@ -26,3 +24,13 @@ syscfg.vals:
     TIMER_0: 1
     TIMER_1: 1
     TIMER_2: 1
+    REBOOT_LOG_FLASH_AREA: FLASH_AREA_REBOOT_LOG
+    CONFIG_FCB_FLASH_AREA: FLASH_AREA_NFFS
+
+syscfg.defs.BUS_DRIVER_PRESENT:
+    BSP_FLASH_SPI_NAME:
+        description: 'SPIFLASH device name'
+        value: '"spiflash0"'
+    BSP_FLASH_SPI_BUS:
+        description: 'bus name SPIFLASH is connected to'
+        value:

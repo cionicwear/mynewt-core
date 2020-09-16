@@ -23,6 +23,10 @@
 #include "os/mynewt.h"
 #include "sensor/sensor.h"
 #include "hal/hal_gpio.h"
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+#include "bus/drivers/i2c_common.h"
+#include "bus/drivers/spi_common.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,6 +58,25 @@ enum lps33thw_low_pass_config {
     LPS33THW_LPF_ENABLED_HIGH_BW = 0x03  /* Bandwidth = data rate / 20 */
 };
 
+/*
+ * Sensor read mode
+ *
+ * LPS33THW_READ_POLL enable polling mode
+ * LPS33THW_READ_STREAM enable FIFO read mode
+ */
+enum lps33thw_read_mode {
+    LPS33THW_READ_POLL = 0,
+    LPS33THW_READ_STREAM = 1,
+};
+
+struct lps33thw_int {
+    /* Synchronize access to this structure */
+    os_sr_t lock;
+
+    /* Sleep waiting for an interrupt to occur */
+    struct os_sem wait;
+};
+
 struct lps33thw_int_cfg {
     uint8_t pin;
     unsigned int data_rdy : 1;
@@ -62,7 +85,9 @@ struct lps33thw_int_cfg {
     unsigned int active_low : 1;
     unsigned int open_drain : 1;
     unsigned int latched : 1;
+    unsigned int fifo_wtm_rdy : 1;
 };
+
 
 struct lps33thw_cfg {
     sensor_type_t mask;
@@ -72,19 +97,36 @@ struct lps33thw_cfg {
     unsigned int autozero : 1;
     unsigned int autorifp : 1;
     unsigned int low_noise_en: 1;
+    uint8_t fifo_wtm;
+    enum lps33thw_read_mode read_mode;
 };
 
 struct lps33thw_private_driver_data {
-    sensor_data_func_t user_handler;
-    void *user_arg;
+    struct sensor_read_ctx user_ctx;
+
+    /* Inetrrupt state */
+    struct lps33thw_int *interrupt;
 };
 
 struct lps33thw {
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    struct bus_i2c_node i2c_node;
+#else
     struct os_dev dev;
+#endif
     struct sensor sensor;
     struct lps33thw_cfg cfg;
     os_time_t last_read_time;
     struct lps33thw_private_driver_data pdd;
+    struct lps33thw_int interrupt;
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    bool node_is_spi;
+#endif
+#if MYNEWT_VAL(LPS33THW_ONE_SHOT_MODE)
+    sensor_type_t type;
+    sensor_data_func_t data_func;
+    struct os_callout lps33thw_one_shot_read;
+#endif
 };
 
 /**
@@ -112,11 +154,11 @@ int lps33thw_set_lpf(struct sensor_itf *itf,
 /**
  * Software reset.
  *
- * @param The interface object associated with the lps33thw.
+ * @param Ptr to the sensor
  *
  * @return 0 on success, non-zero error on failure.
  */
-int lps33thw_reset(struct sensor_itf *itf);
+int lps33thw_reset(struct sensor *sensor);
 
 /*
  * Get pressure.
@@ -213,6 +255,38 @@ int lps33thw_config(struct lps33thw *, struct lps33thw_cfg *);
 
 #if MYNEWT_VAL(LPS33THW_CLI)
 int lps33thw_shell_init(void);
+#endif
+
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+/**
+ * Create I2C bus node for LPS33THW sensor
+ *
+ * @param node        Bus node
+ * @param name        Device name
+ * @param i2c_cfg     I2C node configuration
+ * @param sensor_itf  Sensors interface
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int
+lps33thw_create_i2c_sensor_dev(struct bus_i2c_node *node, const char *name,
+                               const struct bus_i2c_node_cfg *i2c_cfg,
+                               struct sensor_itf *sensor_itf);
+
+/**
+ * Create SPI bus node for LPS33THW sensor
+ *
+ * @param node        Bus node
+ * @param name        Device name
+ * @param spi_cfg     SPI node configuration
+ * @param sensor_itf  Sensors interface
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int
+lps33thw_create_spi_sensor_dev(struct bus_spi_node *node, const char *name,
+                               const struct bus_spi_node_cfg *spi_cfg,
+                               struct sensor_itf *sensor_itf);
 #endif
 
 #ifdef __cplusplus

@@ -30,9 +30,11 @@ extern "C" {
 
 #include <inttypes.h>
 #include <limits.h>
+#include <assert.h>
 
-#include "os/mynewt.h"
-#include "flash_map/flash_map.h"
+#include <syscfg/syscfg.h>
+#include <os/os_mutex.h>
+#include <flash_map/flash_map.h>
 
 #define FCB_MAX_LEN	(CHAR_MAX | CHAR_MAX << 7) /* Max length of element */
 
@@ -66,30 +68,18 @@ struct fcb {
 /**
  * Error codes.
  */
-#define FCB_OK		0
-#define FCB_ERR_ARGS	-1
-#define FCB_ERR_FLASH	-2
-#define FCB_ERR_NOVAR   -3
-#define FCB_ERR_NOSPACE	-4
-#define FCB_ERR_NOMEM	-5
-#define FCB_ERR_CRC	-6
-#define FCB_ERR_MAGIC   -7
-#define FCB_ERR_VERSION -8
+#define FCB_OK             0
+#define FCB_ERR_ARGS      -1
+#define FCB_ERR_FLASH     -2
+#define FCB_ERR_NOVAR     -3
+#define FCB_ERR_NOSPACE   -4
+#define FCB_ERR_NOMEM     -5
+#define FCB_ERR_CRC       -6
+#define FCB_ERR_MAGIC     -7
+#define FCB_ERR_VERSION   -8
+#define FCB_ERR_NEXT_SECT -9
 
 int fcb_init(struct fcb *fcb);
-
-/**
- * fcb_log is needed as the number of entries in a log
- */
-struct fcb_log {
-    struct fcb fl_fcb;
-    uint8_t fl_entries;
-
-#if MYNEWT_VAL(LOG_STORAGE_WATERMARK)
-    /* Internal - tracking storage use */
-    uint32_t fl_watermark_off;
-#endif
-};
 
 /**
  * fcb_append() appends an entry to circular buffer. When writing the
@@ -101,7 +91,7 @@ int fcb_append(struct fcb *, uint16_t len, struct fcb_entry *loc);
 int fcb_append_finish(struct fcb *, struct fcb_entry *append_loc);
 
 /**
- * Walk over all log entries in FCB, or entries in a given flash_area.
+ * Walk over all entries in FCB.
  * cb gets called for every entry. If cb wants to stop the walk, it should
  * return non-zero value.
  *

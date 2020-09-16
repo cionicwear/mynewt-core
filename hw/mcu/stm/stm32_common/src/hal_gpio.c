@@ -136,7 +136,7 @@ static struct gpio_irq_obj gpio_irq_handlers[16];
 
 struct ext_irqs
 {
-#if !MYNEWT_VAL(MCU_STM32L0)
+#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
     volatile uint32_t irq0;
     volatile uint32_t irq1;
     volatile uint32_t irq2;
@@ -171,7 +171,7 @@ ext_irq_handler(int index)
     }
 }
 
-#if !MYNEWT_VAL(MCU_STM32L0)
+#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
 /* External interrupt 0 */
 static void
 ext_irq0(void)
@@ -251,7 +251,7 @@ ext_irq15_10(void)
     }
 }
 
-#else /* MYNEWT_VAL(MCU_STM32L0) */
+#else /* MYNEWT_VAL(MCU_STM32L0) && MYNEWT_VAL(MCU_STM32F0)*/
 
 /**
  * ext irq0_1
@@ -304,7 +304,7 @@ ext_irq4_15(void)
     }
 }
 
-#endif /* MYNEWT_VAL(MCU_STM32L0) */
+#endif /* MYNEWT_VAL(MCU_STM32L0) && MYNEWT_VAL(MCU_STM32F0)*/
 
 /**
  * hal gpio clk enable
@@ -396,7 +396,7 @@ hal_gpio_pin_to_irq(int pin)
 
     index = MCU_GPIO_PIN_NUM(pin);
 
-#if !MYNEWT_VAL(MCU_STM32L0)
+#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
     if (index <= 4) {
         irqn = EXTI0_IRQn + index;
     } else if (index <=  9) {
@@ -427,33 +427,19 @@ hal_gpio_set_nvic(IRQn_Type irqn)
     uint32_t isr;
 
     switch (irqn) {
-#if !MYNEWT_VAL(MCU_STM32L0)
+#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
     case EXTI0_IRQn:
         isr = (uint32_t)&ext_irq0;
         break;
     case EXTI1_IRQn:
         isr = (uint32_t)&ext_irq1;
         break;
-#else /* MYNEWT_VAL(MCU_STM32L0) */
-    case EXTI0_1_IRQn:
-        isr = (uint32_t)&ext_irq0_1;
-        break;
-#endif
-
-#if !MYNEWT_VAL(MCU_STM32L0)
     case EXTI2_IRQn:
         isr = (uint32_t)&ext_irq2;
         break;
     case EXTI3_IRQn:
         isr = (uint32_t)&ext_irq3;
         break;
-#else /* MYNEWT_VAL(MCU_STM32L0) */
-    case EXTI2_3_IRQn:
-        isr = (uint32_t)&ext_irq2_3;
-        break;
-#endif
-
-#if !MYNEWT_VAL(MCU_STM32L0)
     case EXTI4_IRQn:
         isr = (uint32_t)&ext_irq4;
         break;
@@ -463,7 +449,15 @@ hal_gpio_set_nvic(IRQn_Type irqn)
     case EXTI15_10_IRQn:
         isr = (uint32_t)&ext_irq15_10;
         break;
-#else /* MYNEWT_VAL(MCU_STM32L0) */
+#else /* MYNEWT_VAL(MCU_STM32L0) && MYNEWT_VAL(MCU_STM32F0)*/
+    case EXTI0_1_IRQn:
+        isr = (uint32_t)&ext_irq0_1;
+        break;
+    
+    case EXTI2_3_IRQn:
+        isr = (uint32_t)&ext_irq2_3;
+        break;
+
     case EXTI4_15_IRQn:
         isr = (uint32_t)&ext_irq4_15;
         break;
@@ -648,6 +642,20 @@ hal_gpio_init_af(int pin, uint8_t af_type, enum hal_gpio_pull pull, uint8_t od)
 }
 
 /**
+ * Deinitialize the specified pin to revert to default configuration
+ *
+ * @param pin Pin number to unset
+ *
+ * @return int  0: no error; -1 otherwise.
+ */
+int
+hal_gpio_deinit(int pin)
+{
+    GPIO_InitTypeDef gpio;
+    return hal_gpio_deinit_stm(pin, &gpio);
+}
+
+/**
  * gpio write
  *
  * Write a value (either high or low) to the specified pin.
@@ -829,7 +837,7 @@ hal_gpio_irq_enable(int pin)
     mask = GPIO_MASK(pin);
 
     __HAL_DISABLE_INTERRUPTS(ctx);
-#if MYNEWT_VAL(MCU_STM32L4)
+#if MYNEWT_VAL(MCU_STM32L4) || MYNEWT_VAL(MCU_STM32WB)
     EXTI->IMR1 |= mask;
 #else
     EXTI->IMR |= mask;
@@ -851,7 +859,7 @@ hal_gpio_irq_disable(int pin)
 
     mask = GPIO_MASK(pin);
     __HAL_DISABLE_INTERRUPTS(ctx);
-#if MYNEWT_VAL(MCU_STM32L4)
+#if MYNEWT_VAL(MCU_STM32L4) || MYNEWT_VAL(MCU_STM32WB)
     EXTI->IMR1 |= mask;
 #else
     EXTI->IMR &= ~mask;

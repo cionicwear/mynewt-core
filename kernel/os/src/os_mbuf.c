@@ -42,17 +42,6 @@
 #endif
 #include "os/mynewt.h"
 
-/**
- * @addtogroup OSKernel
- * @{
- *   @defgroup OSMqueue Queue of Mbufs
- *   @{
- */
-
-STAILQ_HEAD(, os_mbuf_pool) g_msys_pool_list =
-    STAILQ_HEAD_INITIALIZER(g_msys_pool_list);
-
-
 int
 os_mqueue_init(struct os_mqueue *mq, os_event_fn *ev_cb, void *arg)
 {
@@ -119,118 +108,6 @@ os_mqueue_put(struct os_mqueue *mq, struct os_eventq *evq, struct os_mbuf *m)
 err:
     return (rc);
 }
-
-int
-os_msys_register(struct os_mbuf_pool *new_pool)
-{
-    struct os_mbuf_pool *pool;
-
-    pool = NULL;
-    STAILQ_FOREACH(pool, &g_msys_pool_list, omp_next) {
-        if (new_pool->omp_databuf_len > pool->omp_databuf_len) {
-            break;
-        }
-    }
-
-    if (pool) {
-        STAILQ_INSERT_AFTER(&g_msys_pool_list, pool, new_pool, omp_next);
-    } else {
-        STAILQ_INSERT_TAIL(&g_msys_pool_list, new_pool, omp_next);
-    }
-
-    return (0);
-}
-
-void
-os_msys_reset(void)
-{
-    STAILQ_INIT(&g_msys_pool_list);
-}
-
-static struct os_mbuf_pool *
-_os_msys_find_pool(uint16_t dsize)
-{
-    struct os_mbuf_pool *pool;
-
-    pool = NULL;
-    STAILQ_FOREACH(pool, &g_msys_pool_list, omp_next) {
-        if (dsize <= pool->omp_databuf_len) {
-            break;
-        }
-    }
-
-    if (!pool) {
-        pool = STAILQ_LAST(&g_msys_pool_list, os_mbuf_pool, omp_next);
-    }
-
-    return (pool);
-}
-
-
-struct os_mbuf *
-os_msys_get(uint16_t dsize, uint16_t leadingspace)
-{
-    struct os_mbuf *m;
-    struct os_mbuf_pool *pool;
-
-    pool = _os_msys_find_pool(dsize);
-    if (!pool) {
-        goto err;
-    }
-
-    m = os_mbuf_get(pool, leadingspace);
-    return (m);
-err:
-    return (NULL);
-}
-
-struct os_mbuf *
-os_msys_get_pkthdr(uint16_t dsize, uint16_t user_hdr_len)
-{
-    uint16_t total_pkthdr_len;
-    struct os_mbuf *m;
-    struct os_mbuf_pool *pool;
-
-    total_pkthdr_len =  user_hdr_len + sizeof(struct os_mbuf_pkthdr);
-    pool = _os_msys_find_pool(dsize + total_pkthdr_len);
-    if (!pool) {
-        goto err;
-    }
-
-    m = os_mbuf_get_pkthdr(pool, user_hdr_len);
-    return (m);
-err:
-    return (NULL);
-}
-
-int
-os_msys_count(void)
-{
-    struct os_mbuf_pool *omp;
-    int total;
-
-    total = 0;
-    STAILQ_FOREACH(omp, &g_msys_pool_list, omp_next) {
-        total += omp->omp_pool->mp_num_blocks;
-    }
-
-    return total;
-}
-
-int
-os_msys_num_free(void)
-{
-    struct os_mbuf_pool *omp;
-    int total;
-
-    total = 0;
-    STAILQ_FOREACH(omp, &g_msys_pool_list, omp_next) {
-        total += omp->omp_pool->mp_num_free;
-    }
-
-    return total;
-}
-
 
 int
 os_mbuf_pool_init(struct os_mbuf_pool *omp, struct os_mempool *mp,
@@ -1158,4 +1035,91 @@ os_mbuf_widen(struct os_mbuf *om, uint16_t off, uint16_t len)
     }
 
     return 0;
+}
+
+struct os_mbuf *
+os_mbuf_pack_chains(struct os_mbuf *m1, struct os_mbuf *m2)
+{
+    uint16_t rem_len;
+    uint16_t copylen;
+    uint8_t *dptr;
+    struct os_mbuf *cur;
+    struct os_mbuf *next;
+
+    /* If m1 is NULL, return NULL */
+    if (m1 == NULL) {
+        return NULL;
+    }
+
+    /*
+     * Concatenate the two chains to start. This will discard packet header in
+     * m2 and adjust packet length in m1 if m1 has a packet header.
+     */
+    if (m2 != NULL) {
+        os_mbuf_concat(m1, m2);
+    }
+
+    cur = m1;
+    while (1) {
+        /* If there is leading space in the mbuf, move data up */
+        if (OS_MBUF_LEADINGSPACE(cur)) {
+            dptr = &cur->om_databuf[0];
+            if (OS_MBUF_IS_PKTHDR(cur)) {
+                dptr += cur->om_pkthdr_len;
+            }
+            memmove(dptr, cur->om_data, cur->om_len);
+            cur->om_data = dptr;
+        }
+
+        /* Set pointer to where we will begin copying data in current mbuf */
+        dptr = cur->om_data + cur->om_len;
+
+        /* Get a pointer to the next buf we want to absorb */
+        next = SLIST_NEXT(cur, om_next);
+
+        /*
+         * Is there trailing space in the mbuf? If so, copy data from
+         * following mbufs into the current mbuf
+         */
+        rem_len = OS_MBUF_TRAILINGSPACE(cur);
+        while (rem_len && next) {
+            copylen = min(rem_len, next->om_len);
+            memcpy(dptr, next->om_data, copylen);
+            cur->om_len += copylen;
+            dptr += copylen;
+            rem_len -= copylen;
+
+            /*
+             * We copied bytes from the next mbuf. Move the data pointer
+             * and subtract from its length
+             */
+            next->om_data += copylen;
+            next->om_len -= copylen;
+
+            /*
+             * Keep removing and freeing consecutive zero length mbufs,
+             * stopping when we find one with data in it or we have
+             * reached the end. This will prevent any zero length mbufs
+             * from remaining in the chain.
+             */
+            while (next->om_len == 0) {
+                SLIST_NEXT(cur, om_next) = SLIST_NEXT(next, om_next);
+                os_mbuf_free(next);
+                next = SLIST_NEXT(cur, om_next);
+                if (next == NULL) {
+                    break;
+                }
+            }
+        }
+
+        /* If no mbufs are left, we are done */
+        if (next == NULL) {
+            break;
+        }
+
+        /* Move cur to next as we filled up current */
+        cur = next;
+    }
+
+    return m1;
 }

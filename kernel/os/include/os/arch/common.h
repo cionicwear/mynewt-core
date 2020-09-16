@@ -63,7 +63,6 @@ void os_arch_ctx_sw(struct os_task *);
 os_sr_t os_arch_save_sr(void);
 void os_arch_restore_sr(os_sr_t);
 int os_arch_in_critical(void);
-int os_arch_in_isr(void);
 void os_arch_init(void);
 uint32_t os_arch_start(void);
 os_error_t os_arch_os_init(void);
@@ -71,6 +70,7 @@ os_error_t os_arch_os_start(void);
 void os_set_env(os_stack_t *);
 void os_arch_init_task_stack(os_stack_t *sf);
 void os_default_irq_asm(void);
+void os_assert_cb(void);
 
 #ifdef __cplusplus
 }

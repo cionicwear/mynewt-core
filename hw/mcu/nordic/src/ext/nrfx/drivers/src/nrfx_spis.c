@@ -1,21 +1,21 @@
-/**
- * Copyright (c) 2013 - 2018, Nordic Semiconductor ASA
+/*
+ * Copyright (c) 2013 - 2020, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -33,8 +33,10 @@
 
 #if NRFX_CHECK(NRFX_SPIS_ENABLED)
 
-#if !(NRFX_CHECK(NRFX_SPIS0_ENABLED) || NRFX_CHECK(NRFX_SPIS1_ENABLED) || \
-      NRFX_CHECK(NRFX_SPIS2_ENABLED))
+#if !(NRFX_CHECK(NRFX_SPIS0_ENABLED) || \
+      NRFX_CHECK(NRFX_SPIS1_ENABLED) || \
+      NRFX_CHECK(NRFX_SPIS2_ENABLED) || \
+      NRFX_CHECK(NRFX_SPIS3_ENABLED))
 #error "No enabled SPIS instances. Check <nrfx_config.h>."
 #endif
 
@@ -71,10 +73,17 @@
 #define SPIS2_LENGTH_VALIDATE(...)  0
 #endif
 
+#if NRFX_CHECK(NRFX_SPIS3_ENABLED)
+#define SPIS3_LENGTH_VALIDATE(...)  SPISX_LENGTH_VALIDATE(SPIS3, __VA_ARGS__)
+#else
+#define SPIS3_LENGTH_VALIDATE(...)  0
+#endif
+
 #define SPIS_LENGTH_VALIDATE(drv_inst_idx, rx_len, tx_len)  \
     (SPIS0_LENGTH_VALIDATE(drv_inst_idx, rx_len, tx_len) || \
      SPIS1_LENGTH_VALIDATE(drv_inst_idx, rx_len, tx_len) || \
-     SPIS2_LENGTH_VALIDATE(drv_inst_idx, rx_len, tx_len))
+     SPIS2_LENGTH_VALIDATE(drv_inst_idx, rx_len, tx_len) || \
+     SPIS3_LENGTH_VALIDATE(drv_inst_idx, rx_len, tx_len))
 
 
 #if NRFX_CHECK(NRFX_SPIS_NRF52_ANOMALY_109_WORKAROUND_ENABLED)
@@ -114,7 +123,7 @@ typedef struct
 
 static spis_cb_t m_cb[NRFX_SPIS_ENABLED_COUNT];
 
-nrfx_err_t nrfx_spis_init(nrfx_spis_t  const * const p_instance,
+nrfx_err_t nrfx_spis_init(nrfx_spis_t const *        p_instance,
                           nrfx_spis_config_t const * p_config,
                           nrfx_spis_event_handler_t  event_handler,
                           void *                     p_context)
@@ -153,6 +162,9 @@ nrfx_err_t nrfx_spis_init(nrfx_spis_t  const * const p_instance,
         #endif
         #if NRFX_CHECK(NRFX_SPIS2_ENABLED)
         nrfx_spis_2_irq_handler,
+        #endif
+        #if NRFX_CHECK(NRFX_SPIS3_ENABLED)
+        nrfx_spis_3_irq_handler,
         #endif
     };
     if (nrfx_prs_acquire(p_spis,
@@ -245,7 +257,7 @@ nrfx_err_t nrfx_spis_init(nrfx_spis_t  const * const p_instance,
     // [the GPIOTE driver may be already initialized at this point (by this
     //  driver when another SPIS instance is used, or by an application code),
     //  so just ignore the returned value]
-    (void)nrfx_gpiote_init();
+    (void)nrfx_gpiote_init(NRFX_GPIOTE_DEFAULT_CONFIG_IRQ_PRIORITY);
     static nrfx_gpiote_in_config_t const csn_gpiote_config =
         NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
     nrfx_err_t gpiote_err_code = nrfx_gpiote_in_init(p_config->csn_pin,
@@ -278,7 +290,7 @@ nrfx_err_t nrfx_spis_init(nrfx_spis_t  const * const p_instance,
 }
 
 
-void nrfx_spis_uninit(nrfx_spis_t const * const p_instance)
+void nrfx_spis_uninit(nrfx_spis_t const * p_instance)
 {
     spis_cb_t * p_cb = &m_cb[p_instance->drv_inst_idx];
     NRFX_ASSERT(p_cb->state != NRFX_DRV_STATE_UNINITIALIZED);
@@ -290,6 +302,21 @@ void nrfx_spis_uninit(nrfx_spis_t const * const p_instance)
     NRFX_IRQ_DISABLE(nrfx_get_irq_number(p_instance->p_reg));
     nrf_spis_int_disable(p_spis, DISABLE_ALL);
     #undef  DISABLE_ALL
+
+    nrf_gpio_cfg_default(nrf_spis_sck_pin_get(p_spis));
+    nrf_gpio_cfg_default(nrf_spis_csn_pin_get(p_spis));
+
+    uint32_t miso_pin = nrf_spis_miso_pin_get(p_spis);
+    if (miso_pin != NRF_SPIS_PIN_NOT_CONNECTED)
+    {
+        nrf_gpio_cfg_default(miso_pin);
+    }
+
+    uint32_t mosi_pin = nrf_spis_mosi_pin_get(p_spis);
+    if (mosi_pin != NRF_SPIS_PIN_NOT_CONNECTED)
+    {
+        nrf_gpio_cfg_default(mosi_pin);
+    }
 
 #if NRFX_CHECK(NRFX_PRS_ENABLED)
     nrfx_prs_release(p_spis);
@@ -353,11 +380,11 @@ static void spis_state_change(NRF_SPIS_Type   * p_spis,
     spis_state_entry_action_execute(p_spis, p_cb);
 }
 
-nrfx_err_t nrfx_spis_buffers_set(nrfx_spis_t const * const p_instance,
-                                 uint8_t           const * p_tx_buffer,
-                                 size_t                    tx_buffer_length,
-                                 uint8_t                 * p_rx_buffer,
-                                 size_t                    rx_buffer_length)
+nrfx_err_t nrfx_spis_buffers_set(nrfx_spis_t const * p_instance,
+                                 uint8_t const *     p_tx_buffer,
+                                 size_t              tx_buffer_length,
+                                 uint8_t *           p_rx_buffer,
+                                 size_t              rx_buffer_length)
 {
     NRFX_ASSERT(p_tx_buffer != NULL || tx_buffer_length == 0);
     NRFX_ASSERT(p_rx_buffer != NULL || rx_buffer_length == 0);
@@ -479,6 +506,13 @@ void nrfx_spis_1_irq_handler(void)
 void nrfx_spis_2_irq_handler(void)
 {
     spis_irq_handler(NRF_SPIS2, &m_cb[NRFX_SPIS2_INST_IDX]);
+}
+#endif
+
+#if NRFX_CHECK(NRFX_SPIS3_ENABLED)
+void nrfx_spis_3_irq_handler(void)
+{
+    spis_irq_handler(NRF_SPIS3, &m_cb[NRFX_SPIS3_INST_IDX]);
 }
 #endif
 

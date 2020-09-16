@@ -29,6 +29,15 @@
 
 #include <nrf.h>
 
+/*** Custom master clock frequency */
+/** 380 kbps */
+#define TWI_CUSTOM_FREQUENCY_FREQUENCY_K380 (0x06147ae9UL)
+
+#if defined(NRF52810_XXAA) || defined(NRF52811_XXAA)
+#define PSELSCL PSEL.SCL
+#define PSELSDA PSEL.SDA
+#endif
+
 #define NRF52_HAL_I2C_MAX (2)
 
 #define NRF52_SCL_PIN_CONF                                              \
@@ -207,19 +216,23 @@ hal_i2c_clear_bus(int scl_pin, int sda_pin)
 {
     int i;
     NRF_GPIO_Type *scl_port, *sda_port;
+    int scl_pin_ix;
+    int sda_pin_ix;
     /* Resolve which GPIO port these pins belong to */
     scl_port = HAL_GPIO_PORT(scl_pin);
     sda_port = HAL_GPIO_PORT(sda_pin);
+    scl_pin_ix = HAL_GPIO_INDEX(scl_pin);
+    sda_pin_ix = HAL_GPIO_INDEX(sda_pin);
 
     /* Input connected, standard-low disconnected-high, pull-ups */
-    scl_port->PIN_CNF[scl_pin] = NRF52_SCL_PIN_CONF;
-    sda_port->PIN_CNF[sda_pin] = NRF52_SDA_PIN_CONF;
+    scl_port->PIN_CNF[scl_pin_ix] = NRF52_SCL_PIN_CONF;
+    sda_port->PIN_CNF[sda_pin_ix] = NRF52_SDA_PIN_CONF;
 
     hal_gpio_write(scl_pin, 1);
     hal_gpio_write(sda_pin, 1);
 
-    scl_port->PIN_CNF[scl_pin] = NRF52_SCL_PIN_CONF_CLR;
-    sda_port->PIN_CNF[sda_pin] = NRF52_SDA_PIN_CONF_CLR;
+    scl_port->PIN_CNF[scl_pin_ix] = NRF52_SCL_PIN_CONF_CLR;
+    sda_port->PIN_CNF[sda_pin_ix] = NRF52_SDA_PIN_CONF_CLR;
 
     hal_i2c_delay_us(4);
 
@@ -249,8 +262,8 @@ hal_i2c_clear_bus(int scl_pin, int sda_pin)
 
 ret:
     /* Restore GPIO config */
-    scl_port->PIN_CNF[scl_pin] = NRF52_SCL_PIN_CONF;
-    sda_port->PIN_CNF[sda_pin] = NRF52_SDA_PIN_CONF;
+    scl_port->PIN_CNF[scl_pin_ix] = NRF52_SCL_PIN_CONF;
+    sda_port->PIN_CNF[sda_pin_ix] = NRF52_SDA_PIN_CONF;
 }
 
 int
@@ -280,6 +293,9 @@ hal_i2c_init(uint8_t i2c_num, void *usercfg)
     case 250:
         freq = TWI_FREQUENCY_FREQUENCY_K250;
         break;
+    case 380:
+        freq = TWI_CUSTOM_FREQUENCY_FREQUENCY_K380;
+        break;
     case 400:
         freq = TWI_FREQUENCY_FREQUENCY_K400;
         break;
@@ -294,8 +310,8 @@ hal_i2c_init(uint8_t i2c_num, void *usercfg)
     scl_port = HAL_GPIO_PORT(cfg->scl_pin);
     sda_port = HAL_GPIO_PORT(cfg->sda_pin);
 
-    scl_port->PIN_CNF[cfg->scl_pin] = NRF52_SCL_PIN_CONF;
-    sda_port->PIN_CNF[cfg->sda_pin] = NRF52_SDA_PIN_CONF;
+    scl_port->PIN_CNF[HAL_GPIO_INDEX(cfg->scl_pin)] = NRF52_SCL_PIN_CONF;
+    sda_port->PIN_CNF[HAL_GPIO_INDEX(cfg->sda_pin)] = NRF52_SDA_PIN_CONF;
 
     regs->PSELSCL = cfg->scl_pin;
     regs->PSELSDA = cfg->sda_pin;
@@ -305,6 +321,172 @@ hal_i2c_init(uint8_t i2c_num, void *usercfg)
     return (0);
 err:
     return (rc);
+}
+
+static inline NRF_TWI_Type *
+hal_i2c_get_regs(uint8_t i2c_num)
+{
+    struct nrf52_hal_i2c *i2c;
+    int rc;
+
+    rc = hal_i2c_resolve(i2c_num, &i2c);
+    if (rc != 0) {
+        return NULL;
+    }
+
+    return i2c->nhi_regs;
+}
+
+int
+hal_i2c_init_hw(uint8_t i2c_num, const struct hal_i2c_hw_settings *cfg)
+{
+    NRF_TWI_Type *regs;
+    NRF_GPIO_Type *port;
+    int index;
+
+    regs = hal_i2c_get_regs(i2c_num);
+    if (!regs) {
+        return HAL_I2C_ERR_INVAL;
+    }
+
+    regs->ENABLE = TWI_ENABLE_ENABLE_Disabled;
+
+    port = HAL_GPIO_PORT(cfg->pin_scl);
+    index = HAL_GPIO_INDEX(cfg->pin_scl);
+    port->PIN_CNF[index] = NRF52_SCL_PIN_CONF;
+
+    port = HAL_GPIO_PORT(cfg->pin_sda);
+    index = HAL_GPIO_INDEX(cfg->pin_sda);
+    port->PIN_CNF[index] = NRF52_SDA_PIN_CONF;
+
+    regs->PSELSCL = cfg->pin_scl;
+    regs->PSELSDA = cfg->pin_sda;
+    regs->FREQUENCY = TWI_FREQUENCY_FREQUENCY_K100;
+
+    return 0;
+}
+
+static int
+hal_i2c_set_enabled(uint8_t i2c_num, bool enabled)
+{
+    NRF_TWI_Type *regs;
+
+    regs = hal_i2c_get_regs(i2c_num);
+    if (!regs) {
+        return HAL_I2C_ERR_INVAL;
+    }
+
+    regs->ENABLE = enabled ? TWI_ENABLE_ENABLE_Enabled : TWI_ENABLE_ENABLE_Disabled;
+
+    return 0;
+}
+
+int
+hal_i2c_enable(uint8_t i2c_num)
+{
+    return hal_i2c_set_enabled(i2c_num, 1);
+}
+
+int
+hal_i2c_disable(uint8_t i2c_num)
+{
+    return hal_i2c_set_enabled(i2c_num, 0);
+}
+
+int
+hal_i2c_config(uint8_t i2c_num, const struct hal_i2c_settings *cfg)
+{
+    NRF_TWI_Type *regs;
+    int freq;
+
+    regs = hal_i2c_get_regs(i2c_num);
+    if (!regs) {
+        return HAL_I2C_ERR_INVAL;
+    }
+
+    switch (cfg->frequency) {
+    case 100:
+        freq = TWI_FREQUENCY_FREQUENCY_K100;
+        break;
+    case 250:
+        freq = TWI_FREQUENCY_FREQUENCY_K250;
+        break;
+    case 380:
+        freq = TWI_CUSTOM_FREQUENCY_FREQUENCY_K380;
+        break;
+    case 400:
+        freq = TWI_FREQUENCY_FREQUENCY_K400;
+        break;
+    default:
+        return HAL_I2C_ERR_INVAL;
+    }
+
+    regs->FREQUENCY = freq;
+
+    return 0;
+}
+
+static inline void
+hal_i2c_trigger_start(NRF_TWI_Type *twi, __O uint32_t *task)
+{
+    uint32_t end_ticks;
+    int retry = 2;
+
+    /*
+     * Some devices [1] can cause glitch on I2C bus which makes TWI controller
+     * unresponsive and it won't write anything onto bus until disabled and
+     * enabled again. To workaround this we can just check if SCL line is
+     * pulled low after triggering start task which means controller works
+     * properly. In other case, we disable and enable TWI controller and try
+     * again. If this still fails to make controller work properly
+     *
+     * [1] LP5523 does this on reset
+     */
+
+    do {
+        twi->EVENTS_BB = 0;
+        *task = 1;
+
+        /*
+         * Wait a bit for low state on SCL as this indicates that controller has
+         * started writing something one the bus. It does not matter whether low
+         * state is due to START condition on bus or one of clock cycles when
+         * writing address on bus - in any case this means controller seems to
+         * write something on bus.
+         */
+
+        end_ticks = os_cputime_get32() +
+                    os_cputime_usecs_to_ticks(MYNEWT_VAL(MCU_I2C_RECOVERY_DELAY_USEC));
+
+        do {
+            /*
+             * For write op controller will always keep SCL low after writing
+             * START and address on bus and until we write 1st byte of data to
+             * TXD. This allows to reliably detect activity on bus by using SCL
+             * only.
+             *
+             * For read op with only single byte to read it's possible that it
+             * will be read before we start checking SCL line and thus we'll
+             * never detect any activity this way. To avoid this, we'll also
+             * check BB event which in such case indicates that some activity
+             * on bus happened. This won't work for writes since BB is generated
+             * after byte is transmitted, so we need to use both methods to be
+             * able to handle unresponsive TWI controller for both reads and
+             * writes.
+             */
+            if (!hal_gpio_read(twi->PSELSCL) || twi->EVENTS_BB) {
+                return;
+            }
+        } while (CPUTIME_LT(os_cputime_get32(), end_ticks));
+
+        twi->ENABLE = TWI_ENABLE_ENABLE_Disabled;
+        /*
+         * This is to "clear" other devices on bus which may be affected by the
+         * same glitch.
+         */
+        hal_i2c_clear_bus(twi->PSELSCL, twi->PSELSDA);
+        twi->ENABLE = TWI_ENABLE_ENABLE_Enabled;
+    } while (--retry);
 }
 
 int
@@ -331,7 +513,7 @@ hal_i2c_master_write(uint8_t i2c_num, struct hal_i2c_master_data *pdata,
     regs->EVENTS_SUSPENDED = 0;
     regs->SHORTS = 0;
 
-    regs->TASKS_STARTTX = 1;
+    hal_i2c_trigger_start(regs, &regs->TASKS_STARTTX);
     regs->TASKS_RESUME = 1;
 
     start = os_time_get();
@@ -372,16 +554,6 @@ err:
         nrf_status = regs->ERRORSRC;
         regs->ERRORSRC = nrf_status;
         rc = hal_i2c_convert_status(nrf_status);
-    } else if (rc == HAL_I2C_ERR_TIMEOUT) {
-        /* Some I2C slave peripherals cause a glitch on the bus when they
-         * reset which puts the TWI in an unresponsive state.  Disabling and
-         * re-enabling the TWI returns it to normal operation.
-         * A clear operation is performed in case one of the devices on
-         * the bus is in a bad state.
-         */
-        regs->ENABLE = TWI_ENABLE_ENABLE_Disabled;
-        hal_i2c_clear_bus(regs->PSELSCL, regs->PSELSDA);
-        regs->ENABLE = TWI_ENABLE_ENABLE_Enabled;
     }
 
     return (rc);
@@ -425,7 +597,8 @@ hal_i2c_master_read(uint8_t i2c_num, struct hal_i2c_master_data *pdata,
     } else {
         regs->SHORTS = TWI_SHORTS_BB_SUSPEND_Msk;
     }
-    regs->TASKS_STARTRX = 1;
+
+    hal_i2c_trigger_start(regs, &regs->TASKS_STARTRX);
 
     for (i = 0; i < pdata->len; i++) {
         regs->TASKS_RESUME = 1;
@@ -451,22 +624,12 @@ hal_i2c_master_read(uint8_t i2c_num, struct hal_i2c_master_data *pdata,
 
 err:
     regs->TASKS_STOP = 1;
-    regs->SHORTS = TWI_SHORTS_BB_STOP_Msk;
+    regs->SHORTS = 0;
 
     if (regs->EVENTS_ERROR) {
         nrf_status = regs->ERRORSRC;
         regs->ERRORSRC = nrf_status;
         rc = hal_i2c_convert_status(nrf_status);
-    } else if (rc == HAL_I2C_ERR_TIMEOUT) {
-       /* Some I2C slave peripherals cause a glitch on the bus when they
-        * reset which puts the TWI in an unresponsive state.  Disabling and
-        * re-enabling the TWI returns it to normal operation.
-        * A clear operation is performed in case one of the devices on
-        * the bus is in a bad state.
-        */
-        regs->ENABLE = TWI_ENABLE_ENABLE_Disabled;
-        hal_i2c_clear_bus(regs->PSELSCL, regs->PSELSDA);
-        regs->ENABLE = TWI_ENABLE_ENABLE_Enabled;
     }
 
     return (rc);

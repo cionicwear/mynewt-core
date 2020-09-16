@@ -16,8 +16,6 @@
 # under the License.
 #
 
-# Package: hw/mcu/sifive/fe310
-
 syscfg.defs:
     MCU_FLASH_MIN_WRITE_SIZE:
         description: >
@@ -72,3 +70,18 @@ syscfg.defs:
     TIMER_2:
         description: 'Whether to use PWM0 8 bit timer as system timer'
         value:  0
+    OS_TICKS_PER_SEC:
+        description: 'Desired ticks frequency in Hz'
+        value: 128
+        range: 128,256,512,1024
+    OS_TICKLESS_SLEEP:
+        description: 'Enable tickless sleep'
+        value: 1
+    HAL_SYSTEM_RESET_FULL:
+        description: >
+            When set to 1, hal_system_reset() reboots by jumping to start of flash.
+            When set to 0, hal_system_reset() jumps directly to _reset_handler of
+            application skipping bootloader code.
+            This maybe useful when .bssnz section is being used to store data across
+            software reboots.
+        value: 1

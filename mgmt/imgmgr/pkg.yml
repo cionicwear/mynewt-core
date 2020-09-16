@@ -26,11 +26,10 @@ pkg.keywords:
 pkg.deps:
     - "@apache-mynewt-core/boot/split"
     - "@apache-mynewt-core/encoding/base64"
-    - "@apache-mynewt-core/mgmt/mgmt"
     - "@apache-mynewt-core/sys/flash_map"
+    - "@apache-mynewt-mcumgr/cmd/img_mgmt"
 
 pkg.req_apis:
-    - newtmgr
     - bootloader
 
 pkg.req_apis.LOG_FCB_SLOT1:
@@ -42,8 +41,9 @@ pkg.deps.IMGMGR_FS:
 pkg.deps.IMGMGR_COREDUMP:
     - "@apache-mynewt-core/sys/coredump"
 
-pkg.deps.IMGMGR_SHELL:
+pkg.deps.IMGMGR_CLI:
     - "@apache-mynewt-core/sys/shell"
+    - "@apache-mynewt-core/util/parse"
 
 pkg.init:
-    imgmgr_module_init: 500
+    imgmgr_module_init: 'MYNEWT_VAL(IMGMGR_SYSINIT_STAGE)'

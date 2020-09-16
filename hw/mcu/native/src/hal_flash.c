@@ -23,6 +23,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "os/mynewt.h"
 
@@ -30,7 +31,7 @@
 #include "mcu/mcu_sim.h"
 
 char *native_flash_file;
-static int file;
+static int file = -1;
 static void *file_loc;
 
 static int native_flash_init(const struct hal_flash *dev);
@@ -94,7 +95,14 @@ static void
 flash_native_file_open(char *name)
 {
     int created = 0;
+    char tmpl[] = "/tmp/native_flash.XXXXXX";
+
     extern int ftruncate(int fd, off_t length);
+
+    if (file != -1) {
+        close(file);
+        file = -1;
+    }
 
     if (name) {
         file = open(name, O_RDWR);
@@ -104,7 +112,6 @@ flash_native_file_open(char *name)
             created = 1;
         }
     } else {
-        char tmpl[] = "/tmp/native_flash.XXXXXX";
         file = mkstemp(tmpl);
         assert(file > 0);
         created = 1;
@@ -116,11 +123,20 @@ flash_native_file_open(char *name)
         }
     }
 
+    if (file_loc != NULL) {
+        munmap(file_loc, native_flash_dev.hf_size);
+    }
+
     file_loc = mmap(0, native_flash_dev.hf_size,
           PROT_READ | PROT_WRITE, MAP_SHARED, file, 0);
     assert(file_loc != MAP_FAILED);
     if (created) {
         flash_native_erase(0, native_flash_dev.hf_size);
+    }
+
+    /* If using a temporary file, unlink it immediately. */
+    if (name == NULL) {
+        remove(tmpl);
     }
 }
 
@@ -259,9 +275,9 @@ native_flash_sector_info(const struct hal_flash *dev, int idx,
 static int
 native_flash_init(const struct hal_flash *dev)
 {
-    if (native_flash_file) {
+    //if (native_flash_file) {
         flash_native_file_open(native_flash_file);
-    }
+    //}
 #if MYNEWT_VAL(MCU_FLASH_STYLE_NORDIC)
     int i;
 

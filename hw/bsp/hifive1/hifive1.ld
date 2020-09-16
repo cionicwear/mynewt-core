@@ -23,7 +23,7 @@ ENTRY( _reset_handler )
 
 SECTIONS
 {
-  __stack_size = DEFINED(__stack_size) ? __stack_size : 2K;
+  __stack_size = DEFINED(__stack_size) ? __stack_size : 512;
   .imghdr (NOLOAD):
   {
       . = . + _imghdr_size;
@@ -154,6 +154,15 @@ SECTIONS
   . = ALIGN(4);
   PROVIDE( _edata = . );
   PROVIDE( edata = . );
+
+  .bssnz :
+  {
+      __bssnz_start__ = .;
+      *(.bss.core.nz*)
+      . = ALIGN(4);
+      __bssnz_end__ = .;
+      . = ALIGN(4);
+  } >ram
 
   PROVIDE( _fbss = . );
   PROVIDE( __bss_start = . );

@@ -172,6 +172,13 @@ err:
     return (rc);
 }
 
+int
+hal_spi_init_hw(uint8_t spi_num, uint8_t spi_type,
+                const struct hal_spi_hw_settings *cfg)
+{
+    return hal_spi_init(spi_num, NULL, spi_type);
+}
+
 /**
  * Sets the txrx callback (executed at interrupt context) when the
  * buffer is transferred by the master or the slave using the non-blocking API.
@@ -247,7 +254,7 @@ hal_spi_config(int spi_num, struct hal_spi_settings *settings)
     if (settings->data_order == HAL_SPI_LSB_FIRST) {
         fmt |= SPI_FMT_ENDIAN(1);
     }
-    div = get_cpu_freq() / (2 * settings->baudrate);
+    div = get_cpu_freq() / (2 * settings->baudrate * 1000);
     if (div) {
         div--;
     }

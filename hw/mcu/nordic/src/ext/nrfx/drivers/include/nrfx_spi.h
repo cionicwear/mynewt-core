@@ -1,21 +1,21 @@
-/**
- * Copyright (c) 2015 - 2018, Nordic Semiconductor ASA
+/*
+ * Copyright (c) 2015 - 2020, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -34,6 +34,7 @@
 
 #include <nrfx.h>
 #include <hal/nrf_spi.h>
+#include <hal/nrf_gpio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,18 +44,17 @@ extern "C" {
  * @defgroup nrfx_spi SPI driver
  * @{
  * @ingroup nrf_spi
- * @brief   SPI peripheral driver.
+ * @brief   Serial Peripheral Interface master (SPI) driver.
  */
 
-/**
- * @brief SPI master driver instance data structure.
- */
+/** @brief Data structure of the Serial Peripheral Interface master (SPI) driver instance. */
 typedef struct
 {
     NRF_SPI_Type * p_reg;        ///< Pointer to a structure with SPI registers.
-    uint8_t        drv_inst_idx; ///< Driver instance index.
+    uint8_t        drv_inst_idx; ///< Index of the driver instance. For internal use only.
 } nrfx_spi_t;
 
+#ifndef __NRFX_DOXYGEN__
 enum {
 #if NRFX_CHECK(NRFX_SPI0_ENABLED)
     NRFX_SPI0_INST_IDX,
@@ -67,10 +67,9 @@ enum {
 #endif
     NRFX_SPI_ENABLED_COUNT
 };
+#endif
 
-/**
- * @brief Macro for creating an SPI master driver instance.
- */
+/** @brief Macro for creating an instance of the SPI master driver. */
 #define NRFX_SPI_INSTANCE(id)                               \
 {                                                           \
     .p_reg        = NRFX_CONCAT_2(NRF_SPI, id),             \
@@ -84,9 +83,7 @@ enum {
  */
 #define NRFX_SPI_PIN_NOT_USED  0xFF
 
-/**
- * @brief SPI master driver instance configuration structure.
- */
+/** @brief Configuration structure of the SPI master driver instance. */
 typedef struct
 {
     uint8_t sck_pin;                ///< SCK pin number.
@@ -100,72 +97,77 @@ typedef struct
                                     /**< Set to @ref NRFX_SPI_PIN_NOT_USED
                                      *   if this signal is not needed. The driver
                                      *   supports only active low for this signal.
-                                     *   If the signal should be active high,
+                                     *   If the signal must be active high,
                                      *   it must be controlled externally. */
     uint8_t irq_priority;           ///< Interrupt priority.
-    uint8_t orc;                    ///< Over-run character.
+    uint8_t orc;                    ///< Overrun character.
                                     /**< This character is used when all bytes from the TX buffer are sent,
                                          but the transfer continues due to RX. */
     nrf_spi_frequency_t frequency;  ///< SPI frequency.
     nrf_spi_mode_t      mode;       ///< SPI mode.
     nrf_spi_bit_order_t bit_order;  ///< SPI bit order.
+    nrf_gpio_pin_pull_t miso_pull;  ///< MISO pull up configuration.
 } nrfx_spi_config_t;
 
 /**
  * @brief SPI master instance default configuration.
+ * This configuration sets up SPI with the following options:
+ * - over-run character set to 0xFF
+ * - clock frequency 4 MHz
+ * - mode 0 enabled (SCK active high, sample on leading edge of clock)
+ * - MSB shifted out first
+ * - MISO pull-up disabled
+ *
+ * @param[in] _pin_sck  SCK pin.
+ * @param[in] _pin_mosi MOSI pin.
+ * @param[in] _pin_miso MISO pin.
+ * @param[in] _pin_ss   SS pin.
  */
-#define NRFX_SPI_DEFAULT_CONFIG                           \
-{                                                         \
-    .sck_pin      = NRFX_SPI_PIN_NOT_USED,                \
-    .mosi_pin     = NRFX_SPI_PIN_NOT_USED,                \
-    .miso_pin     = NRFX_SPI_PIN_NOT_USED,                \
-    .ss_pin       = NRFX_SPI_PIN_NOT_USED,                \
-    .irq_priority = NRFX_SPI_DEFAULT_CONFIG_IRQ_PRIORITY, \
-    .orc          = 0xFF,                                 \
-    .frequency    = NRF_SPI_FREQ_4M,                      \
-    .mode         = NRF_SPI_MODE_0,                       \
-    .bit_order    = NRF_SPI_BIT_ORDER_MSB_FIRST,          \
+#define NRFX_SPI_DEFAULT_CONFIG(_pin_sck, _pin_mosi, _pin_miso, _pin_ss)    \
+{                                                                           \
+    .sck_pin      = _pin_sck,                                               \
+    .mosi_pin     = _pin_mosi,                                              \
+    .miso_pin     = _pin_miso,                                              \
+    .ss_pin       = _pin_ss,                                                \
+    .irq_priority = NRFX_SPI_DEFAULT_CONFIG_IRQ_PRIORITY,                   \
+    .orc          = 0xFF,                                                   \
+    .frequency    = NRF_SPI_FREQ_4M,                                        \
+    .mode         = NRF_SPI_MODE_0,                                         \
+    .bit_order    = NRF_SPI_BIT_ORDER_MSB_FIRST,                            \
+    .miso_pull    = NRF_GPIO_PIN_NOPULL,                                    \
 }
 
-/**
- * @brief Single transfer descriptor structure.
- */
+/** @brief Single transfer descriptor structure. */
 typedef struct
 {
     uint8_t const * p_tx_buffer; ///< Pointer to TX buffer.
     size_t          tx_length;   ///< TX buffer length.
     uint8_t       * p_rx_buffer; ///< Pointer to RX buffer.
     size_t          rx_length;   ///< RX buffer length.
-} nrfx_spi_xfer_desc_t;
+}nrfx_spi_xfer_desc_t;
 
 /**
  * @brief Macro for setting up single transfer descriptor.
  *
  * This macro is for internal use only.
  */
-#define NRFX_SPI_SINGLE_XFER(p_tx, tx_len, p_rx, rx_len)  \
-    {                                                     \
-    .p_tx_buffer = (uint8_t const *)(p_tx),               \
-    .tx_length = (tx_len),                                \
-    .p_rx_buffer = (p_rx),                                \
-    .rx_length = (rx_len),                                \
-    }
+#define NRFX_SPI_SINGLE_XFER(p_tx, tx_len, p_rx, rx_len) \
+{                                                        \
+    .p_tx_buffer = (uint8_t const *)(p_tx),              \
+    .tx_length = (tx_len),                               \
+    .p_rx_buffer = (p_rx),                               \
+    .rx_length = (rx_len),                               \
+}
 
-/**
- * @brief Macro for setting duplex TX RX transfer.
- */
+/** @brief Macro for setting the duplex TX RX transfer. */
 #define NRFX_SPI_XFER_TRX(p_tx_buf, tx_length, p_rx_buf, rx_length) \
         NRFX_SPI_SINGLE_XFER(p_tx_buf, tx_length, p_rx_buf, rx_length)
 
-/**
- * @brief Macro for setting TX transfer.
- */
+/** @brief Macro for setting the TX transfer. */
 #define NRFX_SPI_XFER_TX(p_buf, length) \
         NRFX_SPI_SINGLE_XFER(p_buf, length, NULL, 0)
 
-/**
- * @brief Macro for setting RX transfer.
- */
+/** @brief Macro for setting the RX transfer. */
 #define NRFX_SPI_XFER_RX(p_buf, length) \
         NRFX_SPI_SINGLE_XFER(NULL, 0, p_buf, length)
 
@@ -178,15 +180,14 @@ typedef enum
     NRFX_SPI_EVENT_DONE, ///< Transfer done.
 } nrfx_spi_evt_type_t;
 
+/** @brief SPI master event description with transmission details. */
 typedef struct
 {
     nrfx_spi_evt_type_t  type;      ///< Event type.
     nrfx_spi_xfer_desc_t xfer_desc; ///< Transfer details.
 } nrfx_spi_evt_t;
 
-/**
- * @brief SPI master driver event handler type.
- */
+/** @brief SPI master driver event handler type. */
 typedef void (* nrfx_spi_evt_handler_t)(nrfx_spi_evt_t const * p_event,
                                         void *                 p_context);
 
@@ -196,20 +197,19 @@ typedef void (* nrfx_spi_evt_handler_t)(nrfx_spi_evt_t const * p_event,
  * This function configures and enables the specified peripheral.
  *
  * @param[in] p_instance Pointer to the driver instance structure.
- * @param[in] p_config   Pointer to the structure with initial configuration.
- *
- * @param     handler    Event handler provided by the user. If NULL, transfers
+ * @param[in] p_config   Pointer to the structure with the initial configuration.
+ * @param[in] handler    Event handler provided by the user. If NULL, transfers
  *                       will be performed in blocking mode.
- * @param     p_context  Context passed to event handler.
+ * @param[in] p_context  Context passed to the event handler.
  *
- * @retval NRFX_SUCCESS             If initialization was successful.
- * @retval NRFX_ERROR_INVALID_STATE If the driver was already initialized.
- * @retval NRFX_ERROR_BUSY          If some other peripheral with the same
+ * @retval NRFX_SUCCESS             Initialization was successful.
+ * @retval NRFX_ERROR_INVALID_STATE The driver was already initialized.
+ * @retval NRFX_ERROR_BUSY          Some other peripheral with the same
  *                                  instance ID is already in use. This is
  *                                  possible only if @ref nrfx_prs module
  *                                  is enabled.
  */
-nrfx_err_t nrfx_spi_init(nrfx_spi_t const * const  p_instance,
+nrfx_err_t nrfx_spi_init(nrfx_spi_t const *        p_instance,
                          nrfx_spi_config_t const * p_config,
                          nrfx_spi_evt_handler_t    handler,
                          void *                    p_context);
@@ -219,7 +219,7 @@ nrfx_err_t nrfx_spi_init(nrfx_spi_t const * const  p_instance,
  *
  * @param[in] p_instance Pointer to the driver instance structure.
  */
-void       nrfx_spi_uninit(nrfx_spi_t const * const p_instance);
+void nrfx_spi_uninit(nrfx_spi_t const * p_instance);
 
 /**
  * @brief Function for starting the SPI data transfer.
@@ -234,28 +234,28 @@ void       nrfx_spi_uninit(nrfx_spi_t const * const p_instance);
  * @param flags       Transfer options (0 for default settings).
  *                    Currently, no additional flags are available.
  *
- * @retval NRFX_SUCCESS             If the procedure was successful.
- * @retval NRFX_ERROR_BUSY          If the driver is not ready for a new transfer.
- * @retval NRFX_ERROR_NOT_SUPPORTED If the provided parameters are not supported.
+ * @retval NRFX_SUCCESS             The procedure is successful.
+ * @retval NRFX_ERROR_BUSY          The driver is not ready for a new transfer.
+ * @retval NRFX_ERROR_NOT_SUPPORTED The provided parameters are not supported.
  */
-nrfx_err_t nrfx_spi_xfer(nrfx_spi_t const * const     p_instance,
+nrfx_err_t nrfx_spi_xfer(nrfx_spi_t const *           p_instance,
                          nrfx_spi_xfer_desc_t const * p_xfer_desc,
                          uint32_t                     flags);
 
 /**
- * @brief Function for aborting ongoing transfer.
+ * @brief Function for aborting the ongoing transfer.
  *
  * @param[in] p_instance Pointer to the driver instance structure.
  */
 void nrfx_spi_abort(nrfx_spi_t const * p_instance);
+
+/** @} */
 
 
 void nrfx_spi_0_irq_handler(void);
 void nrfx_spi_1_irq_handler(void);
 void nrfx_spi_2_irq_handler(void);
 
-
-/** @} */
 
 #ifdef __cplusplus
 }

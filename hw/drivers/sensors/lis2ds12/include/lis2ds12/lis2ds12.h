@@ -2,7 +2,7 @@
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * resarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
@@ -36,7 +36,7 @@ extern "C" {
 #define LIS2DS12_DATA_RATE_LP_10BIT_100HZ       0xC0
 #define LIS2DS12_DATA_RATE_LP_10BIT_200HZ       0xD0
 #define LIS2DS12_DATA_RATE_LP_10BIT_400HZ       0xE0
-#define LIS2DS12_DATA_RATE_LP_10BIT_800HZ       0x70
+#define LIS2DS12_DATA_RATE_LP_10BIT_800HZ       0xF0
 #define LIS2DS12_DATA_RATE_HR_14BIT_12_5HZ      0x10
 #define LIS2DS12_DATA_RATE_HR_14BIT_25HZ        0x20
 #define LIS2DS12_DATA_RATE_HR_14BIT_50HZ        0x30

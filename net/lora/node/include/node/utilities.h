@@ -29,17 +29,6 @@
 #define TimerTime_t uint32_t
 
 /*!
- * Generic definition
- */
-#ifndef SUCCESS
-#define SUCCESS                                     1
-#endif
-
-#ifndef FAIL
-#define FAIL                                        0
-#endif
-
-/*!
  * \brief Returns the minimum value between a and b
  *
  * \param [IN] a 1st value
@@ -136,13 +125,5 @@ TimerTime_t TimerGetCurrentTime( void );
  * \retval time             returns elapsed time
  */
 TimerTime_t TimerGetElapsedTime( TimerTime_t savedTime );
-
-/*!
- * \brief Return the Time elapsed since a fix moment in Time
- *
- * \param [IN] eventInFuture    fix moment in the future
- * \retval time             returns difference between now and future event
- */
-TimerTime_t TimerGetFutureTime( TimerTime_t eventInFuture );
 
 #endif // __UTILITIES_H__

@@ -30,6 +30,8 @@
 
 #include "id/id.h"
 
+#define ID_BASE64_MFG_HASH_SZ  (BASE64_ENCODE_SIZE(MFG_HASH_SZ))
+
 static char *id_conf_get(int argc, char **argv, char *val, int val_len_max);
 static int id_conf_set(int argc, char **argv, char *val);
 static int id_conf_export(void (*export_func)(char *name, char *val),
@@ -49,6 +51,9 @@ const char *id_app_str = "";
 #if MYNEWT_VAL(ID_SERIAL_PRESENT)
 char id_serial[ID_SERIAL_MAX_LEN];
 #endif
+#if MYNEWT_VAL(ID_SERIAL_MFG_PRESENT)
+char id_serial_mfg[ID_SERIAL_MFG_MAX_LEN];
+#endif
 #if MYNEWT_VAL(ID_MANUFACTURER_LOCAL)
 char id_manufacturer[ID_MANUFACTURER_MAX_LEN];
 #endif
@@ -56,8 +61,8 @@ char id_manufacturer[ID_MANUFACTURER_MAX_LEN];
 char id_model[ID_MODEL_MAX_LEN];
 #endif
 
-/** Base64-encoded null-terminated manufacturing hash. */
-char id_mfghash[BASE64_ENCODE_SIZE(MFG_HASH_SZ) + 1];
+/** Colon-delimited null-terminated list of base64-encoded mfgimage hashes. */
+char id_mfghash[MYNEWT_VAL(MFG_MAX_MMRS) * (ID_BASE64_MFG_HASH_SZ + 1)];
 
 struct conf_handler id_conf = {
     .ch_name = "id",
@@ -86,6 +91,10 @@ id_conf_get(int argc, char **argv, char *val, int val_len_max)
         } else if (!strcmp(argv[0], "serial")) {
             return (char *)id_serial;
 #endif
+#if MYNEWT_VAL(ID_SERIAL_MFG_PRESENT)
+        } else if (!strcmp(argv[0], "serial_mfg")) {
+            return (char *)id_serial_mfg;
+#endif
 #if MYNEWT_VAL(ID_MANUFACTURER_PRESENT)
         } else if (!strcmp(argv[0], "mfger")) {
             return (char *)id_manufacturer;
@@ -93,6 +102,10 @@ id_conf_get(int argc, char **argv, char *val, int val_len_max)
 #if MYNEWT_VAL(ID_MODEL_PRESENT)
         } else if (!strcmp(argv[0], "model")) {
             return (char *)id_model;
+#endif
+#if MYNEWT_VAL(ID_TARGET_PRESENT)
+        } else if (!strcmp(argv[0], "target")) {
+            return MYNEWT_VAL(TARGET_NAME);
 #endif
         } else if (!strcmp(argv[0], "mfghash")) {
             return id_mfghash;
@@ -108,6 +121,11 @@ id_conf_set(int argc, char **argv, char *val)
 #if MYNEWT_VAL(ID_SERIAL_PRESENT)
         if (!strcmp(argv[0], "serial")) {
             return CONF_VALUE_SET(val, CONF_STRING, id_serial);
+        }
+#endif
+#if MYNEWT_VAL(ID_SERIAL_MFG_PRESENT)
+        if (!strcmp(argv[0], "serial_mfg")) {
+            return CONF_VALUE_SET(val, CONF_STRING, id_serial_mfg);
         }
 #endif
 #if MYNEWT_VAL(ID_MANUFACTURER_LOCAL)
@@ -141,10 +159,16 @@ id_conf_export(void (*export_func)(char *name, char *val),
         export_func("id/bsp", (char *)id_bsp_str);
         export_func("id/app", (char *)id_app_str);
         export_func("id/mfghash", (char *)id_mfghash);
+#if MYNEWT_VAL(ID_TARGET_PRESENT)
+        export_func("id/target", MYNEWT_VAL(TARGET_NAME));
+#endif
     }
 #if MYNEWT_VAL(ID_SERIAL_PRESENT)
     export_func("id/serial", id_serial);
 #endif /* ID_SERIAL_PRESENT */
+#if MYNEWT_VAL(ID_SERIAL_MFG_PRESENT)
+    export_func("id/serial_mfg", id_serial_mfg);
+#endif /* ID_SERIAL_MFG_PRESENT */
 #if MYNEWT_VAL(ID_MANUFACTURER_PRESENT)
 #if MYNEWT_VAL(ID_MANUFACTURER_LOCAL)
     export_func("id/mfger", id_manufacturer);
@@ -170,27 +194,43 @@ static void
 id_read_mfghash(void)
 {
     uint8_t raw_hash[MFG_HASH_SZ];
-    struct mfg_meta_tlv tlv;
-    uint32_t off;
+    struct mfg_reader reader;
+    int str_off;
     int rc;
 
     memset(id_mfghash, 0, sizeof id_mfghash);
 
-    /* Find hash TLV in the manufacturing meta region. */
-    off = 0;
-    rc = mfg_next_tlv_with_type(&tlv, &off, MFG_META_TLV_TYPE_HASH);
-    if (rc != 0) {
-        return;
-    }
+    mfg_open(&reader);
 
-    /* Read the TLV contents. */
-    rc = mfg_read_tlv_hash(&tlv, off, raw_hash);
-    if (rc != 0) {
-        return;
-    }
+    str_off = 0;
+    while (1) {
+        rc = mfg_seek_next_with_type(&reader, MFG_META_TLV_TYPE_HASH);
+        if (rc != 0) {
+            return;
+        }
 
-    /* Store the SHA256 hash as a base64-encoded string. */
-    base64_encode(raw_hash, sizeof raw_hash, id_mfghash, 1);
+        if (str_off + ID_BASE64_MFG_HASH_SZ + 1 > sizeof id_mfghash) {
+            return;
+        }
+
+        /* Read the TLV contents. */
+        rc = mfg_read_tlv_hash(&reader, raw_hash);
+        if (rc != 0) {
+            return;
+        }
+
+        /* Append a delimiter if this isn't the first hash. */
+        if (str_off != 0) {
+            id_mfghash[str_off] = ':';
+            str_off++;
+        }
+
+        /* Append the SHA256 hash as a base64-encoded string. */
+        base64_encode(raw_hash, sizeof raw_hash, &id_mfghash[str_off], 1);
+        str_off += ID_BASE64_MFG_HASH_SZ;
+
+        id_mfghash[str_off] = '\0';
+    }
 }
 
 void

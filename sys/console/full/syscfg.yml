@@ -16,14 +16,18 @@
 # under the License.
 #
 
-# Package: sys/console/full
-
 syscfg.defs:
     CONSOLE_UART:
         description: 'Set console output to UART'
         value: 1
     CONSOLE_RTT:
         description: 'Set console output to RTT'
+        value: 0
+    CONSOLE_SEMIHOSTING:
+        description: 'Set console output to ARM semihosting'
+        value: 0
+    CONSOLE_USB:
+        description: 'Set console to USB'
         value: 0
     CONSOLE_BLE_MONITOR:
         description: 'Set console output to BLE Monitor'
@@ -43,11 +47,42 @@ syscfg.defs:
     CONSOLE_MAX_INPUT_LEN:
         description: 'Maximum input line length'
         value: 256
-    CONSOLE_HISTORY_SIZE:
+    CONSOLE_HISTORY:
         description: >
-            Number of lines to be stored in console history.
-            Set to "0" to disable console history.
+            Select how console should handle command history.
+        value: none
+        choices:
+            - none  # no history support
+            - ram   # history kept in ram for current session only
+            - log   # history kept in log
+    CONSOLE_HISTORY_AUTO_SEARCH:
+        description: >
+            When set to 1 history is automatically searched for lines starting with already typed
+            text.
         value: 0
+    CONSOLE_PROMPT_MAX_LEN:
+        description: 'Maximum number of characters for prompt'
+        value: 16
+    CONSOLE_PROMPT_STICKY:
+        description: >
+            If set to 1 prompt will be visible all the time at the
+            bottom of terminal if terminal was detected.
+        value: 0
+    CONSOLE_PROMPT_SOFT_CURSOR:
+        description: >
+            Set this to 1 for VT102 like terminals in case of volume of
+            log prints makes it difficult to see cursor in prompt line.
+        value: 0
+    CONSOLE_PROMPT_SOFT_CURSOR_ATTR:
+        description: >
+            Terminal escape sequence for cursor graphics mode.
+            For black and white (minicom) use "7m" - inverse
+            For color (putty) use "30;42m" - black/green
+        value: '"7m"'
+    CONSOLE_PROMPT_HIDE_CURSOR_IN_LOG_AREA:
+        description: >
+            Hide cursor in log area.
+        value: 1
 
     CONSOLE_UART_BAUD:
         description: 'Console UART baud rate.'
@@ -94,3 +129,25 @@ syscfg.defs:
             value may affect RTT console responsiveness, using small value may
             affect device performance due to more frequent polling.
         value: 250
+
+    CONSOLE_SEMIHOSTING_TX_BUF_SIZE:
+        description: 'ARM semihosting console transmit buffer size'
+        value: 128
+
+    CONSOLE_DEFAULT_LOCK_TIMEOUT:
+        description: 'Default timeout (in ms) for console_lock() function used in console_write.'
+        value: 1000
+
+    CONSOLE_SYSINIT_STAGE:
+        description: >
+            Sysinit stage for console functionality.
+        value: 20
+
+    CONSOLE_HISTORY_SIZE:
+        description: >
+            This is no longer used.
+            Equivalent settings:
+                CONSOLE_HISTORY: ram
+                CONSOLE_HISTORY_RAM_HISTORY_SIZE: <n>   <- previous value of CONSOLE_HISTORY_SIZE
+        value: 0
+        defunct: 1

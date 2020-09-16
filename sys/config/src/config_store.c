@@ -67,7 +67,34 @@ conf_dst_register(struct conf_store *cs)
 static void
 conf_load_cb(char *name, char *val, void *cb_arg)
 {
-    conf_set_value(name, val);
+    if (!cb_arg || !strcmp((char*)cb_arg, name)) {
+        /* If cb_arg is set, set specific conf value
+         * If cb_arg is not set, just set the value
+         * anyways
+         */
+        conf_set_value(name, val);
+    }
+}
+
+int
+conf_load_one(char *name)
+{
+    struct conf_store *cs;
+
+    /*
+     * for this specific config store
+     *    load config
+     *    apply config
+     *    commit all
+     */
+    conf_lock();
+    conf_loading = true;
+    SLIST_FOREACH(cs, &conf_load_srcs, cs_next) {
+        cs->cs_itf->csi_load(cs, conf_load_cb, name);
+    }
+    conf_loading = false;
+    conf_unlock();
+    return conf_commit(name);
 }
 
 int
@@ -233,16 +260,15 @@ conf_save_tree(char *name)
     int rc;
 
     conf_lock();
+
     ch = conf_parse_and_lookup(name, &name_argc, name_argv);
     if (!ch) {
         rc = OS_INVALID_PARM;
         goto out;
     }
-    if (ch->ch_export) {
-        rc = ch->ch_export(conf_store_one, CONF_EXPORT_PERSIST);
-    } else {
-        rc = 0;
-    }
+
+    rc = conf_export_cb(ch, conf_store_one, CONF_EXPORT_PERSIST);
+
 out:
     conf_unlock();
     return rc;
@@ -273,11 +299,9 @@ conf_save(void)
     }
     rc = 0;
     SLIST_FOREACH(ch, &conf_handlers, ch_list) {
-        if (ch->ch_export) {
-            rc2 = ch->ch_export(conf_store_one, CONF_EXPORT_PERSIST);
-            if (!rc) {
-                rc = rc2;
-            }
+        rc2 = conf_export_cb(ch, conf_store_one, CONF_EXPORT_PERSIST);
+        if (!rc) {
+            rc = rc2;
         }
     }
     if (cs->cs_itf->csi_save_end) {

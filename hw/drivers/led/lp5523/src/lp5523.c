@@ -19,8 +19,13 @@
 
 #include <string.h>
 #include "os/mynewt.h"
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+#include "bus/drivers/i2c_common.h"
+#include "bus/drivers/spi_common.h"
+#else
 #include <hal/hal_i2c.h>
 #include <i2cn/i2cn.h>
+#endif
 #include <modlog/modlog.h>
 #include <stats/stats.h>
 
@@ -42,9 +47,6 @@ STATS_NAME_END(lp5523_stat_section)
 /* Global variable used to hold stats data */
 STATS_SECT_DECL(lp5523_stat_section) g_lp5523stats;
 
-#define LP5523_LOG(lvl_, ...) \
-    MODLOG_ ## lvl_(MYNEWT_VAL(LP5523_LOG_MODULE), __VA_ARGS__)
-
 int
 lp5523_set_reg(struct led_itf *itf, enum lp5523_registers addr,
     uint8_t value)
@@ -52,6 +54,9 @@ lp5523_set_reg(struct led_itf *itf, enum lp5523_registers addr,
     int rc;
     uint8_t payload[2] = { addr, value };
 
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_node_simple_write(itf->li_dev, payload, sizeof(payload));
+#else
     struct hal_i2c_master_data data_struct = {
         .address = itf->li_addr,
         .len = 2,
@@ -67,7 +72,7 @@ lp5523_set_reg(struct led_itf *itf, enum lp5523_registers addr,
                            MYNEWT_VAL(LP5523_I2C_RETRIES));
 
     if (rc) {
-        LP5523_LOG(ERROR,
+        LP5523_LOG_ERROR(
                    "Failed to write to 0x%02X:0x%02X with value 0x%02X "
                    "(rc=%d)\n",
                    itf->li_addr, addr, value, rc);
@@ -75,6 +80,7 @@ lp5523_set_reg(struct led_itf *itf, enum lp5523_registers addr,
     }
 
     led_itf_unlock(itf);
+#endif
 
     return rc;
 }
@@ -85,6 +91,9 @@ lp5523_get_reg(struct led_itf *itf, enum lp5523_registers addr,
 {
     int rc;
 
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_node_simple_write_read_transact(itf->li_dev, &addr, 1, value, 1);
+#else
     struct hal_i2c_master_data data_struct = {
         .address = itf->li_addr,
         .len = 1,
@@ -101,7 +110,7 @@ lp5523_get_reg(struct led_itf *itf, enum lp5523_registers addr,
                            MYNEWT_VAL(LP5523_I2C_RETRIES));
 
     if (rc) {
-        LP5523_LOG(ERROR, "I2C access failed at address 0x%02X\n",
+        LP5523_LOG_ERROR("I2C access failed at address 0x%02X\n",
                    itf->li_addr);
         STATS_INC(g_lp5523stats, write_errors);
         goto err;
@@ -113,13 +122,14 @@ lp5523_get_reg(struct led_itf *itf, enum lp5523_registers addr,
                           MYNEWT_VAL(LP5523_I2C_RETRIES));
 
     if (rc) {
-         LP5523_LOG(ERROR, "Failed to read from 0x%02X:0x%02X\n",
+         LP5523_LOG_ERROR("Failed to read from 0x%02X:0x%02X\n",
                     itf->li_addr, addr);
          STATS_INC(g_lp5523stats, read_errors);
     }
 
 err:
     led_itf_unlock(itf);
+#endif
 
     return rc;
 }
@@ -129,17 +139,23 @@ lp5523_set_n_regs(struct led_itf *itf, enum lp5523_registers addr,
     uint8_t *vals, uint8_t len)
 {
     int rc;
-    uint8_t regs[LP5523_MAX_PAYLOAD] = {0};
+    uint8_t payload[LP5523_MAX_PAYLOAD] = {0};
 
+    if (len >= LP5523_MAX_PAYLOAD) {
+        return -1;
+    }
+
+    payload[0] = addr;
+    memcpy(&payload[1], vals, len);
+
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_node_simple_write(itf->li_dev, payload, len + 1);
+#else
     struct hal_i2c_master_data data_struct = {
         .address = itf->li_addr,
         .len = len + 1,
-        .buffer = regs
+        .buffer = payload,
     };
-
-    memcpy(regs, vals, len + 1);
-
-    regs[0] = addr;
 
     rc = led_itf_lock(itf, MYNEWT_VAL(LP5523_ITF_LOCK_TMO));
     if (rc) {
@@ -150,12 +166,13 @@ lp5523_set_n_regs(struct led_itf *itf, enum lp5523_registers addr,
                            1, MYNEWT_VAL(LP5523_I2C_RETRIES));
 
     if (rc) {
-        LP5523_LOG(ERROR, "Failed to write to 0x%02X:0x%02X\n", itf->li_addr,
-                   regs[0]);
+        LP5523_LOG_ERROR("Failed to write to 0x%02X:0x%02X\n", itf->li_addr,
+                   addr);
         STATS_INC(g_lp5523stats, read_errors);
     }
 
     led_itf_unlock(itf);
+#endif
 
     return rc;
 }
@@ -168,6 +185,9 @@ lp5523_get_n_regs(struct led_itf *itf, enum lp5523_registers addr,
     int rc;
     uint8_t addr_b = (uint8_t) addr;
 
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_node_simple_write_read_transact(itf->li_dev, &addr_b, 1, vals, len);
+#else
     struct hal_i2c_master_data data_struct = {
         .address = itf->li_addr,
         .len = 1,
@@ -183,7 +203,7 @@ lp5523_get_n_regs(struct led_itf *itf, enum lp5523_registers addr,
                            0, MYNEWT_VAL(LP5523_I2C_RETRIES));
 
     if (rc) {
-        LP5523_LOG(ERROR, "Failed to write to 0x%02X:0x%02X\n", itf->li_addr,
+        LP5523_LOG_ERROR("Failed to write to 0x%02X:0x%02X\n", itf->li_addr,
                    addr_b);
         STATS_INC(g_lp5523stats, read_errors);
         goto err;
@@ -195,13 +215,14 @@ lp5523_get_n_regs(struct led_itf *itf, enum lp5523_registers addr,
                           MYNEWT_VAL(LP5523_I2C_RETRIES));
 
     if (rc) {
-         LP5523_LOG(ERROR, "Failed to read from 0x%02X:0x%02X\n", itf->li_addr,
+         LP5523_LOG_ERROR("Failed to read from 0x%02X:0x%02X\n", itf->li_addr,
                     addr_b);
          STATS_INC(g_lp5523stats, read_errors);
     }
 
 err:
     led_itf_unlock(itf);
+#endif
 
     return rc;
 }
@@ -308,26 +329,35 @@ int
 lp5523_set_output_on(struct led_itf *itf, uint8_t output, uint8_t on)
 {
     int rc;
-    uint16_t outputs;
+    uint8_t reg_addr;
+    uint8_t reg;
+    uint8_t shamt;
 
     if ((output < 1) || (output > 9)) {
         rc = -1;
         goto err;
     }
 
-    rc = lp5523_get_bitfield(itf, LP5523_OUTPUT_CTRL_MSB,
-                             &outputs);
+    if (output < 9) {
+        reg_addr = LP5523_OUTPUT_CTRL_LSB;
+        shamt = output - 1;
+    } else {
+        reg_addr = LP5523_OUTPUT_CTRL_MSB;
+        shamt = output - 9;
+    }
+
+    rc = lp5523_get_reg(itf, reg_addr, &reg);
     if (rc) {
         goto err;
     }
 
     if (!on) {
-        outputs &= ~(0x1 << (output - 1));
+        reg &= ~(0x01 << (shamt));
     } else {
-        outputs |= (0x1 << (output - 1));
+        reg |= (0x01 << (shamt));
     }
 
-    rc = lp5523_set_bitfield(itf, LP5523_OUTPUT_CTRL_MSB, outputs);
+    rc = lp5523_set_reg(itf, reg_addr, reg);
     if (rc) {
         goto err;
     }
@@ -341,20 +371,29 @@ int
 lp5523_get_output_on(struct led_itf *itf, uint8_t output, uint8_t *on)
 {
     int rc;
-    uint16_t outputs;
+    uint8_t reg_addr;
+    uint8_t reg;
+    uint8_t shamt;
 
     if ((output < 1) || (output > 9)) {
         rc = -1;
         goto err;
     }
 
-    rc = lp5523_get_bitfield(itf, LP5523_OUTPUT_CTRL_MSB,
-                             &outputs);
+    if (output < 9) {
+        reg_addr = LP5523_OUTPUT_CTRL_LSB;
+        shamt = output - 1;
+    } else {
+        reg_addr = LP5523_OUTPUT_CTRL_MSB;
+        shamt = output - 9;
+    }
+
+    rc = lp5523_get_reg(itf, reg_addr, &reg);
     if (rc) {
         goto err;
     }
 
-    *on = (outputs & (0x1 << (output - 1)));
+    *on = (reg & (0x1 << shamt));
 
     return 0;
 err:
@@ -381,7 +420,6 @@ lp5523_get_output_reg(struct led_itf *itf, enum lp5523_output_registers addr,
     }
     return lp5523_get_reg(itf, addr + (output - 1), value);
 }
-
 
 int
 lp5523_set_engine_reg(struct led_itf *itf, enum lp5523_engine_registers addr,
@@ -593,20 +631,40 @@ lp5523_get_engine_mapping(struct led_itf *itf, uint8_t engine,
 static int
 lp5523_set_pr_instruction(struct led_itf *itf, uint8_t addr, uint16_t *ins)
 {
-    uint8_t mem[2] = { ((*ins) >> 8) & 0x00ff, (*ins) & 0x00ff };
+    int rc;
 
-    return lp5523_set_n_regs(itf, LP5523_PROGRAM_MEMORY + (addr << 1), mem, 2);
+    uint8_t byte1 = (((*ins) >> 8) & 0x00ff);
+    uint8_t byte2 = ((*ins) & 0x00ff);
+
+    addr = addr << 1;
+
+    rc = lp5523_set_n_regs(itf, LP5523_PROGRAM_MEMORY + addr, &byte1, 1);
+    if (rc) {
+        return rc;
+    }
+
+    rc = lp5523_set_n_regs(itf, LP5523_PROGRAM_MEMORY + (addr + 1), &byte2, 1);
+
+    return rc;
 }
 
 static int
 lp5523_get_pr_instruction(struct led_itf *itf, uint8_t addr, uint16_t *ins)
 {
     int rc;
-    uint8_t mem[2];
+    uint8_t byte1;
+    uint8_t byte2;
 
-    rc = lp5523_get_n_regs(itf, LP5523_PROGRAM_MEMORY + (addr << 1), mem, 2);
+    addr = addr << 1;
 
-    *ins = (((uint16_t)mem[0]) << 8) | mem[1];
+    rc = lp5523_get_n_regs(itf, LP5523_PROGRAM_MEMORY + addr, &byte1, 1);
+    if (rc) {
+        return rc;
+    }
+
+    rc = lp5523_get_n_regs(itf, LP5523_PROGRAM_MEMORY + (addr + 1), &byte2, 1);
+
+    *ins = (((uint16_t)byte1) << 8) | byte2;
 
     return rc;
 }
@@ -616,15 +674,22 @@ lp5523_verify_pr_instruction(struct led_itf *itf, uint8_t addr,
     uint16_t *ins)
 {
     int rc;
-    uint8_t mem[2];
+    uint8_t byte1;
+    uint8_t byte2;
     uint16_t ver;
 
-    rc = lp5523_get_n_regs(itf, LP5523_PROGRAM_MEMORY + (addr << 1), mem, 2);
+    addr = addr << 1;
+    rc = lp5523_get_n_regs(itf, LP5523_PROGRAM_MEMORY + addr, &byte1, 1);
     if (rc) {
         return rc;
     }
 
-    ver = ((((uint16_t)mem[0]) << 8) | mem[1]);
+    rc = lp5523_get_n_regs(itf, LP5523_PROGRAM_MEMORY + (addr + 1), &byte2, 1);
+    if (rc) {
+        return rc;
+    }
+
+    ver = ((((uint16_t)byte1) << 8) | byte2);
 
     return (*ins != ver) ? 1 : 0;
 }
@@ -871,6 +936,7 @@ lp5523_self_test(struct led_itf *itf) {
     uint8_t vdd;
     uint8_t adc;
     uint8_t i;
+    uint8_t on = 0;
 
     rc = lp5523_get_status(itf, &status);
     if (rc) {
@@ -894,8 +960,14 @@ lp5523_self_test(struct led_itf *itf) {
         return rc;
     }
 
-    i = 1;
-    while (i <= 9) {
+    for (i = 1; i <= 9; ++i) {
+        rc = lp5523_get_output_on(itf, i, &on);
+        if (rc) {
+            return rc;
+        }
+        if (!on) {
+            continue;
+        }
         /* set LED PWM to 0xff */
         rc = lp5523_set_output_reg(itf, LP5523_PWM, i, 0xff);
         if (rc) {
@@ -918,7 +990,6 @@ lp5523_self_test(struct led_itf *itf) {
         if (rc) {
             return rc;
         }
-        ++i;
     }
 
     return 0;
@@ -929,7 +1000,7 @@ lp5523_init(struct os_dev *dev, void *arg)
 {
     int rc;
 
-    if (!arg || !dev) {
+    if (!dev) {
         return SYS_ENODEV;
     }
 
@@ -976,7 +1047,9 @@ lp5523_config(struct led_itf *itf, struct lp5523_cfg *cfg)
     int i;
     uint8_t misc_val;
 
+#if !MYNEWT_VAL(BUS_DRIVER_PRESENT)
     itf->li_addr = LP5523_I2C_BASE_ADDR + cfg->asel;
+#endif
 
     if (cfg->prereset) {
         rc = lp5523_reset(itf);
@@ -1071,3 +1144,29 @@ lp5523_config(struct led_itf *itf, struct lp5523_cfg *cfg)
 err:
     return rc;
 }
+
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+static void
+init_node_cb(struct bus_node *bnode, void *arg)
+{
+    assert(arg == NULL);
+
+    lp5523_init((struct os_dev *)bnode, NULL);
+}
+
+int
+lp5523_create_i2c_dev(struct bus_i2c_node *node, const char *name,
+                      const struct bus_i2c_node_cfg *i2c_cfg)
+{
+    struct bus_node_callbacks cbs = {
+        .init = init_node_cb,
+    };
+    int rc;
+
+    bus_node_set_callbacks((struct os_dev *)node, &cbs);
+
+    rc = bus_i2c_node_create(name, node, i2c_cfg, NULL);
+
+    return rc;
+}
+#endif

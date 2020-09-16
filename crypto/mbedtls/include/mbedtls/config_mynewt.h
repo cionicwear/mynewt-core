@@ -46,7 +46,10 @@ extern "C" {
 #undef MBEDTLS_SELF_TEST
 #endif
 
-#define MBEDTLS_SHA256_SMALLER     /* comes with performance hit */
+#define MBEDTLS_SHA256_SMALLER       /* comes with performance hit */
+#define MBEDTLS_ENTROPY_HARDWARE_ALT /* hardware entropy source */
+#define MBEDTLS_NIST_KW_C            /* encrypted images with AES-KW */
+#define MBEDTLS_AES_ALT              /* enable HW based AES */
 
 /**
  * \name SECTION: Module configuration options
@@ -180,8 +183,21 @@ extern "C" {
 #undef MBEDTLS_ECP_DP_CURVE25519_ENABLED
 #endif
 
+#if MYNEWT_VAL(MBEDTLS_AES_ALT) == 0
+#undef MBEDTLS_AES_ALT
+#endif
 #if MYNEWT_VAL(MBEDTLS_AES_C) == 0
 #undef MBEDTLS_AES_C
+#endif
+#if MYNEWT_VAL(MBEDTLS_AES_ROM_TABLES)
+#define MBEDTLS_AES_ROM_TABLES
+#else
+#undef MBEDTLS_AES_ROM_TABLES
+#endif
+#if MYNEWT_VAL(MBEDTLS_AES_FEWER_TABLES)
+#define MBEDTLS_AES_FEWER_TABLES
+#else
+#undef MBEDTLS_AES_FEWER_TABLES
 #endif
 #if MYNEWT_VAL(MBEDTLS_ARC4_C) == 0
 #undef MBEDTLS_ARC4_C
@@ -234,6 +250,14 @@ extern "C" {
 #undef MBEDTLS_CTR_DRBG_C
 #endif
 
+#if MYNEWT_VAL(MBEDTLS_SHA256_ALT) == 0
+#undef MBEDTLS_SHA256_ALT
+#elif !defined(MBEDTLS_SHA256_ALT)
+#define MBEDTLS_SHA256_ALT 1
+#endif
+#if MYNEWT_VAL(MBEDTLS_SHA256_C) == 0
+#undef MBEDTLS_SHA256_C
+#endif
 #if MYNEWT_VAL(MBEDTLS_MD5_C) == 0
 #undef MBEDTLS_MD5_C
 #endif
@@ -267,6 +291,10 @@ extern "C" {
 
 #if MYNEWT_VAL(MBEDTLS_ENTROPY_C) == 0
 #undef MBEDTLS_ENTROPY_C
+#endif
+
+#if MYNEWT_VAL(MBEDTLS_ENTROPY_HARDWARE_ALT) == 0
+#undef MBEDTLS_ENTROPY_HARDWARE_ALT
 #endif
 
 #if MYNEWT_VAL(MBEDTLS_PKCS1_V15) == 0

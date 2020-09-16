@@ -40,7 +40,7 @@ struct log_handler {
 };
 
 static inline int
-log_register(char *name, struct log *log, const struct log_handler *h,
+log_register(const char *name, struct log *log, const struct log_handler *h,
              void *arg, uint8_t level)
 {
     return 0;
@@ -71,9 +71,57 @@ log_append_mbuf_typed_no_free(struct log *log, uint8_t module, uint8_t level,
     return 0;
 }
 
+static inline int
+log_append_mbuf_typed(struct log *log, uint8_t module, uint8_t level,
+                      uint8_t etype, struct os_mbuf *om)
+{
+    os_mbuf_free_chain(om);
+    return 0;
+}
+
+static inline int
+log_append_mbuf_body_no_free(struct log *log, uint8_t module, uint8_t level,
+                             uint8_t etype, struct os_mbuf *om)
+{
+    return 0;
+}
+
+static inline int
+log_append_mbuf_body(struct log *log, uint8_t module, uint8_t level,
+                     uint8_t etype, struct os_mbuf *om)
+{
+    os_mbuf_free_chain(om);
+    return 0;
+}
+
 static inline void
 log_init(void)
 {
+}
+
+static inline void log_set_level(struct log *log, uint8_t level)
+{
+    return;
+}
+
+static inline uint8_t log_get_level(const struct log *log)
+{
+    return 0;
+}
+
+/**
+ * @brief Set maximum length of an entry in the log. If set to
+ *        0, no check will be made for maximum write length.
+ *        Note that this is maximum log body length; the log
+ *        entry header is not included in the check.
+ *
+ * @param log                   Log to set max entry length
+ * @param level                 New max entry length
+ */
+static inline void
+log_set_max_entry_len(struct log *log, uint16_t max_entry_len)
+{
+    return;
 }
 
 #define log_printf(...)
@@ -84,9 +132,6 @@ log_init(void)
 extern const struct log_handler log_console_handler;
 extern const struct log_handler log_cbmem_handler;
 extern const struct log_handler log_fcb_handler;
-#if MYNEWT_VAL(LOG_FCB_SLOT1)
-extern const struct log_handler log_fcb_slot1_handler;
-#endif
 
 #if MYNEWT_VAL(LOG_CONSOLE)
 static inline struct log *

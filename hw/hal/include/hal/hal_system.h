@@ -68,6 +68,12 @@ enum hal_reset_reason {
     HAL_RESET_BROWNOUT = 5,
     /** Restart due to user request */
     HAL_RESET_REQUESTED = 6,
+    /** System Off, wakeup on external interrupt*/
+    HAL_RESET_SYS_OFF_INT = 7,
+    /** Restart due to DFU */
+    HAL_RESET_DFU = 8,
+    /** Restart reason other */
+    HAL_RESET_OTHER = 256,
 };
 
 /**
@@ -88,6 +94,11 @@ const char *hal_reset_cause_str(void);
  * Starts clocks needed by system
  */
 void hal_system_clock_start(void);
+
+/**
+ * Reset callback to be called before an reset happens inside hal_system_reset()
+ */
+void hal_system_reset_cb(void);
 
 #ifdef __cplusplus
 }

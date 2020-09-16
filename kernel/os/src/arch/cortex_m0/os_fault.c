@@ -117,12 +117,11 @@ __assert_func(const char *file, int line, const char *func, const char *e)
     console_blocking_mode();
     OS_PRINT_ASSERT(file, line, func, e);
 
-    if (hal_debugger_connected()) {
-       /*
-        * If debugger is attached, breakpoint before the trap.
-        */
-       asm("bkpt");
-    }
+
+#if MYNEWT_VAL(OS_ASSERT_CB)
+    os_assert_cb();
+#endif
+
     SCB->ICSR = SCB_ICSR_NMIPENDSET_Msk;
     /* Exception happens right away. Next line not executed. */
     hal_system_reset();
@@ -133,6 +132,9 @@ os_default_irq(struct trap_frame *tf)
 {
 #if MYNEWT_VAL(OS_COREDUMP)
     struct coredump_regs regs;
+#endif
+#if MYNEWT_VAL(OS_CRASH_RESTORE_REGS)
+    uint32_t *orig_sp;
 #endif
 
     console_blocking_mode();
@@ -153,6 +155,48 @@ os_default_irq(struct trap_frame *tf)
     trap_to_coredump(tf, &regs);
     coredump_dump(&regs, sizeof(regs));
 #endif
+
+#if MYNEWT_VAL(OS_CRASH_RESTORE_REGS)
+    if ((SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk) < 16) {
+        console_printf("Use 'set $pc = 0x%08lx' to restore PC in gdb\n",
+                       tf->ef->pc);
+
+        orig_sp = &tf->ef->r0;
+        orig_sp += 8;
+        if (tf->ef->psr & SCB_CCR_STKALIGN_Msk) {
+            orig_sp++;
+        }
+
+        console_printf("Use 'set $pc = 0x%08lx' to restore PC in gdb\n",
+                       tf->ef->pc);
+
+        __asm volatile (
+            "mov sp,  %[stack_ptr]\n"
+            "mov r0,  %[regs1]\n"
+            "mov r1,  %[regs2]\n"
+            "mov r2,  r1\n"
+            "add r2,  r2, #16\n"
+            "ldm r2!, {r4-r7}\n"
+            "mov r8,  r4\n"
+            "mov r9,  r5\n"
+            "mov r10, r6\n"
+            "mov r11, r7\n"
+            "ldm r1!, {r4-r7}\n"
+            "ldr r1,  [r0, #16]\n"
+            "mov r12, r1\n"
+            "ldr r1,  [r0, #20]\n"
+            "mov lr,  r1\n"
+            "ldm r0!, {r0-r3}\n"
+            "bkpt"
+            :
+            : [regs1] "r" (tf->ef),
+              [regs2] "r" (&tf->r4),
+              [stack_ptr] "r" (orig_sp)
+            : "r0", "r1", "r2"
+        );
+    }
+#endif
+
     hal_system_reset();
 }
 

@@ -26,7 +26,7 @@ pkg.keywords:
 
 pkg.deps:
     - "@apache-mynewt-core/kernel/os"
-    - "@apache-mynewt-core/boot/bootutil"
+    - "@mcuboot/boot/bootutil"
     - "@apache-mynewt-core/sys/shell"
     - "@apache-mynewt-core/sys/config"
     - "@apache-mynewt-core/sys/console/full"
@@ -43,4 +43,4 @@ pkg.deps.CONFIG_FCB:
 
 pkg.deps.BUILD_WITH_OIC:
     - "@apache-mynewt-core/net/oic"
-    - "@apache-mynewt-core/encoding/cborattr"
+    - "@apache-mynewt-mcumgr/cborattr"
