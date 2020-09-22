@@ -39,7 +39,6 @@ static int default_module = -1;
 static struct shell_cmd app_cmd;
 static shell_prompt_function_t app_prompt_handler;
 static shell_line_func_t app_line_handler = shell_process_command;
-static shell_cmd_func_t app_cmd_handler;
 
 /* Shared queue for shell events to be processed */
 static struct os_eventq *shell_evq;
@@ -458,11 +457,16 @@ shell_exec(int argc, char **argv, struct streamer *streamer)
     return rc;
 }
 
-static void
+void
 shell_process_command(char *line, struct streamer *streamer)
 {
     char *argv[MYNEWT_VAL(SHELL_CMD_ARGC_MAX) + 1];
     size_t argc;
+    struct streamer *strm = streamer;
+
+    if(strm == NULL){
+        strm = streamer_console_get();
+    }
 
     argc = line2argv(line, argv, MYNEWT_VAL(SHELL_CMD_ARGC_MAX) + 1, streamer);
     if (!argc) {

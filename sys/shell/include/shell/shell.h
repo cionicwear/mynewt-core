@@ -170,7 +170,6 @@ void shell_evq_set(struct os_eventq *evq);
  */
 void shell_process_command(char *line, struct streamer *streamer);
 
-#if MYNEWT_VAL(SHELL_NEWTMGR)
 /**
  * @brief Processes a set of arguments and executes their corresponding shell
  * command.
