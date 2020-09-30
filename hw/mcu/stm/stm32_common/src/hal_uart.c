@@ -132,7 +132,15 @@ static struct hal_uart_irq uart_irqs[4];
 static struct hal_uart_irq uart_irqs[3];
 #endif
 
-#if !MYNEWT_VAL(STM32_HAL_UART_HAS_SR)
+#if MYNEWT_VAL(MCU_STM32H7)
+#  define STATUS(x)     ((x)->ISR)
+#  define RXNE          USART_ISR_RXNE_RXFNE
+#  define TXE           USART_ISR_TXE_TXFNF
+#  define TC            USART_ISR_TC
+#  define RXDR(x)       ((x)->RDR)
+#  define TXDR(x)       ((x)->TDR)
+#  define BAUD(x,y)     UART_DIV_SAMPLING16((x), (y), UART_PRESCALER_DIV1)
+#elif !MYNEWT_VAL(STM32_HAL_UART_HAS_SR)
 #  define STATUS(x)     ((x)->ISR)
 #  define RXNE          USART_ISR_RXNE
 #  define TXE           USART_ISR_TXE

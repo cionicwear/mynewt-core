@@ -96,6 +96,18 @@ struct stm32_hal_spi stm32_hal_spi4;
 struct stm32_hal_spi stm32_hal_spi5;
 #endif
 
+#if MYNEWT_VAL(MCU_STM32H7)
+#define RXNE_IT_FLAG    SPI_IT_RXP
+#define TXE_IT_FLAG     SPI_IT_TXP
+#define SR_RX           SPI_SR_RXP
+#define BR_POS          SPI_CFG1_MBR_Pos;
+#else
+#define RXNE_IT_FLAG    SPI_IT_RXNE
+#define TXE_IT_FLAG     SPI_IT_TXE
+#define SR_RX           SPI_SR_RXNE
+#define BR_POS          SPI_CR1_BR_Pos;
+#endif
+
 static struct stm32_hal_spi *stm32_hal_spis[STM32_HAL_SPI_MAX] = {
 #if SPI_0_ENABLED
     &stm32_hal_spi0,
@@ -272,9 +284,9 @@ spi_ss_isr(void *arg)
          */
         if (spi->tx_in_prog) {
             __HAL_SPI_ENABLE_IT(&spi->handle,
-              SPI_IT_RXNE | SPI_IT_TXE | SPI_IT_ERR);
+              RXNE_IT_FLAG | TXE_IT_FLAG | SPI_IT_ERR);
         } else {
-            __HAL_SPI_ENABLE_IT(&spi->handle, SPI_IT_TXE | SPI_IT_ERR);
+            __HAL_SPI_ENABLE_IT(&spi->handle, TXE_IT_FLAG | SPI_IT_ERR);
         }
         reg = spi->handle.Instance->CR1;
         reg &= ~SPI_CR1_SSI;
@@ -286,7 +298,7 @@ spi_ss_isr(void *arg)
         /*
          * Chip select done. Check whether there's pending data to RX.
          */
-        if (spi->handle.Instance->SR & SPI_SR_RXNE && spi->handle.RxISR) {
+        if (spi->handle.Instance->SR & SR_RX && spi->handle.RxISR) {
             spi->handle.RxISR(&spi->handle);
         }
 
@@ -298,7 +310,7 @@ spi_ss_isr(void *arg)
         reg |= SPI_CR1_SSI;
         spi->handle.Instance->CR1 = reg;
 
-        __HAL_SPI_DISABLE_IT(&spi->handle, SPI_IT_RXNE|SPI_IT_TXE|SPI_IT_ERR);
+        __HAL_SPI_DISABLE_IT(&spi->handle, RXNE_IT_FLAG|TXE_IT_FLAG|SPI_IT_ERR);
 
         len = spi->handle.RxXferSize - spi->handle.RxXferCount;
         if (len) {
@@ -474,7 +486,7 @@ stm32_spi_resolve_prescaler(uint8_t spi_num, uint32_t baudrate, uint32_t *presca
     for (i = 0; i < 8; i++) {
         candidate_br = apbfreq >> (i + 1);
         if (candidate_br <= baudrate) {
-            *prescaler = i << SPI_CR1_BR_Pos;
+            *prescaler = i << BR_POS;
             break;
         }
     }
