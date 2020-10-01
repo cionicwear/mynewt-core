@@ -10,7 +10,7 @@
 #include <stdint.h>
 
 #if defined(STM32H747xx)
- #define MCU_NUM_PERIPH_VECTORS 145
+ #define MCU_NUM_PERIPH_VECTORS 150
 #else
  #error "Number of peripheral vectors not defined for this MCU."
 #endif
