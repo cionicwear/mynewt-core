@@ -79,7 +79,7 @@ jlink_load () {
     # not to do that, or report failure if gdb fails to write this file
     #
     if [ -z $JLINK_TARGET_HOST ]; then
-        echo "shell sh -c \"trap '' 2; $JLINK_GDB_SERVER -device $JLINK_DEV -speed 1000 -if SWD -port $PORT -singlerun $EXTRA_JTAG_CMD  &\" " > $GDB_CMD_FILE
+        echo "shell sh -c \"trap '' 2; $JLINK_GDB_SERVER -device $JLINK_DEV -speed 1000 -if SWD -port $PORT -singlerun -nogui $EXTRA_JTAG_CMD  &\" " > $GDB_CMD_FILE
     fi
     echo "$JLINK_TARGET_CMD" >> $GDB_CMD_FILE
     echo "mon reset" >> $GDB_CMD_FILE
