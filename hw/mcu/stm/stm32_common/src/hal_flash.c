@@ -142,6 +142,59 @@ stm32_flash_write_linear(const struct hal_flash *dev, uint32_t address,
 }
 #endif
 
+#if MYNEWT_VAL(MCU_STM32H7)
+static int
+stm32_flash_write_256_aligned(const struct hal_flash *dev, uint32_t address,
+        const void *src, uint32_t num_bytes)
+{
+    const uint8_t *sptr;
+    uint32_t n_bytes = 0, rc;
+	int32_t left = 0, to_write = 0;
+	uint8_t tmp[32];
+
+    HAL_FLASH_Unlock();
+
+    sptr = src;
+	left = num_bytes;
+
+	while(left)
+	{
+		n_bytes = address % 32;
+		if(n_bytes)
+		{
+			// if data is not aligned on 256 bits we have to manually set 
+			// the proper address.
+			address = address - n_bytes;
+		}
+
+		// reset the buffer
+		memset(tmp, 0xff, 32); 
+
+		to_write = 32 - n_bytes;
+
+		if(to_write > left)
+			to_write = left;
+
+		memcpy(tmp+n_bytes, sptr, to_write);
+
+		left -= to_write;
+		sptr += to_write;
+
+		rc = HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, address, (uint64_t)((uint32_t) tmp));
+
+		if(rc)
+			goto err;
+
+		address += 0x20; // 256 bits
+	}
+
+err:
+	HAL_FLASH_Lock();
+
+    return 0;
+}
+#endif
+
 #if !FLASH_IS_LINEAR
 static int
 stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
@@ -151,12 +204,18 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
     uint32_t i;
     int rc;
 
-    sptr = src;
+    
     /*
      * Clear status of previous operation.
      */
     STM32_HAL_FLASH_CLEAR_ERRORS();
 
+#if MYNEWT_VAL(MCU_STM32H7)
+    (void) sptr;
+    (void) i;
+    rc = stm32_flash_write_256_aligned(dev, address, src, num_bytes);
+#else
+    sptr = src;
     for (i = 0; i < num_bytes; i++) {
         rc = HAL_FLASH_Program(FLASH_PROGRAM_TYPE, address, sptr[i]);
         if (rc != 0) {
@@ -165,8 +224,9 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
 
         address++;
     }
+#endif
 
-    return 0;
+    return rc;
 }
 #endif
 
@@ -197,6 +257,17 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
     for (i = 0; i < dev->hf_sector_cnt; i++) {
         if (stm32_flash_sectors[i] == sector_address) {
             eraseinit.TypeErase = FLASH_TYPEERASE_SECTORS;
+
+#if defined (DUAL_BANK)
+            if(IS_FLASH_PROGRAM_ADDRESS_BANK1(sector_address))
+            {
+                eraseinit.Banks = FLASH_BANK_1;
+            }else
+            {
+                eraseinit.Banks = FLASH_BANK_2;   
+                i = i - 8; 
+            }
+#endif
 #ifdef FLASH_OPTCR_nDBANK
             eraseinit.Banks = FLASH_BANK_1; /* Only used for mass erase */
 #endif
