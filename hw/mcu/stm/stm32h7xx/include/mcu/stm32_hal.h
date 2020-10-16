@@ -68,7 +68,7 @@ struct stm32_hal_spi_cfg {
 #include "stm32h7xx_ll_bus.h"
 #include "stm32h7xx_ll_tim.h"
 
-#define STM32_HAL_TIMER_MAX     (3)
+#define STM32_HAL_TIMER_MAX     (6)
 
 /* hw/drivers/trng */
 #include "stm32h7xx_hal_rng.h"
