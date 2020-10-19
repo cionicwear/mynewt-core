@@ -221,6 +221,13 @@ void SystemInit (void)
   /* Disable all interrupts */
   RCC->CIER = 0x00000000;
 
+  /* Configure System Clock */
+  SystemClock_Config();
+
+  /* Update SystemCoreClock global variable */
+  SystemCoreClockUpdate();
+
+
 #if (STM32H7_DEV_ID == 0x450UL)
   /* dual core CM7 or single core line */
   if((DBGMCU->IDCODE & 0xFFFF0000U) < 0x20000000U)

@@ -178,6 +178,9 @@ SystemClock_Config(void)
 
 #endif /* MYNEWT_VAL(STM32_CLOCK_PLL_PLLR) */
 
+    osc_init.PLL.PLLVCOSEL       = RCC_PLL1VCOWIDE;
+    osc_init.PLL.PLLRGE          = RCC_PLL1VCIRANGE_2;
+
     status = HAL_RCC_OscConfig(&osc_init);
     if (status != HAL_OK) {
         assert(0);
@@ -198,8 +201,8 @@ SystemClock_Config(void)
      * PCLK2 clocks dividers. HSI and HSE are also valid system clock sources,
      * although there is no much point in supporting them now.
      */
-    clk_init.ClockType = RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK |
-                         RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+    clk_init.ClockType = RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_D1PCLK1 |
+                         RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2 | RCC_CLOCKTYPE_D3PCLK1;
     clk_init.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
 
 // #if !IS_RCC_HCLK(MYNEWT_VAL(STM32_CLOCK_AHB_DIVIDER))
@@ -213,7 +216,7 @@ SystemClock_Config(void)
 // #if !IS_RCC_PCLK(MYNEWT_VAL(STM32_CLOCK_APB2_DIVIDER))
 // #error "APB2 clock divider is invalid"
 // #endif
-
+    clk_init.SYSCLKDivider = RCC_SYSCLK_DIV1;
     clk_init.AHBCLKDivider = MYNEWT_VAL(STM32_CLOCK_AHB_DIVIDER);
     clk_init.APB1CLKDivider = MYNEWT_VAL(STM32_CLOCK_APB1_DIVIDER);
     clk_init.APB2CLKDivider = MYNEWT_VAL(STM32_CLOCK_APB2_DIVIDER);
@@ -226,28 +229,6 @@ SystemClock_Config(void)
     if (status != HAL_OK) {
         assert(0);
     }
-
-#if ((MYNEWT_VAL(STM32_CLOCK_HSI) == 0) || (MYNEWT_VAL(STM32_CLOCK_HSE) == 0))
-    /*
-     * Turn off HSE/HSI oscillator; this must be done at the end because
-     * SYSCLK source has to be updated first.
-     */
-    osc_init.OscillatorType = RCC_OSCILLATORTYPE_NONE;
-#if (MYNEWT_VAL(STM32_CLOCK_HSE) == 0)
-    osc_init.OscillatorType |= RCC_OSCILLATORTYPE_HSE;
-    osc_init.HSEState = RCC_HSE_OFF;
-#endif
-#if (MYNEWT_VAL(STM32_CLOCK_HSI) == 0)
-    osc_init.OscillatorType |= RCC_OSCILLATORTYPE_HSI;
-    osc_init.HSIState = RCC_HSI_OFF;
-#endif
-    osc_init.PLL.PLLState = RCC_PLL_NONE;
-
-    status = HAL_RCC_OscConfig(&osc_init);
-    if (status != HAL_OK) {
-        assert(0);
-    }
-#endif
 
     /*
      * These are flash instruction and data caches, not the be confused with
