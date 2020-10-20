@@ -66,7 +66,6 @@ SystemClock_Config(void)
     __HAL_PWR_VOLTAGESCALING_CONFIG(MYNEWT_VAL(STM32_CLOCK_VOLTAGESCALING_CONFIG));
 
     osc_init.OscillatorType = RCC_OSCILLATORTYPE_NONE;
-
     /*
      * LSI is used to clock the independent watchdog and optionally the RTC.
      * It can be disabled per user request, but is automatically enabled again
@@ -230,6 +229,28 @@ SystemClock_Config(void)
         assert(0);
     }
 
+#if MYNEWT_VAL(STM32_CLOCK_PLL2)
+    /* PLL2 for USART interface */
+    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_UART4
+                              |RCC_PERIPHCLK_USART6|RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_USART3
+                              |RCC_PERIPHCLK_UART5|RCC_PERIPHCLK_UART7
+                              |RCC_PERIPHCLK_UART8;
+    PeriphClkInitStruct.PLL2.PLL2M = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLM);
+    PeriphClkInitStruct.PLL2.PLL2N = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLN);
+    PeriphClkInitStruct.PLL2.PLL2P = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLP);
+    PeriphClkInitStruct.PLL2.PLL2Q = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLQ);
+    PeriphClkInitStruct.PLL2.PLL2R = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLR);
+    PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_2;
+    PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
+    PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
+    PeriphClkInitStruct.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL2;
+    PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL2;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      assert(0);
+    }
+#endif
     /*
      * These are flash instruction and data caches, not the be confused with
      * MCU caches.
