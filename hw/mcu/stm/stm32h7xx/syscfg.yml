@@ -87,6 +87,32 @@ syscfg.defs:
         description: PLL config R parameter
         value: 0
 
+    #PLL2 defs
+    STM32_CLOCK_PLL2:
+        description: Use of PLL2 (here used for peripherals)
+        value: 0
+
+    STM32_CLOCK_PLL2_PLLM:
+        description: PLL2 config M parameter
+        value: 0
+
+    STM32_CLOCK_PLL2_PLLN:
+        description: PLL2 config N parameter
+        value: 0
+
+    STM32_CLOCK_PLL2_PLLP:
+        description: PLL2 config P parameter
+        value: 0
+
+    STM32_CLOCK_PLL2_PLLQ:
+        description: PLL2 config Q parameter
+        value: 0
+
+    STM32_CLOCK_PLL2_PLLR:
+        description: PLL2 config R parameter
+        value: 0
+
+
     STM32_CLOCK_ENABLE_OVERDRIVE:
         description: Turn on over-drive mode (reach higher clock rates)
         value: 0

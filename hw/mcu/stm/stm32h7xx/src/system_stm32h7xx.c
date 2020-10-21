@@ -136,7 +136,7 @@ void SystemClock_Config(void);
 /** @addtogroup STM32H7xx_System_Private_Functions
   * @{
   */
-
+void SystemClock_Config();
 /**
   * @brief  Setup the microcontroller system
   *         Initialize the FPU setting and  vector table location
