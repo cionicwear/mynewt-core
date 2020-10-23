@@ -48,6 +48,7 @@ SystemClock_Config(void)
     RCC_OscInitTypeDef osc_init;
     RCC_ClkInitTypeDef clk_init;
     HAL_StatusTypeDef status;
+    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
     /* Enable the MCU instruction cache */
 #if MYNEWT_VAL(STM32_ENABLE_ICACHE)
@@ -231,7 +232,6 @@ SystemClock_Config(void)
 
 #if MYNEWT_VAL(STM32_CLOCK_PLL2)
     /* PLL2 for USART interface */
-    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
     PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_UART4
                               |RCC_PERIPHCLK_USART6|RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_USART3
                               |RCC_PERIPHCLK_UART5|RCC_PERIPHCLK_UART7
@@ -246,9 +246,28 @@ SystemClock_Config(void)
     PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
     PeriphClkInitStruct.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL2;
     PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL2;
+#endif
+
+#if MYNEWT_VAL(STM32_CLOCK_PLL3)
+    /* PLL2 for USART interface */
+    PeriphClkInitStruct.PLL3.PLL3M = MYNEWT_VAL(STM32_CLOCK_PLL3_PLLM);
+    PeriphClkInitStruct.PLL3.PLL3N = MYNEWT_VAL(STM32_CLOCK_PLL3_PLLN);
+    PeriphClkInitStruct.PLL3.PLL3P = MYNEWT_VAL(STM32_CLOCK_PLL3_PLLP);
+    PeriphClkInitStruct.PLL3.PLL3Q = MYNEWT_VAL(STM32_CLOCK_PLL3_PLLQ);
+    PeriphClkInitStruct.PLL3.PLL3R = MYNEWT_VAL(STM32_CLOCK_PLL3_PLLR);
+    PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
+    PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
+    PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
+#endif
+
+#if MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL)
+    PeriphClkInitStruct.SdmmcClockSelection = MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL);
+#endif
+
+#if MYNEWT_VAL(STM32_CLOCK_PLL3) || MYNEWT_VAL(STM32_CLOCK_PLL2)
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
     {
-      assert(0);
+        assert(0);
     }
 #endif
     /*
