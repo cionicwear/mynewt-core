@@ -213,16 +213,16 @@ syscfg.defs:
         value: 0
     SPI_0_PIN_SCK:
         description: 'SCK pin for SPI_0'
-        value: ''
+        value: -1
     SPI_0_PIN_MOSI:
         description: 'MOSI pin for SPI_0'
-        value: ''
+        value: -1
     SPI_0_PIN_MISO:
         description: 'MISO pin for SPI_0'
-        value: ''
+        value: -1
     SPI_0_PIN_SS:
         description: 'SS pin for SPI_0'
-        value: ''
+        value: -1
 
     SPI_1_MASTER:
         description: 'SPI 1 master'
@@ -242,16 +242,16 @@ syscfg.defs:
         value: 0
     SPI_1_PIN_SCK:
         description: 'SCK pin for SPI_1'
-        value: ''
+        value: -1
     SPI_1_PIN_MOSI:
         description: 'MOSI pin for SPI_1'
-        value: ''
+        value: -1
     SPI_1_PIN_MISO:
         description: 'MISO pin for SPI_1'
-        value: ''
+        value: -1
     SPI_1_PIN_SS:
         description: 'SS pin for SPI_1'
-        value: ''
+        value: -1
 
     SPI_2_MASTER:
         description: 'SPI 2 master'
@@ -271,16 +271,16 @@ syscfg.defs:
         value: 0
     SPI_2_PIN_SCK:
         description: 'SCK pin for SPI_2'
-        value: ''
+        value: -1
     SPI_2_PIN_MOSI:
         description: 'MOSI pin for SPI_2'
-        value: ''
+        value: -1
     SPI_2_PIN_MISO:
         description: 'MISO pin for SPI_2'
-        value: ''
+        value: -1
     SPI_2_PIN_SS:
         description: 'SS pin for SPI_2'
-        value: ''
+        value: -1
 
     SPI_3_MASTER:
         description: 'SPI 2 master'
@@ -300,16 +300,73 @@ syscfg.defs:
         value: 0
     SPI_3_PIN_SCK:
         description: 'SCK pin for SPI_3'
-        value: ''
+        value: -1
     SPI_3_PIN_MOSI:
         description: 'MOSI pin for SPI_3'
-        value: ''
+        value: -1
     SPI_3_PIN_MISO:
         description: 'MISO pin for SPI_3'
-        value: ''
+        value: -1
     SPI_3_PIN_SS:
         description: 'SS pin for SPI_3'
-        value: ''
+        value: -1
+
+    SPI_4:
+        description: 'SPI 4 enabled'
+        value: 'MYNEWT_VAL_SPI_4_MASTER || MYNEWT_VAL_SPI_4_SLAVE'
+    SPI_4_CUSTOM_CFG:
+        description: 'Allow SPI_4 configuration override'
+        value: 0
+    SPI_4_PIN_SCK:
+        description: 'SCK pin for SPI_4'
+        value: -1
+    SPI_4_PIN_MOSI:
+        description: 'MOSI pin for SPI_4'
+        value: -1
+    SPI_4_PIN_MISO:
+        description: 'MISO pin for SPI_4'
+        value: -1
+    SPI_4_PIN_SS:
+        description: 'SS pin for SPI_4'
+        value: -1
+
+    SPI_5:
+        description: 'SPI 5 enabled'
+        value: 'MYNEWT_VAL_SPI_5_MASTER || MYNEWT_VAL_SPI_5_SLAVE'
+    SPI_5_CUSTOM_CFG:
+        description: 'Allow SPI_5 configuration override'
+        value: 0
+    SPI_5_PIN_SCK:
+        description: 'SCK pin for SPI_5'
+        value: -1
+    SPI_5_PIN_MOSI:
+        description: 'MOSI pin for SPI_5'
+        value: -1
+    SPI_5_PIN_MISO:
+        description: 'MISO pin for SPI_5'
+        value: -1
+    SPI_5_PIN_SS:
+        description: 'SS pin for SPI_5'
+        value: -1
+
+    SPI_6:
+        description: 'SPI 6 enabled'
+        value: 'MYNEWT_VAL_SPI_6_MASTER || MYNEWT_VAL_SPI_6_SLAVE'
+    SPI_6_CUSTOM_CFG:
+        description: 'Allow SPI_6 configuration override'
+        value: 0
+    SPI_6_PIN_SCK:
+        description: 'SCK pin for SPI_6'
+        value: -1
+    SPI_6_PIN_MOSI:
+        description: 'MOSI pin for SPI_6'
+        value: -1
+    SPI_6_PIN_MISO:
+        description: 'MISO pin for SPI_6'
+        value: -1
+    SPI_6_PIN_SS:
+        description: 'SS pin for SPI_6'
+        value: -1
 
     I2C_0:
         description: 'I2C (TWI) interface 0'
