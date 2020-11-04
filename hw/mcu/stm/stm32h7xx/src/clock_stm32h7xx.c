@@ -220,6 +220,7 @@ SystemClock_Config(void)
     clk_init.AHBCLKDivider = MYNEWT_VAL(STM32_CLOCK_AHB_DIVIDER);
     clk_init.APB1CLKDivider = MYNEWT_VAL(STM32_CLOCK_APB1_DIVIDER);
     clk_init.APB2CLKDivider = MYNEWT_VAL(STM32_CLOCK_APB2_DIVIDER);
+    clk_init.APB3CLKDivider = MYNEWT_VAL(STM32_CLOCK_APB3_DIVIDER);
 
 #if !IS_FLASH_LATENCY(MYNEWT_VAL(STM32_FLASH_LATENCY))
 #error "Flash latency value is invalid"
@@ -264,6 +265,11 @@ SystemClock_Config(void)
     PeriphClkInitStruct.SdmmcClockSelection = MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL);
 #endif
 
+#if MYNEWT_VAL(STM32_USB_CLOCK_SEL)
+    PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_USB;
+    PeriphClkInitStruct.UsbClockSelection = MYNEWT_VAL(STM32_USB_CLOCK_SEL);
+#endif
+
 #if MYNEWT_VAL(STM32_CLOCK_PLL3) || MYNEWT_VAL(STM32_CLOCK_PLL2)
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
     {
@@ -281,5 +287,14 @@ SystemClock_Config(void)
 #if DATA_CACHE_ENABLE
     __HAL_FLASH_DATA_CACHE_ENABLE();
 #endif
+
+      /*activate CSI clock mondatory for I/O Compensation Cell*/
+  __HAL_RCC_CSI_ENABLE() ;
+
+  /* Enable SYSCFG clock mondatory for I/O Compensation Cell */
+  __HAL_RCC_SYSCFG_CLK_ENABLE() ;
+
+  /* Enables the I/O Compensation Cell */
+  HAL_EnableCompensationCell();
 }
 #endif

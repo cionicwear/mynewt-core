@@ -141,6 +141,10 @@ syscfg.defs:
         description: SDMMC clock source
         value: 0
 
+    STM32_USB_CLOCK_SEL:
+        description: USB clock source
+        value: 0
+
     STM32_CLOCK_ENABLE_OVERDRIVE:
         description: Turn on over-drive mode (reach higher clock rates)
         value: 0
@@ -154,6 +158,10 @@ syscfg.defs:
         value: 0
 
     STM32_CLOCK_APB2_DIVIDER:
+        description: APB high-speed prescaler
+        value: 0
+
+    STM32_CLOCK_APB3_DIVIDER:
         description: APB high-speed prescaler
         value: 0
 
