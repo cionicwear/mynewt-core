@@ -281,7 +281,7 @@ hal_uart_blocking_tx(int port, uint8_t data)
     USART_TypeDef *regs;
 
     u = uart_by_port(port);
-    if (!u || u->u_open) {
+    if (!u || !u->u_open) {
         return;
     }
 
@@ -574,7 +574,23 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
 #endif
 
     } else {
+#if MYNEWT_VAL(STM32_UART_PLL)
+        uint32_t pclk;
+    
+        if(MYNEWT_VAL(STM32_UART_PLL) == 2){
+            PLL2_ClocksTypeDef pll2_clocks;
+            HAL_RCCEx_GetPLL2ClockFreq(&pll2_clocks);
+            pclk = pll2_clocks.PLL2_Q_Frequency;
+        }else if(MYNEWT_VAL(STM32_UART_PLL) == 3){
+            PLL3_ClocksTypeDef pll3_clocks;
+            HAL_RCCEx_GetPLL3ClockFreq(&pll3_clocks);
+            pclk = pll3_clocks.PLL3_Q_Frequency;
+        }
+        
+        u->u_regs->BRR = BAUD(pclk, baudrate);
+#else
         u->u_regs->BRR = BAUD(HAL_RCC_GetPCLK1Freq(), baudrate);
+#endif
     }
 
     (void)RXDR(u->u_regs);

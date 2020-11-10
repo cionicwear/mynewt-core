@@ -192,3 +192,7 @@ syscfg.defs:
     MCU_FLASH_ERASED_VAL:
         description: Value read from erased flash.
         value: 0xff
+
+    STM32_UART_PLL:
+        description: Set the PLL used for UART peripherals
+        value: 0
