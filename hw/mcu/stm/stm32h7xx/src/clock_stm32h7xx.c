@@ -262,6 +262,7 @@ SystemClock_Config(void)
 #endif
 
 #if MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL)
+    PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_SDMMC;
     PeriphClkInitStruct.SdmmcClockSelection = MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL);
 #endif
 
