@@ -17,21 +17,9 @@
  * under the License.
  */
 
-#ifndef NRFX_CONFIG_H__
-#define NRFX_CONFIG_H__
+#ifndef NRFX52820_CONFIG_H__
+#define NRFX52820_CONFIG_H__
 
-#if NRF52
-#include "nrfx52_config.h"
-#elif NRF52810_XXAA
-#include "nrfx52810_config.h"
-#elif NRF52811_XXAA
-#include "nrfx52811_config.h"
-#elif NRF52840_XXAA
-#include "nrfx52840_config.h"
-#elif NRF52820_XXAA
-#include "nrfx52820_config.h"
-#else
-#error Unsupported chip selected
-#endif
+#include "syscfg/syscfg.h"
 
-#endif // NRFX_CONFIG_H__
+#endif // NRFX52820_CONFIG_H__

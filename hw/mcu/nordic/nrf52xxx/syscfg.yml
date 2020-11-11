@@ -28,6 +28,7 @@ syscfg.defs:
             - nRF52811
             - nRF52832
             - nRF52840
+            - nRF52820
 
     MCU_FLASH_MIN_WRITE_SIZE:
         description: >

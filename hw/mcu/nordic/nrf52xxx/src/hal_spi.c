@@ -35,7 +35,10 @@
 #define NRF52_HAL_SPI_MAX (4)
 #else
 #define SPIM_TXD_MAXCNT_MAX             255
-#define NRF52_HAL_SPI_MAX (3)
+// CIONIC - This line enters in conflict with line 57. From git blame this line has been added as 
+// a workaround for errata #198 affecting Engineering C nRF52840.
+// Commenting it for now
+//#define NRF52_HAL_SPI_MAX (3)
 #endif
 
 /* IRQ handler type */
