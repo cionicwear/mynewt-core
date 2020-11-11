@@ -90,6 +90,12 @@ static bool errata_108(void);
 static bool errata_136(void);
 #endif
 
+#ifdef NRF52820_XXAA
+static bool errata_36(void);
+static bool errata_66(void);
+static bool errata_136(void);
+#endif
+
 #if defined ( __CC_ARM )
     uint32_t SystemCoreClock __attribute__((used)) = __SYSTEM_CLOCK_64M;
 #elif defined ( __ICCARM__ )
@@ -487,6 +493,72 @@ void SystemInit(void)
             NRF_P1->PIN_CNF[9]  = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
         #endif
 #endif
+#ifdef NRF52820_XXAA
+    /* Workaround for Errata 36 "CLOCK: Some registers are not reset when expected" found at the Errata document
+       for your device located at https://infocenter.nordicsemi.com/index.jsp  */
+    if (errata_36()){
+        NRF_CLOCK->EVENTS_DONE = 0;
+        NRF_CLOCK->EVENTS_CTTO = 0;
+        NRF_CLOCK->CTIV = 0;
+    }
+
+    /* Workaround for Errata 66 "TEMP: Linearity specification not met with default settings" found at the Errata document
+       for your device located at https://infocenter.nordicsemi.com/index.jsp  */
+    if (errata_66()){
+        NRF_TEMP->A0 = NRF_FICR->TEMP.A0;
+        NRF_TEMP->A1 = NRF_FICR->TEMP.A1;
+        NRF_TEMP->A2 = NRF_FICR->TEMP.A2;
+        NRF_TEMP->A3 = NRF_FICR->TEMP.A3;
+        NRF_TEMP->A4 = NRF_FICR->TEMP.A4;
+        NRF_TEMP->A5 = NRF_FICR->TEMP.A5;
+        NRF_TEMP->B0 = NRF_FICR->TEMP.B0;
+        NRF_TEMP->B1 = NRF_FICR->TEMP.B1;
+        NRF_TEMP->B2 = NRF_FICR->TEMP.B2;
+        NRF_TEMP->B3 = NRF_FICR->TEMP.B3;
+        NRF_TEMP->B4 = NRF_FICR->TEMP.B4;
+        NRF_TEMP->B5 = NRF_FICR->TEMP.B5;
+        NRF_TEMP->T0 = NRF_FICR->TEMP.T0;
+        NRF_TEMP->T1 = NRF_FICR->TEMP.T1;
+        NRF_TEMP->T2 = NRF_FICR->TEMP.T2;
+        NRF_TEMP->T3 = NRF_FICR->TEMP.T3;
+        NRF_TEMP->T4 = NRF_FICR->TEMP.T4;
+    }
+    
+    /* Workaround for Errata 136 "System: Bits in RESETREAS are set when they should not be" found at the Errata document
+       for your device located at https://infocenter.nordicsemi.com/index.jsp  */
+    if (errata_136()){
+        if (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk){
+            NRF_POWER->RESETREAS =  ~POWER_RESETREAS_RESETPIN_Msk;
+        }
+    }
+    
+    /* Enable the FPU if the compiler used floating point unit instructions. __FPU_USED is a MACRO defined by the
+     * compiler. Since the FPU consumes energy, remember to disable FPU use in the compiler if floating point unit
+     * operations are not used in your code. */
+    #if (__FPU_USED == 1)
+        SCB->CPACR |= (3UL << 20) | (3UL << 22);
+        __DSB();
+        __ISB();
+    #endif
+
+    /* Configure GPIO pads as pPin Reset pin if Pin Reset capabilities desired. If CONFIG_GPIO_AS_PINRESET is not
+      defined, pin reset will not be available. One GPIO (see Product Specification to see which one) will then be
+      reserved for PinReset and not available as normal GPIO. */
+    #if defined (CONFIG_GPIO_AS_PINRESET)
+        if (((NRF_UICR->PSELRESET[0] & UICR_PSELRESET_CONNECT_Msk) != (UICR_PSELRESET_CONNECT_Connected << UICR_PSELRESET_CONNECT_Pos)) ||
+            ((NRF_UICR->PSELRESET[1] & UICR_PSELRESET_CONNECT_Msk) != (UICR_PSELRESET_CONNECT_Connected << UICR_PSELRESET_CONNECT_Pos))){
+            NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
+            while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+            NRF_UICR->PSELRESET[0] = 18;
+            while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+            NRF_UICR->PSELRESET[1] = 18;
+            while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+            NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+            while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+            NVIC_SystemReset();
+        }
+    #endif
+#endif
     SystemCoreClockUpdate();
 
     NVIC_Relocate();
@@ -820,5 +892,38 @@ static bool errata_121(void)
 	return false;
 }
 #endif
+
+#ifdef NRF52820_XXAA
+static bool errata_36(void)
+{
+	uint32_t var1 = *(uint32_t *)0x10000130ul;
+
+    if (var1 == 0x10){
+        return true;
+    }
+    return false;
+}
+
+static bool errata_66(void)
+{
+    uint32_t var1 = *(uint32_t *)0x10000130ul;
+    
+    if (var1 == 0x10){
+        return true;
+    }
+    return false;
+}
+
+static bool errata_136(void)
+{
+    uint32_t var1 = *(uint32_t *)0x10000130ul;
+
+    if (var1 == 0x10){
+        return true;
+    }
+    return false;
+}
+#endif
+
 
 /*lint --flb "Leave library region" */
