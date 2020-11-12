@@ -428,6 +428,11 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
             assert(0);
             return -1;
         }
+#if defined(NRF52820_XXAA)
+        // Connect RTS and CTS 
+        nrf_uart->PSEL.RTS |= 0x80000000;
+        nrf_uart->PSEL.CTS |= 0x80000000;
+#endif
         break;
     }
     baud_reg = hal_uart_baudrate(baudrate);
