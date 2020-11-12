@@ -191,7 +191,7 @@ stm32_flash_write_256_aligned(const struct hal_flash *dev, uint32_t address,
 err:
 	HAL_FLASH_Lock();
 
-    return 0;
+    return rc;
 }
 #endif
 
@@ -253,7 +253,7 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
     HAL_StatusTypeDef err;
     uint32_t SectorError;
     int i;
-
+    HAL_FLASH_Unlock();
     for (i = 0; i < dev->hf_sector_cnt; i++) {
         if (stm32_flash_sectors[i] == sector_address) {
             eraseinit.TypeErase = FLASH_TYPEERASE_SECTORS;
@@ -277,12 +277,13 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
 
             err = HAL_FLASHEx_Erase(&eraseinit, &SectorError);
             if (err) {
+                HAL_FLASH_Lock();
                 return -1;
             }
             return 0;
         }
     }
-
+    HAL_FLASH_Lock();
     return -1;
 }
 
