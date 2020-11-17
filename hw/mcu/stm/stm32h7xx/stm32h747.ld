@@ -164,6 +164,15 @@ SECTIONS
 
     } > RAM AT > FLASH
 
+    .sdram (NOLOAD):
+    {
+        . = ALIGN(4);
+        _ssdram = .;
+        *(.sdram*)
+        . = ALIGN(4);
+        _esdram = .;
+    } > SDRAM
+    
     .corebss (NOLOAD):
     {
         . = ALIGN(4);
