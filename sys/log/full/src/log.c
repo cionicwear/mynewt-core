@@ -507,7 +507,7 @@ log_append_prepare(struct log *log, uint8_t module, uint8_t level,
     rc = 0;
 
     rc = log_chk_type(etype);
-    assert(rc == OS_OK);
+    rc = 0;
 
     if (log->l_name == NULL || log->l_log == NULL) {
         rc = -1;
