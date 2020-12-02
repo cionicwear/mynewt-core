@@ -148,8 +148,8 @@ stm32_flash_write_256_aligned(const struct hal_flash *dev, uint32_t address,
         const void *src, uint32_t num_bytes)
 {
     const uint8_t *sptr;
-    uint32_t n_bytes = 0, rc;
-	int32_t left = 0, to_write = 0;
+    uint32_t n_bytes = 0;
+	int32_t left = 0, to_write = 0, rc;
 	uint8_t tmp[32];
 
     HAL_FLASH_Unlock();
@@ -167,8 +167,17 @@ stm32_flash_write_256_aligned(const struct hal_flash *dev, uint32_t address,
 			address = address - n_bytes;
 		}
 
-		// reset the buffer
-		memset(tmp, 0xff, 32); 
+       
+		// Make sure the word we're about to write is not already written
+        // Writing twice to the same word location, would trig a ECC error
+        // This would rise a Bus Fault each time the MCU tries to read this word
+        memcpy(tmp, (uint8_t *)address, 32);
+        for(uint8_t i = 0 ; i < 32 ; i++){
+            if(tmp[i] != 0xff){
+                rc = -1;
+                break;
+            }
+        }
 
 		to_write = 32 - n_bytes;
 
@@ -183,12 +192,11 @@ stm32_flash_write_256_aligned(const struct hal_flash *dev, uint32_t address,
 		rc = HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, address, (uint64_t)((uint32_t) tmp));
 
 		if(rc)
-			goto err;
+			break;
 
 		address += 0x20; // 256 bits
 	}
 
-err:
 	HAL_FLASH_Lock();
 
     return rc;
@@ -252,7 +260,12 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
     FLASH_EraseInitTypeDef eraseinit;
     HAL_StatusTypeDef err;
     uint32_t SectorError;
-    int i;
+    int i, rc = 0;
+    /*
+     * Clear status of previous operation.
+     */
+    STM32_HAL_FLASH_CLEAR_ERRORS();
+
     HAL_FLASH_Unlock();
     for (i = 0; i < dev->hf_sector_cnt; i++) {
         if (stm32_flash_sectors[i] == sector_address) {
@@ -277,14 +290,14 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
 
             err = HAL_FLASHEx_Erase(&eraseinit, &SectorError);
             if (err) {
-                HAL_FLASH_Lock();
-                return -1;
+                rc = -1;
             }
-            return 0;
+            break;
         }
     }
+
     HAL_FLASH_Lock();
-    return -1;
+    return rc;
 }
 
 #else /* FLASH_IS_LINEAR */
