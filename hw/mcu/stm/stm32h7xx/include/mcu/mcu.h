@@ -30,6 +30,8 @@ extern "C" {
 #define STM32_SYSTEM_MEMORY     0x1FF00000
 #endif
 
+void SystemClock_Config();
+
 #ifdef __cplusplus
 }
 #endif
