@@ -213,6 +213,16 @@ SECTIONS
         *(.stack*)
     } > DTCM
 
+    .ipc_sh_mem  :
+    { 
+        . = ALIGN(4);
+        _sipc_sh_mem = .; 
+        *(.ipc_sh_mem*);
+        
+        . = ALIGN(4);
+        _eipc_sh_mem = .;
+    } >SRAM4 AT> FLASH
+
     /* Set stack top to end of DTCM; stack limit is bottom of stack */
     __StackTop = ORIGIN(DTCM) + LENGTH(DTCM);
     __StackLimit = __StackTop - SIZEOF(.stack_dummy);
