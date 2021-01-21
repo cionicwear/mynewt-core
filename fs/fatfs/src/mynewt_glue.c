@@ -648,13 +648,6 @@ disk_ioctl(BYTE pdrv, BYTE cmd, void* buff)
     return RES_OK;
 }
 
-/* FIXME: _FS_NORTC=1 because there is not hal_rtc interface */
-DWORD
-get_fattime(void)
-{
-    return 0;
-}
-
 void
 fatfs_pkg_init(void)
 {
