@@ -210,7 +210,7 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
 {
     const uint8_t *sptr;
     uint32_t i;
-    int rc;
+    int rc = 0;
 
     
     /*

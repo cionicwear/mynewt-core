@@ -786,7 +786,7 @@ typedef struct
 #define ADC1                ((ADC_TypeDef *) ADC1_BASE)
 #define ADC1_COMMON         ((ADC_Common_TypeDef *) ADC1_COMMON_BASE)
 /* Legacy define */
-#define ADC                  ADC1_COMMON
+// #define ADC                  ADC1_COMMON
 #define SDIO                ((SDIO_TypeDef *) SDIO_BASE)
 #define SPI1                ((SPI_TypeDef *) SPI1_BASE)
 #define SPI4                ((SPI_TypeDef *) SPI4_BASE)
