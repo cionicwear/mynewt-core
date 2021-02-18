@@ -145,28 +145,26 @@ stm32_tmr_irq(struct stm32_hal_tmr *tmr)
 {
     uint32_t sr;
     uint32_t sr_reg;
-    uint32_t clr = 0;
     __HAL_DISABLE_INTERRUPTS(sr);
     sr_reg = tmr->sht_regs->SR;
     if (sr_reg & TIM_SR_UIF) {
         /*
          * Overflow interrupt
          */
-        clr |= TIM_SR_UIF;
         if (tmr->sht_regs->ARR == STM32_16BIT) {
             /* Only handle 16bit timer overflow */
             tmr->sht_oflow += STM32_OFLOW_VALUE;
         }
+        tmr->sht_regs->SR = ~TIM_SR_UIF;
     }
+    __HAL_ENABLE_INTERRUPTS(sr);
     if (sr_reg & TIM_SR_CC1IF) {
         /*
          * Capture event
          */
-        clr |= TIM_SR_CC1IF;
+        tmr->sht_regs->SR = ~TIM_SR_CC1IF;
         stm32_tmr_cbs(tmr);
     }
-    tmr->sht_regs->SR = ~clr;
-    __HAL_ENABLE_INTERRUPTS(sr);
 }
 #endif
 
