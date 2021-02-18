@@ -86,7 +86,7 @@ int hal_timer_deinit(int timer_num);
  * @return 0 on success, non-zero error code on failure
  */
 int hal_timer_config(int timer_num, uint32_t freq_hz);
-
+int hal_timer_config_spec(int num, uint32_t freq_hz, uint8_t bits);
 /**
  * Returns the resolution of the HW timer. NOTE: the frequency may not be
  * obtainable so the caller can use this to determine the resolution.
