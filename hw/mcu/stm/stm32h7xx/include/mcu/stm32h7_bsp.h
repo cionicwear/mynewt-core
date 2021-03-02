@@ -38,7 +38,9 @@ struct stm32_uart_cfg {
     int8_t suc_pin_rx;
     int8_t suc_pin_rts;
     int8_t suc_pin_cts;
-    uint8_t suc_pin_af;                 /* AF selection for this */
+    uint8_t suc_pin_af;
+    uint8_t suc_pin_af_rx;                 /* AF selection for this */
+    uint8_t suc_pin_af_tx;                 /* AF selection for this */
     IRQn_Type suc_irqn;                 /* NVIC IRQn */
 };
 

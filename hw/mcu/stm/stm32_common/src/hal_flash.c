@@ -224,14 +224,17 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
     rc = stm32_flash_write_256_aligned(dev, address, src, num_bytes);
 #else
     sptr = src;
+    HAL_FLASH_Unlock();
     for (i = 0; i < num_bytes; i++) {
         rc = HAL_FLASH_Program(FLASH_PROGRAM_TYPE, address, sptr[i]);
         if (rc != 0) {
+            HAL_FLASH_Lock();
             return rc;
         }
 
         address++;
     }
+    HAL_FLASH_Lock();
 #endif
 
     return rc;
