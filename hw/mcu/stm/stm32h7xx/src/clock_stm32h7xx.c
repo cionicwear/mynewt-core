@@ -247,6 +247,7 @@ SystemClock_Config(void)
     PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
     PeriphClkInitStruct.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL2;
     PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL2;
+    PeriphClkInitStruct.AdcClockSelection = RCC_ADCCLKSOURCE_PLL2;
 #endif
 
 #if MYNEWT_VAL(STM32_CLOCK_PLL3)
@@ -270,6 +271,8 @@ SystemClock_Config(void)
     PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_USB;
     PeriphClkInitStruct.UsbClockSelection = MYNEWT_VAL(STM32_USB_CLOCK_SEL);
 #endif
+
+    PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_ADC;
 
 #if MYNEWT_VAL(STM32_CLOCK_PLL3) || MYNEWT_VAL(STM32_CLOCK_PLL2)
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
