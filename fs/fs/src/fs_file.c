@@ -194,6 +194,13 @@ fs_open(const char *filename, uint8_t access_flags, struct fs_file **out_file)
 }
 
 int
+fs_mkfs(const char *disk, uint8_t format)
+{
+    struct fs_ops *fops = fops_from_filename(disk);
+    return fops->f_mkfs(disk, format);
+}
+
+int
 fs_close(struct fs_file *file)
 {
     struct fs_ops *fops = fops_from_file(file);

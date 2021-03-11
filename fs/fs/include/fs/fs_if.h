@@ -45,7 +45,7 @@ struct fs_ops {
     int (*f_unlink)(const char *filename);
     int (*f_rename)(const char *from, const char *to);
     int (*f_mkdir)(const char *path);
-
+    int (*f_mkfs)(const char *path, uint8_t format);
     int (*f_opendir)(const char *path, struct fs_dir **out_dir);
     int (*f_readdir)(struct fs_dir *dir, struct fs_dirent **out_dirent);
     int (*f_closedir)(struct fs_dir *dir);

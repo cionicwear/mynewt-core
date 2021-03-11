@@ -51,7 +51,7 @@ static int fatfs_closedir(struct fs_dir *dir);
 static int fatfs_dirent_name(const struct fs_dirent *fs_dirent, size_t max_len,
   char *out_name, uint8_t *out_name_len);
 static int fatfs_dirent_is_dir(const struct fs_dirent *fs_dirent);
-
+static int fatfs_mkfs(const char *path, uint8_t format);
 #define DRIVE_LEN 4
 
 struct fatfs_file {
@@ -89,7 +89,7 @@ static struct fs_ops fatfs_ops = {
     .f_unlink = fatfs_unlink,
     .f_rename = fatfs_rename,
     .f_mkdir = fatfs_mkdir,
-
+    .f_mkfs = fatfs_mkfs,
     .f_opendir = fatfs_opendir,
     .f_readdir = fatfs_readdir,
     .f_closedir = fatfs_closedir,
@@ -450,6 +450,15 @@ fatfs_mkdir(const char *path)
 
     res = f_mkdir(fatfs_path);
     return fatfs_to_vfs_error(res);
+}
+
+static int
+fatfs_mkfs(const char *disk, uint8_t format)
+{
+    FRESULT res;
+    uint8_t work_buffer[512];
+    res = f_mkfs(disk, FM_FAT32, 0,work_buffer, 512);
+    return res;
 }
 
 static int
