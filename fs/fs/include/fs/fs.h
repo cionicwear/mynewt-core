@@ -34,6 +34,7 @@ struct fs_file;
 struct fs_dir;
 struct fs_dirent;
 
+int fs_mkfs(const char *disk, uint8_t format);
 int fs_open(const char *filename, uint8_t access_flags, struct fs_file **);
 int fs_close(struct fs_file *);
 int fs_read(struct fs_file *, uint32_t len, void *out_data, uint32_t *out_len);
