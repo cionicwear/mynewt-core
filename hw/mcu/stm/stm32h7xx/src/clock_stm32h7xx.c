@@ -236,7 +236,7 @@ SystemClock_Config(void)
     PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_UART4
                               |RCC_PERIPHCLK_USART6|RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_USART3
                               |RCC_PERIPHCLK_UART5|RCC_PERIPHCLK_UART7
-                              |RCC_PERIPHCLK_UART8 | RCC_PERIPHCLK_ADC;
+                              |RCC_PERIPHCLK_UART8 | RCC_PERIPHCLK_ADC | RCC_PERIPHCLK_FMC;
     PeriphClkInitStruct.PLL2.PLL2M = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLM);
     PeriphClkInitStruct.PLL2.PLL2N = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLN);
     PeriphClkInitStruct.PLL2.PLL2P = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLP);
@@ -247,6 +247,7 @@ SystemClock_Config(void)
     PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
     PeriphClkInitStruct.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL2;
     PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL2;
+    PeriphClkInitStruct.FmcClockSelection = RCC_FMCCLKSOURCE_PLL2;
 #endif
 
 #if MYNEWT_VAL(STM32_CLOCK_PLL3)
