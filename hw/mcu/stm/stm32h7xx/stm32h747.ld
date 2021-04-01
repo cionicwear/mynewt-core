@@ -223,6 +223,15 @@ SECTIONS
         _eipc_shmem = .;
     } >SRAM4 AT> FLASH
 
+    .ipc_async_shmem  :
+    { 
+        . = ALIGN(4);
+        _sipc_ashmem = .; 
+        *(.ipc_async_shmem*);
+        . = ALIGN(4);
+        _eipc_ashmem = .;
+    } >SRAM4 AT> FLASH
+
     /* Set stack top to end of DTCM; stack limit is bottom of stack */
     __StackTop = ORIGIN(DTCM) + LENGTH(DTCM);
     __StackLimit = __StackTop - SIZEOF(.stack_dummy);
