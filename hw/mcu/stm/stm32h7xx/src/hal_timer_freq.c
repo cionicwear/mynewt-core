@@ -55,6 +55,9 @@ stm32_hal_timer_get_freq(void *timx)
     switch (regs) {
 #ifdef TIM1
     case (uintptr_t)TIM1:
+        freq = HAL_RCC_GetPCLK2Freq()*2;
+        div  = stm32_hal_timer_abp_clk_div(clocks.APB2CLKDivider);
+        break;
 #endif
 #ifdef TIM8
     case (uintptr_t)TIM8:
