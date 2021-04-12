@@ -266,12 +266,10 @@ stm32_hw_setup(int num, TIM_TypeDef *regs)
 
 #ifdef TIM1
     if (regs == TIM1) {
-#if MYNEWT_VAL(MCU_STM32F0)
+#if MYNEWT_VAL(MCU_STM32F0) || MYNEWT_VAL(MCU_STM32H7)
         stm32_tmr_reg_irq(TIM1_CC_IRQn, func);
 #elif MYNEWT_VAL(MCU_STM32F3) || MYNEWT_VAL(MCU_STM32L4) || MYNEWT_VAL(MCU_STM32WB)
         stm32_tmr_reg_irq(TIM1_UP_TIM16_IRQn, func);
-#else
-        stm32_tmr_reg_irq(TIM1_UP_TIM10_IRQn, func);
 #endif
         __HAL_RCC_TIM1_CLK_ENABLE();
     }
