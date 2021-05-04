@@ -17,6 +17,9 @@
 # under the License.
 #
 
+bsp.name: "nRF52 DK"
+bsp.url: https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52-DK
+bsp.maker: "Nordic Semiconductor"
 bsp.arch: cortex_m4
 bsp.compiler: compiler/arm-none-eabi-m4
 bsp.linkerscript:
@@ -25,6 +28,9 @@ bsp.linkerscript:
 bsp.linkerscript.BOOT_LOADER.OVERWRITE:
     - "hw/bsp/nordic_pca10040/boot-nrf52xxaa.ld"
     - "@apache-mynewt-core/hw/mcu/nordic/nrf52xxx/nrf52.ld"
+bsp.linkerscript.RAM_RESIDENT.OVERWRITE:
+    - "hw/bsp/nordic_pca10040/boot-nrf52xxaa.ld"
+    - "@apache-mynewt-core/hw/mcu/nordic/nrf52xxx/nrf52_ram_resident.ld"
 bsp.part2linkerscript: "hw/bsp/nordic_pca10040/split-nordic_pca10040.ld"
 bsp.downloadscript: "hw/bsp/nordic_pca10040/nordic_pca10040_download.sh"
 bsp.debugscript: "hw/bsp/nordic_pca10040/nordic_pca10040_debug.sh"

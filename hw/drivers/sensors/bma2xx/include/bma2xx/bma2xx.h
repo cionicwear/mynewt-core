@@ -2,7 +2,7 @@
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * resarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
@@ -27,12 +27,17 @@
 #include "sensor/temperature.h"
 
 #ifdef __cplusplus
-#extern "C" {
+extern "C" {
 #endif
 
 /* XXX use some better defaults. For now it is min */
 #define BMA2XX_LOW_G_DELAY_MS_DEFAULT       2
 #define BMA2XX_HIGH_G_DELAY_MS_DEFAULT      2
+#define BMA2XX_LOW_G_THRESH_G_DEFAULT       0.375f
+#define BMA2XX_LOW_G_HYSTER_G_DEFAULT       0.125f
+#define BMA2XX_HIGH_G_THRESH_G_DEFAULT      1.5f
+#define BMA2XX_HIGH_G_HYSTER_G_DEFAULT      0.125f
+#define BMA2XX_ORIENT_HYSTER_G_DEFAULT      0.0625f
 
 /* Supported device models.  */
 enum bma2xx_model {

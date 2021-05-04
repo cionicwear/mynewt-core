@@ -1,21 +1,21 @@
-/**
- * Copyright (c) 2015 - 2018, Nordic Semiconductor ASA
+/*
+ * Copyright (c) 2015 - 2020, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -33,7 +33,10 @@
 
 #if NRFX_CHECK(NRFX_UARTE_ENABLED)
 
-#if !(NRFX_CHECK(NRFX_UARTE0_ENABLED) || NRFX_CHECK(NRFX_UARTE1_ENABLED))
+#if !(NRFX_CHECK(NRFX_UARTE0_ENABLED) || \
+      NRFX_CHECK(NRFX_UARTE1_ENABLED) || \
+      NRFX_CHECK(NRFX_UARTE2_ENABLED) || \
+      NRFX_CHECK(NRFX_UARTE3_ENABLED))
 #error "No enabled UARTE instances. Check <nrfx_config.h>."
 #endif
 
@@ -64,10 +67,23 @@
 #define UARTE1_LENGTH_VALIDATE(...)  0
 #endif
 
+#if NRFX_CHECK(NRFX_UARTE2_ENABLED)
+#define UARTE2_LENGTH_VALIDATE(...)  UARTEX_LENGTH_VALIDATE(UARTE2, __VA_ARGS__)
+#else
+#define UARTE2_LENGTH_VALIDATE(...)  0
+#endif
+
+#if NRFX_CHECK(NRFX_UARTE3_ENABLED)
+#define UARTE3_LENGTH_VALIDATE(...)  UARTEX_LENGTH_VALIDATE(UARTE3, __VA_ARGS__)
+#else
+#define UARTE3_LENGTH_VALIDATE(...)  0
+#endif
+
 #define UARTE_LENGTH_VALIDATE(drv_inst_idx, length)     \
     (UARTE0_LENGTH_VALIDATE(drv_inst_idx, length, 0) || \
-     UARTE1_LENGTH_VALIDATE(drv_inst_idx, length, 0))
-
+     UARTE1_LENGTH_VALIDATE(drv_inst_idx, length, 0) || \
+     UARTE2_LENGTH_VALIDATE(drv_inst_idx, length, 0) || \
+     UARTE3_LENGTH_VALIDATE(drv_inst_idx, length, 0))
 
 typedef struct
 {
@@ -76,10 +92,11 @@ typedef struct
     uint8_t            const * p_tx_buffer;
     uint8_t                  * p_rx_buffer;
     uint8_t                  * p_rx_secondary_buffer;
-    size_t                     tx_buffer_length;
+    volatile size_t            tx_buffer_length;
     size_t                     rx_buffer_length;
     size_t                     rx_secondary_buffer_length;
     nrfx_drv_state_t           state;
+    bool                       rx_aborted;
 } uarte_control_block_t;
 static uarte_control_block_t m_cb[NRFX_UARTE_ENABLED_COUNT];
 
@@ -97,9 +114,9 @@ static void apply_config(nrfx_uarte_t        const * p_instance,
     }
 
     nrf_uarte_baudrate_set(p_instance->p_reg, p_config->baudrate);
-    nrf_uarte_configure(p_instance->p_reg, p_config->parity, p_config->hwfc);
+    nrf_uarte_configure(p_instance->p_reg, &p_config->hal_cfg);
     nrf_uarte_txrx_pins_set(p_instance->p_reg, p_config->pseltxd, p_config->pselrxd);
-    if (p_config->hwfc == NRF_UARTE_HWFC_ENABLED)
+    if (p_config->hal_cfg.hwfc == NRF_UARTE_HWFC_ENABLED)
     {
         if (p_config->pselcts != NRF_UARTE_PSEL_DISCONNECTED)
         {
@@ -121,10 +138,12 @@ static void interrupts_enable(nrfx_uarte_t const * p_instance,
     nrf_uarte_event_clear(p_instance->p_reg, NRF_UARTE_EVENT_ENDTX);
     nrf_uarte_event_clear(p_instance->p_reg, NRF_UARTE_EVENT_ERROR);
     nrf_uarte_event_clear(p_instance->p_reg, NRF_UARTE_EVENT_RXTO);
+    nrf_uarte_event_clear(p_instance->p_reg, NRF_UARTE_EVENT_TXSTOPPED);
     nrf_uarte_int_enable(p_instance->p_reg, NRF_UARTE_INT_ENDRX_MASK |
                                             NRF_UARTE_INT_ENDTX_MASK |
                                             NRF_UARTE_INT_ERROR_MASK |
-                                            NRF_UARTE_INT_RXTO_MASK);
+                                            NRF_UARTE_INT_RXTO_MASK  |
+                                            NRF_UARTE_INT_TXSTOPPED_MASK);
     NRFX_IRQ_PRIORITY_SET(nrfx_get_irq_number((void *)p_instance->p_reg),
                           interrupt_priority);
     NRFX_IRQ_ENABLE(nrfx_get_irq_number((void *)p_instance->p_reg));
@@ -135,7 +154,8 @@ static void interrupts_disable(nrfx_uarte_t const * p_instance)
     nrf_uarte_int_disable(p_instance->p_reg, NRF_UARTE_INT_ENDRX_MASK |
                                              NRF_UARTE_INT_ENDTX_MASK |
                                              NRF_UARTE_INT_ERROR_MASK |
-                                             NRF_UARTE_INT_RXTO_MASK);
+                                             NRF_UARTE_INT_RXTO_MASK  |
+                                             NRF_UARTE_INT_TXSTOPPED_MASK);
     NRFX_IRQ_DISABLE(nrfx_get_irq_number((void *)p_instance->p_reg));
 }
 
@@ -172,6 +192,46 @@ static void pins_to_default(nrfx_uarte_t const * p_instance)
     }
 }
 
+static void apply_workaround_for_enable_anomaly(nrfx_uarte_t const * p_instance)
+{
+#if defined(NRF5340_XXAA_APPLICATION) || defined(NRF5340_XXAA_NETWORK) || defined(NRF9160_XXAA)
+    // Apply workaround for anomalies:
+    // - nRF9160 - anomaly 23
+    // - nRF5340 - anomaly 44
+    volatile uint32_t const * rxenable_reg =
+        (volatile uint32_t *)(((uint32_t)p_instance->p_reg) + 0x564);
+    volatile uint32_t const * txenable_reg =
+        (volatile uint32_t *)(((uint32_t)p_instance->p_reg) + 0x568);
+
+    if (*txenable_reg == 1)
+    {
+        nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPTX);
+    }
+
+    if (*rxenable_reg == 1)
+    {
+        nrf_uarte_enable(p_instance->p_reg);
+        nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPRX);
+
+        bool workaround_succeded;
+        // The UARTE is able to receive up to four bytes after the STOPRX task has been triggered.
+        // On lowest supported baud rate (1200 baud), with parity bit and two stop bits configured
+        // (resulting in 12 bits per data byte sent), this may take up to 40 ms.
+        NRFX_WAIT_FOR(*rxenable_reg == 0, 40000, 1, workaround_succeded);
+        if (!workaround_succeded)
+        {
+            NRFX_LOG_ERROR("Failed to apply workaround for instance with base address: %p.",
+                           (void *)p_instance->p_reg);
+        }
+
+        (void)nrf_uarte_errorsrc_get_and_clear(p_instance->p_reg);
+        nrf_uarte_disable(p_instance->p_reg);
+    }
+#else
+    (void)(p_instance);
+#endif // defined(NRF5340_XXAA_APPLICATION) || defined(NRF5340_XXAA_NETWORK) || defined(NRF9160_XXAA)
+}
+
 nrfx_err_t nrfx_uarte_init(nrfx_uarte_t const *        p_instance,
                            nrfx_uarte_config_t const * p_config,
                            nrfx_uarte_event_handler_t  event_handler)
@@ -197,6 +257,12 @@ nrfx_err_t nrfx_uarte_init(nrfx_uarte_t const *        p_instance,
         #if NRFX_CHECK(NRFX_UARTE1_ENABLED)
         nrfx_uarte_1_irq_handler,
         #endif
+        #if NRFX_CHECK(NRFX_UARTE2_ENABLED)
+        nrfx_uarte_2_irq_handler,
+        #endif
+        #if NRFX_CHECK(NRFX_UARTE3_ENABLED)
+        nrfx_uarte_3_irq_handler,
+        #endif
     };
     if (nrfx_prs_acquire(p_instance->p_reg,
             irq_handlers[p_instance->drv_inst_idx]) != NRFX_SUCCESS)
@@ -210,6 +276,8 @@ nrfx_err_t nrfx_uarte_init(nrfx_uarte_t const *        p_instance,
 #endif // NRFX_CHECK(NRFX_PRS_ENABLED)
 
     apply_config(p_instance, p_config);
+
+    apply_workaround_for_enable_anomaly(p_instance);
 
     p_cb->handler   = event_handler;
     p_cb->p_context = p_config->p_context;
@@ -233,18 +301,45 @@ nrfx_err_t nrfx_uarte_init(nrfx_uarte_t const *        p_instance,
 void nrfx_uarte_uninit(nrfx_uarte_t const * p_instance)
 {
     uarte_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
-
-    nrf_uarte_disable(p_instance->p_reg);
+    NRF_UARTE_Type * p_reg = p_instance->p_reg;
 
     if (p_cb->handler)
     {
         interrupts_disable(p_instance);
     }
+    // Make sure all transfers are finished before UARTE is disabled
+    // to achieve the lowest power consumption.
+    nrf_uarte_shorts_disable(p_reg, NRF_UARTE_SHORT_ENDRX_STARTRX);
 
+    // Check if there is any ongoing reception.
+    if (p_cb->rx_buffer_length)
+    {
+        nrf_uarte_event_clear(p_reg, NRF_UARTE_EVENT_RXTO);
+        nrf_uarte_task_trigger(p_reg, NRF_UARTE_TASK_STOPRX);
+    }
+
+    nrf_uarte_event_clear(p_reg, NRF_UARTE_EVENT_TXSTOPPED);
+    nrf_uarte_task_trigger(p_reg, NRF_UARTE_TASK_STOPTX);
+
+    // Wait for TXSTOPPED event and for RXTO event, provided that there was ongoing reception.
+    bool stopped;
+
+    // The UARTE is able to receive up to four bytes after the STOPRX task has been triggered.
+    // On lowest supported baud rate (1200 baud), with parity bit and two stop bits configured
+    // (resulting in 12 bits per data byte sent), this may take up to 40 ms.
+    NRFX_WAIT_FOR((nrf_uarte_event_check(p_reg, NRF_UARTE_EVENT_TXSTOPPED) &&
+                  (!p_cb->rx_buffer_length || nrf_uarte_event_check(p_reg, NRF_UARTE_EVENT_RXTO))),
+                  40000, 1, stopped);
+    if (!stopped)
+    {
+        NRFX_LOG_ERROR("Failed to stop instance with base address: %p.", (void *)p_instance->p_reg);
+    }
+
+    nrf_uarte_disable(p_reg);
     pins_to_default(p_instance);
 
 #if NRFX_CHECK(NRFX_PRS_ENABLED)
-    nrfx_prs_release(p_instance->p_reg);
+    nrfx_prs_release(p_reg);
 #endif
 
     p_cb->state   = NRFX_DRV_STATE_UNINITIALIZED;
@@ -312,6 +407,15 @@ nrfx_err_t nrfx_uarte_tx(nrfx_uarte_t const * p_instance,
         if (txstopped)
         {
             err_code = NRFX_ERROR_FORBIDDEN;
+        }
+        else
+        {
+            // Transmitter has to be stopped by triggering the STOPTX task to achieve
+            // the lowest possible level of the UARTE power consumption.
+            nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPTX);
+
+            while (!nrf_uarte_event_check(p_instance->p_reg, NRF_UARTE_EVENT_TXSTOPPED))
+            {}
         }
         p_cb->tx_buffer_length = 0;
     }
@@ -427,6 +531,7 @@ nrfx_err_t nrfx_uarte_rx(nrfx_uarte_t const * p_instance,
     }
     else
     {
+        p_cb->rx_aborted = false;
         nrf_uarte_int_enable(p_instance->p_reg, NRF_UARTE_INT_ERROR_MASK |
                                                 NRF_UARTE_INT_ENDRX_MASK);
     }
@@ -490,12 +595,13 @@ void nrfx_uarte_rx_abort(nrfx_uarte_t const * p_instance)
 {
     uarte_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
 
-    // When using double-buffered RX, we must disable the short before aborting. Otherwise,
-    // we will never receive the RXTO event
-    if (p_cb->rx_secondary_buffer_length) {
+    // Short between ENDRX event and STARTRX task must be disabled before
+    // aborting transmission.
+    if (p_cb->rx_secondary_buffer_length != 0)
+    {
         nrf_uarte_shorts_disable(p_instance->p_reg, NRF_UARTE_SHORT_ENDRX_STARTRX);
     }
-
+    p_cb->rx_aborted = true;
     nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPRX);
     NRFX_LOG_INFO("RX transaction aborted.");
 }
@@ -523,12 +629,12 @@ static void uarte_irq_handler(NRF_UARTE_Type *        p_uarte,
     else if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ENDRX))
     {
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ENDRX);
-        size_t amount = nrf_uarte_rx_amount_get(p_uarte);
-        // If the transfer was stopped before completion, amount of transfered bytes
-        // will not be equal to the buffer length. Interrupted transfer is ignored.
-        if (amount == p_cb->rx_buffer_length)
+
+        // Aborted transfers are handled in RXTO event processing.
+        if (!p_cb->rx_aborted)
         {
-            if (p_cb->rx_secondary_buffer_length)
+            size_t amount = p_cb->rx_buffer_length;
+            if (p_cb->rx_secondary_buffer_length != 0)
             {
                 uint8_t * p_data = p_cb->p_rx_buffer;
                 nrf_uarte_shorts_disable(p_uarte, NRF_UARTE_SHORT_ENDRX_STARTRX);
@@ -548,9 +654,13 @@ static void uarte_irq_handler(NRF_UARTE_Type *        p_uarte,
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXTO))
     {
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_RXTO);
-        if (p_cb->rx_buffer_length)
+
+        if (p_cb->rx_buffer_length != 0)
         {
             p_cb->rx_buffer_length = 0;
+            // In case of using double-buffered reception both variables storing buffer length
+            // have to be cleared to prevent incorrect behaviour of the driver.
+            p_cb->rx_secondary_buffer_length = 0;
             rx_done_event(p_cb, nrf_uarte_rx_amount_get(p_uarte), p_cb->p_rx_buffer);
         }
 
@@ -564,7 +674,21 @@ static void uarte_irq_handler(NRF_UARTE_Type *        p_uarte,
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ENDTX))
     {
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ENDTX);
-        if (p_cb->tx_buffer_length)
+
+        // Transmitter has to be stopped by triggering STOPTX task to achieve
+        // the lowest possible level of the UARTE power consumption.
+        nrf_uarte_task_trigger(p_uarte, NRF_UARTE_TASK_STOPTX);
+
+        if (p_cb->tx_buffer_length != 0)
+        {
+            tx_done_event(p_cb, nrf_uarte_tx_amount_get(p_uarte));
+        }
+    }
+
+    if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_TXSTOPPED))
+    {
+        nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_TXSTOPPED);
+        if (p_cb->tx_buffer_length != 0)
         {
             tx_done_event(p_cb, nrf_uarte_tx_amount_get(p_uarte));
         }
@@ -582,6 +706,20 @@ void nrfx_uarte_0_irq_handler(void)
 void nrfx_uarte_1_irq_handler(void)
 {
     uarte_irq_handler(NRF_UARTE1, &m_cb[NRFX_UARTE1_INST_IDX]);
+}
+#endif
+
+#if NRFX_CHECK(NRFX_UARTE2_ENABLED)
+void nrfx_uarte_2_irq_handler(void)
+{
+    uarte_irq_handler(NRF_UARTE2, &m_cb[NRFX_UARTE2_INST_IDX]);
+}
+#endif
+
+#if NRFX_CHECK(NRFX_UARTE3_ENABLED)
+void nrfx_uarte_3_irq_handler(void)
+{
+    uarte_irq_handler(NRF_UARTE3, &m_cb[NRFX_UARTE3_INST_IDX]);
 }
 #endif
 

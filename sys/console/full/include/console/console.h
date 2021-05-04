@@ -45,6 +45,14 @@ typedef void (*console_rx_cb)(void);
 typedef int (*console_append_char_cb)(char *line, uint8_t byte);
 typedef void (*completion_cb)(char *str, console_append_char_cb cb);
 
+/**
+ * De initializes the UART console.
+ */
+void console_deinit(void);
+/**
+ * Re Initializes the UART console.
+ */
+void console_reinit(void);
 int console_init(console_rx_cb rx_cb);
 int console_is_init(void);
 void console_write(const char *str, int cnt);
@@ -55,6 +63,7 @@ void console_blocking_mode(void);
 void console_non_blocking_mode(void);
 void console_echo(int on);
 
+int console_vprintf(const char *fmt, va_list ap);
 int console_printf(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2)));;
 
@@ -68,7 +77,16 @@ void console_line_event_put(struct os_event *ev);
 /**
  * Global indicating whether console is silent or not
  */
-extern bool g_silence_console;
+extern bool g_console_silence;
+/**
+ * Global indicating whether non nlip console is silent or not
+ */
+extern bool g_console_silence_non_nlip;
+/**
+ * Global indicating whether console input is disabled or not
+ */
+extern bool g_console_ignore_non_nlip;
+
 
 /**
  * Silences console output, input is still active
@@ -79,12 +97,51 @@ extern bool g_silence_console;
 static void inline
 console_silence(bool silent)
 {
-    g_silence_console = silent;
+    g_console_silence = silent;
+}
+
+/**
+ * Silences non nlip console output, input is still active
+ *
+ * @param silent Let non nlip console know if it needs to be silent,
+ *        true for silence, false otherwise
+ */
+static void inline
+console_silence_non_nlip(bool silent)
+{
+    g_console_silence_non_nlip = silent;
+}
+
+
+/**
+ * Ignores console input that is non nlip, output is still active
+ *
+ * @param ignore Lets console know if non nlip input should be disabled,
+ *        true for ignore input, false otherwise
+ */
+static void inline
+console_ignore_non_nlip(bool ignore)
+{
+    g_console_ignore_non_nlip = ignore;
 }
 
 extern int console_is_midline;
 extern int console_out(int character);
 extern void console_rx_restart(void);
+
+int console_lock(int timeout);
+int console_unlock(void);
+
+/**
+ * Set prompt and current input line.
+ *
+ * This shows prompt with current input editor, cursor is placed
+ * at the end of line.
+ *
+ * @param prompt non-editable part of user input line
+ * @param line  editable part
+ */
+void console_prompt_set(const char *prompt, const char *line);
 
 #ifdef __cplusplus
 }

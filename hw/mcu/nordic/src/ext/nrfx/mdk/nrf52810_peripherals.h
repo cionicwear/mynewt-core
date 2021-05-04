@@ -1,6 +1,6 @@
 /*
 
-Copyright (c) 2010 - 2018, Nordic Semiconductor ASA All rights reserved.
+Copyright (c) 2010 - 2020, Nordic Semiconductor ASA All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -34,12 +34,20 @@ POSSIBILITY OF SUCH DAMAGE.
 #define _NRF52810_PERIPHERALS_H
 
 
+/* Clock Peripheral */
+#define CLOCK_PRESENT
+#define CLOCK_COUNT 1
+
 /* Power Peripheral */
 #define POWER_PRESENT
 #define POWER_COUNT 1
 
 #define POWER_FEATURE_RAM_REGISTERS_PRESENT
 #define POWER_FEATURE_RAM_REGISTERS_COUNT       3
+
+/* Non-Volatile Memory Controller */
+#define NVMC_PRESENT
+#define NVMC_COUNT 1
 
 /* Systick timer */
 #define SYSTICK_PRESENT
@@ -55,6 +63,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define P0_PIN_NUM 32
 
+#define P0_FEATURE_PINS_PRESENT 0xFFFFFFFFUL
+
 /* MPU and BPROT */
 #define BPROT_PRESENT
 
@@ -66,6 +76,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #define RADIO_COUNT 1
 
 #define RADIO_EASYDMA_MAXCNT_SIZE 8
+
+#define RADIO_TXPOWER_TXPOWER_Max RADIO_TXPOWER_TXPOWER_Pos4dBm
 
 /* Accelerated Address Resolver */
 #define AAR_PRESENT
@@ -128,6 +140,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #define TEMP_PRESENT
 #define TEMP_COUNT 1
 
+/* Serial Peripheral Interface Master */
+#define SPI_PRESENT
+#define SPI_COUNT 1
+
 /* Serial Peripheral Interface Master with DMA */
 #define SPIM_PRESENT
 #define SPIM_COUNT 1
@@ -148,6 +164,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define SPIS0_EASYDMA_MAXCNT_SIZE 10
 
+/* Two Wire Interface Master */
+#define TWI_PRESENT
+#define TWI_COUNT 1
+
 /* Two Wire Interface Master with DMA */
 #define TWIM_PRESENT
 #define TWIM_COUNT 1
@@ -159,6 +179,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #define TWIS_COUNT 1
 
 #define TWIS0_EASYDMA_MAXCNT_SIZE 10
+
+/* Universal Asynchronous Receiver-Transmitter */
+#define UART_PRESENT
+#define UART_COUNT 1
 
 /* Universal Asynchronous Receiver-Transmitter with DMA */
 #define UARTE_PRESENT

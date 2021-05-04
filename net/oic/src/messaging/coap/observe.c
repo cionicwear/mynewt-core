@@ -81,7 +81,7 @@ add_observer(oc_resource_t *resource, oc_endpoint_t *endpoint,
         o->obs_counter = observe_counter;
         o->resource = resource;
         resource->num_observers++;
-        OC_LOG(DEBUG, "Adding observer (%u/%u) for /%s [0x%02X%02X]\n",
+        OC_LOG_DEBUG("Adding observer (%u/%u) for /%s [0x%02X%02X]\n",
           coap_observer_pool.mp_num_blocks - coap_observer_pool.mp_num_free,
           coap_observer_pool.mp_num_blocks, o->url, o->token[0], o->token[1]);
         SLIST_INSERT_HEAD(&oc_observers, o, next);
@@ -95,7 +95,7 @@ add_observer(oc_resource_t *resource, oc_endpoint_t *endpoint,
 void
 coap_remove_observer(coap_observer_t *o)
 {
-    OC_LOG(DEBUG, "Removing observer for /%s [0x%02X%02X]\n",
+    OC_LOG_DEBUG("Removing observer for /%s [0x%02X%02X]\n",
                  o->url, o->token[0], o->token[1]);
     SLIST_REMOVE(&oc_observers, o, coap_observer, next);
     os_memblock_put(&coap_observer_pool, o);
@@ -184,6 +184,24 @@ coap_remove_observer_by_mid(oc_endpoint_t *endpoint, uint16_t mid)
     }
     return removed;
 }
+
+void
+coap_observer_walk(int (*walk_func)(struct coap_observer *, void *), void *arg)
+{
+    struct coap_observer *obs, *next;
+    int rc;
+
+    obs = SLIST_FIRST(&oc_observers);
+    while (obs) {
+        next = SLIST_NEXT(obs, next);
+        rc = walk_func(obs, arg);
+        if (rc) {
+            break;
+        }
+        obs = next;
+    }
+}
+
 /*---------------------------------------------------------------------------*/
 /*- Notification ------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
@@ -193,43 +211,28 @@ coap_notify_observers(oc_resource_t *resource,
                       oc_endpoint_t *endpoint)
 {
     int num_observers = 0;
+    coap_observer_t *obs = NULL;
     oc_request_t request = {};
     oc_response_t response = {};
     oc_response_buffer_t response_buffer;
+#if MYNEWT_VAL(OC_SEPARATE_RESPONSES)
+    struct coap_packet_rx req[1];
+#endif
+    coap_packet_t notification[1];
+    coap_transaction_t *transaction = NULL;
     struct os_mbuf *m = NULL;
 
     if (resource) {
         if (!resource->num_observers) {
-            OC_LOG(DEBUG, "coap_notify_observers: no observers left\n");
+            OC_LOG_DEBUG("coap_notify_observers: no observers left\n");
             return 0;
         }
-        num_observers = resource->num_observers;
-    }
-    response.separate_response = 0;
-    if (!response_buf && resource) {
-        OC_LOG(DEBUG, "coap_notify_observers: Issue GET request to resource\n");
-        /* performing GET on the resource */
-        m = os_msys_get_pkthdr(0, 0);
-        if (!m) {
-            /* XXX count */
-            return num_observers;
-        }
-        response_buffer.buffer = m;
         response_buffer.block_offset = NULL;
         response.response_buffer = &response_buffer;
         request.resource = resource;
         request.response = &response;
-        oc_rep_new(m);
-        resource->get_handler(&request, resource->default_interface);
-        response_buf = &response_buffer;
-        if (response_buf->code == OC_IGNORE) {
-            OC_LOG(ERROR, "coap_notify_observers: Resource ignored request\n");
-            os_mbuf_free_chain(m);
-            return num_observers;
-        }
     }
 
-    coap_observer_t *obs = NULL;
     /* iterate over observers */
     for (obs = SLIST_FIRST(&oc_observers); obs; obs = SLIST_NEXT(obs, next)) {
         /* skip if neither resource nor endpoint match */
@@ -239,11 +242,29 @@ coap_notify_observers(oc_resource_t *resource,
             continue;
         }
 
+        response.separate_response = 0;
         num_observers = obs->resource->num_observers;
+        if (!response_buf && resource) {
+            OC_LOG_DEBUG("coap_notify_observers: GET request to resource\n");
+            /* performing GET on the resource */
+            m = os_msys_get_pkthdr(0, 0);
+            if (!m) {
+                return num_observers;
+            }
+            response_buffer.buffer = m;
+            request.origin = &obs->endpoint;
+            oc_rep_new(m);
+            resource->get_handler(&request, resource->default_interface);
+            response_buf = &response_buffer;
+            if (response_buf->code == OC_IGNORE) {
+                OC_LOG_ERROR("coap_notify_observers: Resource ignored req\n");
+                os_mbuf_free_chain(m);
+                return num_observers;
+            }
+        }
 #if MYNEWT_VAL(OC_SEPARATE_RESPONSES)
         if (response.separate_response != NULL &&
-          response_buf->code == oc_status_code(OC_STATUS_OK)) {
-            struct coap_packet_rx req[1];
+            response_buf->code == oc_status_code(OC_STATUS_OK)) {
 
             req->block1_num = 0;
             req->block1_size = 0;
@@ -255,31 +276,30 @@ coap_notify_observers(oc_resource_t *resource,
             req->mid = 0;
             memcpy(req->token, obs->token, obs->token_len);
             req->token_len = obs->token_len;
-            OC_LOG(DEBUG, "Resource is SLOW; creating separate response\n");
+            OC_LOG_DEBUG("Resource is SLOW; creating separate response\n");
             if (coap_separate_accept(req, response.separate_response,
-                &obs->endpoint, 0) == 1) {
+                                     &obs->endpoint, 0) == 1) {
                 response.separate_response->active = 1;
             }
         } else {
 #endif /* OC_SEPARATE_RESPONSES */
-            OC_LOG(DEBUG, "coap_notify_observers: notifying observer\n");
-            coap_transaction_t *transaction = NULL;
-            if (response_buf && (transaction = coap_new_transaction(
-                  coap_get_mid(), &obs->endpoint))) {
+            if (response_buf &&
+                (transaction = coap_new_transaction(coap_get_mid(),
+                                                    &obs->endpoint))) {
+
+                OC_LOG_DEBUG("coap_notify_observers: notifying observer\n");
 
                 /* update last MID for RST matching */
                 obs->last_mid = transaction->mid;
 
                 /* prepare response */
                 /* build notification */
-                coap_packet_t notification[1];
-                /* this way the packet can be treated as pointer as usual */
                 coap_init_message(notification, COAP_TYPE_NON, CONTENT_2_05, 0);
 
                 notification->mid = transaction->mid;
-                if (!oc_endpoint_use_tcp(&obs->endpoint) &&
+                if (!oc_endpoint_has_conn(&obs->endpoint) &&
                     obs->obs_counter % COAP_OBSERVE_REFRESH_INTERVAL == 0) {
-                    OC_LOG(DEBUG, "coap_observe_notify: forcing CON "
+                    OC_LOG_DEBUG("coap_observe_notify: forcing CON "
                                  "notification to check for client liveness\n");
                     notification->type = COAP_TYPE_CON;
                 }
@@ -288,7 +308,7 @@ coap_notify_observers(oc_resource_t *resource,
                 coap_set_status_code(notification, response_buf->code);
                 coap_set_header_content_format(notification, APPLICATION_CBOR);
                 if (notification->code < BAD_REQUEST_4_00 &&
-                  obs->resource->num_observers) {
+                    obs->resource->num_observers) {
                     coap_set_header_observe(notification, (obs->obs_counter)++);
                     observe_counter++;
                 } else {
@@ -302,6 +322,19 @@ coap_notify_observers(oc_resource_t *resource,
                 } else {
                     coap_clear_transaction(transaction);
                 }
+                if (response_buf == &response_buffer) {
+                    /*
+                     * We allocated mbuf, and it's still valid.
+                     */
+                    os_mbuf_free_chain(m);
+                    m = NULL;
+                    response_buf = NULL;
+                }
+            } else if (response_buf) {
+                /*
+                 * Failed to alloc transaction.
+                 */
+                break;
             }
 #if MYNEWT_VAL(OC_SEPARATE_RESPONSES)
         }

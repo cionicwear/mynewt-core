@@ -26,7 +26,7 @@
  * For native cpu implementation.
  */
 static uint8_t native_timer_task_started;
-#define NATIVE_TIMER_STACK_SIZE   (1024)
+#define NATIVE_TIMER_STACK_SIZE   OS_STACK_ALIGN(1024)
 static os_stack_t native_timer_stack[NATIVE_TIMER_STACK_SIZE];
 static struct os_task native_timer_task_struct;
 static struct os_eventq native_timer_evq;
@@ -106,8 +106,8 @@ hal_timer_config(int num, uint32_t clock_freq)
     nt->last_ostime = os_time_get();
     if (!native_timer_task_started) {
         os_task_init(&native_timer_task_struct, "native_timer",
-          native_timer_task, NULL, OS_TASK_PRI_HIGHEST, OS_WAIT_FOREVER,
-          native_timer_stack, NATIVE_TIMER_STACK_SIZE);
+          native_timer_task, NULL, MYNEWT_VAL(MCU_TIMER_POLLER_PRIO),
+          OS_WAIT_FOREVER, native_timer_stack, NATIVE_TIMER_STACK_SIZE);
 
         /* Initialize the eventq and task */
         os_eventq_init(&native_timer_evq);

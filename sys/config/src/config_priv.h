@@ -25,13 +25,7 @@ extern "C" {
 #endif
 
 int conf_cli_register(void);
-int conf_nmgr_register(void);
-
-/*
- * Lock config subsystem.
- */
-void conf_lock(void);
-void conf_unlock(void);
+int conf_mgmt_register(void);
 
 struct mgmt_cbuf;
 int conf_line_parse(char *buf, char **namep, char **valp);
@@ -39,6 +33,12 @@ int conf_line_make(char *dst, int dlen, const char *name, const char *val);
 int conf_line_make2(char *dst, int dlen, const char *name, const char *value);
 struct conf_handler *conf_parse_and_lookup(char *name, int *name_argc,
                                            char *name_argv[]);
+
+/**
+ * Executes a conf_handler's "export" callback and returns the result.
+ */
+int conf_export_cb(struct conf_handler *ch, conf_export_func_t export_func,
+                   conf_export_tgt_t tgt);
 
 SLIST_HEAD(conf_store_head, conf_store);
 extern struct conf_store_head conf_load_srcs;

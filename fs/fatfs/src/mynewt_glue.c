@@ -38,6 +38,7 @@ static int fatfs_close(struct fs_file *fs_file);
 static int fatfs_read(struct fs_file *fs_file, uint32_t len, void *out_data,
   uint32_t *out_len);
 static int fatfs_write(struct fs_file *fs_file, const void *data, int len);
+static int fatfs_flush(struct fs_file *fs_file);
 static int fatfs_seek(struct fs_file *fs_file, uint32_t offset);
 static uint32_t fatfs_getpos(const struct fs_file *fs_file);
 static int fatfs_file_len(const struct fs_file *fs_file, uint32_t *out_len);
@@ -50,7 +51,7 @@ static int fatfs_closedir(struct fs_dir *dir);
 static int fatfs_dirent_name(const struct fs_dirent *fs_dirent, size_t max_len,
   char *out_name, uint8_t *out_name_len);
 static int fatfs_dirent_is_dir(const struct fs_dirent *fs_dirent);
-
+static int fatfs_mkfs(const char *path, uint8_t format);
 #define DRIVE_LEN 4
 
 struct fatfs_file {
@@ -79,6 +80,7 @@ static struct fs_ops fatfs_ops = {
     .f_close = fatfs_close,
     .f_read = fatfs_read,
     .f_write = fatfs_write,
+    .f_flush = fatfs_flush,
 
     .f_seek = fatfs_seek,
     .f_getpos = fatfs_getpos,
@@ -87,7 +89,7 @@ static struct fs_ops fatfs_ops = {
     .f_unlink = fatfs_unlink,
     .f_rename = fatfs_rename,
     .f_mkdir = fatfs_mkdir,
-
+    .f_mkfs = fatfs_mkfs,
     .f_opendir = fatfs_opendir,
     .f_readdir = fatfs_readdir,
     .f_closedir = fatfs_closedir,
@@ -184,7 +186,7 @@ drivenumber_from_disk(char *disk_name)
     struct mounted_disk *new_disk;
     int disk_number;
     FATFS *fs;
-    char path[DRIVE_LEN];
+    char path[6];
 
     disk_number = 0;
     if (disk_name) {
@@ -198,7 +200,7 @@ drivenumber_from_disk(char *disk_name)
 
     /* XXX: check for errors? */
     fs = malloc(sizeof(FATFS));
-    sprintf(path, "%d:", disk_number);
+    sprintf(path, "%d:", (uint8_t)disk_number);
     f_mount(fs, path, 1);
 
     /* FIXME */
@@ -211,6 +213,44 @@ drivenumber_from_disk(char *disk_name)
     return disk_number;
 }
 
+/**
+ * Converts fs path to fatfs path
+ *
+ * Function changes mmc0:/dir/file.ext to 0:/dir/file.ext
+ *
+ * @param fs_path
+ * @return pointer to allocated memory with fatfs path
+ */
+static char *
+fatfs_path_from_fs_path(const char *fs_path)
+{
+    char *disk;
+    int drive_number;
+    char *file_path = NULL;
+    char *fatfs_path = NULL;
+
+    disk = disk_name_from_path(fs_path);
+    if (disk == NULL) {
+        goto err;
+    }
+    drive_number = drivenumber_from_disk(disk);
+    free(disk);
+    file_path = disk_filepath_from_path(fs_path);
+
+    if (file_path == NULL) {
+        goto err;
+    }
+
+    fatfs_path = malloc(strlen(file_path) + 3);
+    if (fatfs_path == NULL) {
+        goto err;
+    }
+    sprintf(fatfs_path, "%d:%s", drive_number, file_path);
+err:
+    free(file_path);
+    return fatfs_path;
+}
+
 static int
 fatfs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_file)
 {
@@ -218,10 +258,7 @@ fatfs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_file)
     FIL *out_file = NULL;
     BYTE mode;
     struct fatfs_file *file = NULL;
-    char *disk;
-    int number;
-    char *filepath;
-    char drivepath[255 + DRIVE_LEN];  /* FIXME */
+    char *fatfs_path = NULL;
     int rc;
 
     file = malloc(sizeof(struct fatfs_file));
@@ -251,13 +288,12 @@ fatfs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_file)
         mode |= FA_CREATE_ALWAYS;
     }
 
-    disk = disk_name_from_path(path);
-    number = drivenumber_from_disk(disk);
-    filepath = disk_filepath_from_path(path);
-    sprintf(drivepath, "%d:%s", number, filepath);
-    free(filepath);
-
-    res = f_open(out_file, drivepath, mode);
+    fatfs_path = fatfs_path_from_fs_path(path);
+    if (fatfs_path == NULL) {
+        rc = FS_ENOMEM;
+        goto out;
+    }
+    res = f_open(out_file, fatfs_path, mode);
     if (res != FR_OK) {
         rc = fatfs_to_vfs_error(res);
         goto out;
@@ -269,6 +305,7 @@ fatfs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_file)
     rc = FS_EOK;
 
 out:
+    free(fatfs_path);
     if (rc != FS_EOK) {
         if (file) free(file);
         if (out_file) free(out_file);
@@ -279,15 +316,15 @@ out:
 static int
 fatfs_close(struct fs_file *fs_file)
 {
-    FRESULT res;
+    FRESULT res = FR_OK;
     FIL *file = ((struct fatfs_file *) fs_file)->file;
 
-    if (file == NULL) {
-        return FS_EOK;
+    if (file != NULL) {
+        res = f_close(file);
+        free(file);
     }
 
-    res = f_close(file);
-    free(file);
+    free(fs_file);
     return fatfs_to_vfs_error(res);
 }
 
@@ -314,11 +351,11 @@ fatfs_getpos(const struct fs_file *fs_file)
 static int
 fatfs_file_len(const struct fs_file *fs_file, uint32_t *out_len)
 {
-    uint32_t offset;
     FIL *file = ((struct fatfs_file *) fs_file)->file;
 
-    offset = (uint32_t) f_size(file);
-    return offset;
+    *out_len = (uint32_t) f_size(file);
+
+    return FS_EOK;
 }
 
 static int
@@ -349,12 +386,30 @@ fatfs_write(struct fs_file *fs_file, const void *data, int len)
 }
 
 static int
+fatfs_flush(struct fs_file *fs_file)
+{
+    FRESULT res;
+    FIL *file = ((struct fatfs_file *)fs_file)->file;
+
+    res = f_sync(file);
+
+    return fatfs_to_vfs_error(res);
+}
+
+static int
 fatfs_unlink(const char *path)
 {
     FRESULT res;
+    char *fatfs_path;
 
-    //FIXME: handle disk
-    res = f_unlink(path);
+    fatfs_path = fatfs_path_from_fs_path(path);
+
+    if (fatfs_path == NULL) {
+        return FS_ENOMEM;
+    }
+    res = f_unlink(fatfs_path);
+    free(fatfs_path);
+
     return fatfs_to_vfs_error(res);
 }
 
@@ -362,9 +417,22 @@ static int
 fatfs_rename(const char *from, const char *to)
 {
     FRESULT res;
+    char *fatfs_src_path;
+    char *fatfs_dst_path;
 
-    //FIXME: handle disk
-    res = f_rename(from, to);
+    fatfs_src_path = fatfs_path_from_fs_path(from);
+    fatfs_dst_path = fatfs_path_from_fs_path(to);
+
+    if (fatfs_src_path == NULL || fatfs_dst_path == NULL) {
+        free(fatfs_src_path);
+        free(fatfs_dst_path);
+        return FS_ENOMEM;
+    }
+
+    res = f_rename(fatfs_src_path, fatfs_dst_path);
+    free(fatfs_src_path);
+    free(fatfs_dst_path);
+
     return fatfs_to_vfs_error(res);
 }
 
@@ -372,9 +440,25 @@ static int
 fatfs_mkdir(const char *path)
 {
     FRESULT res;
+    char *fatfs_path;
 
-    res = f_mkdir(path);
+    fatfs_path = fatfs_path_from_fs_path(path);
+
+    if (fatfs_path == NULL) {
+        return FS_ENOMEM;
+    }
+
+    res = f_mkdir(fatfs_path);
     return fatfs_to_vfs_error(res);
+}
+
+static int
+fatfs_mkfs(const char *disk, uint8_t format)
+{
+    FRESULT res;
+    uint8_t work_buffer[512];
+    res = f_mkfs(disk, FM_FAT32, 0,work_buffer, 512);
+    return res;
 }
 
 static int
@@ -383,10 +467,7 @@ fatfs_opendir(const char *path, struct fs_dir **out_fs_dir)
     FRESULT res;
     FATFS_DIR *out_dir = NULL;
     struct fatfs_dir *dir = NULL;
-    char *disk;
-    int number;
-    char *filepath;
-    char drivepath[255 + DRIVE_LEN];  /* FIXME */
+    char *fatfs_path = NULL;
     int rc;
 
     dir = malloc(sizeof(struct fatfs_dir));
@@ -401,13 +482,9 @@ fatfs_opendir(const char *path, struct fs_dir **out_fs_dir)
         goto out;
     }
 
-    disk = disk_name_from_path(path);
-    number = drivenumber_from_disk(disk);
-    filepath = disk_filepath_from_path(path);
-    sprintf(drivepath, "%d:%s", number, filepath);
-    free(filepath);
+    fatfs_path = fatfs_path_from_fs_path(path);
 
-    res = f_opendir(out_dir, drivepath);
+    res = f_opendir(out_dir, fatfs_path);
     if (res != FR_OK) {
         rc = fatfs_to_vfs_error(res);
         goto out;
@@ -419,11 +496,12 @@ fatfs_opendir(const char *path, struct fs_dir **out_fs_dir)
     rc = FS_EOK;
 
 out:
+    free(fatfs_path);
     if (rc != FS_EOK) {
         if (dir) free(dir);
         if (out_dir) free(out_dir);
     }
-    return FS_EOK;
+    return rc;
 }
 
 static int
@@ -453,6 +531,7 @@ fatfs_closedir(struct fs_dir *fs_dir)
 
     res = f_closedir(dir);
     free(dir);
+    free(fs_dir);
     return fatfs_to_vfs_error(res);
 }
 
@@ -561,14 +640,21 @@ disk_write(BYTE pdrv, const BYTE* buff, DWORD sector, UINT count)
 DRESULT
 disk_ioctl(BYTE pdrv, BYTE cmd, void* buff)
 {
-    return RES_OK;
-}
+    int rc;
+    struct disk_ops *dops;
 
-/* FIXME: _FS_NORTC=1 because there is not hal_rtc interface */
-DWORD
-get_fattime(void)
-{
-    return 0;
+    dops = dops_from_handle(pdrv);
+    if (dops == NULL) {
+        return STA_NOINIT;
+    }
+
+    rc = dops->ioctl(pdrv, cmd, buff);
+    
+    if (rc < 0) {
+        return STA_NOINIT;
+    }
+
+    return RES_OK;
 }
 
 void

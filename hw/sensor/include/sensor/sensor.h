@@ -23,6 +23,10 @@
 #include <string.h>
 #include "os/mynewt.h"
 
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+#include "bus/drivers/i2c_common.h"
+#include "bus/drivers/spi_common.h"
+#endif
 #if MYNEWT_VAL(SENSOR_OIC)
 #include "oic/oc_ri.h"
 #endif
@@ -80,6 +84,10 @@ typedef enum {
     SENSOR_TYPE_EULER                = (1 << 14),
     /* Color Sensor */
     SENSOR_TYPE_COLOR                = (1 << 15),
+    /* Voltage */
+    SENSOR_TYPE_VOLTAGE              = (1 << 16),
+    /* Current */
+    SENSOR_TYPE_CURRENT              = (1 << 17),
 
     /* Standard sensor types to be defined here */
 
@@ -480,6 +488,16 @@ typedef int (*sensor_unset_notification_t)(struct sensor *,
  */
 typedef int (*sensor_handle_interrupt_t)(struct sensor *sensor);
 
+/**
+ * Reset Sensor function Ptr
+ *
+ * @param Ptr to the sensor
+ *
+ * @return 0 on success, non-zero on failure
+ */
+typedef int (*sensor_reset_t)(struct sensor *);
+
+
 struct sensor_driver {
     sensor_read_func_t sd_read;
     sensor_get_config_func_t sd_get_config;
@@ -490,6 +508,7 @@ struct sensor_driver {
     sensor_set_notification_t sd_set_notification;
     sensor_unset_notification_t sd_unset_notification;
     sensor_handle_interrupt_t sd_handle_interrupt;
+    sensor_reset_t sd_reset;
 };
 
 struct sensor_timestamp {
@@ -499,13 +518,17 @@ struct sensor_timestamp {
 };
 
 struct sensor_int {
-    uint8_t host_pin;
+    int8_t host_pin;
     uint8_t device_pin;
     uint8_t active;
 };
 
 struct sensor_itf {
 
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    /* Device configuration is stored in bus node */
+    struct os_dev *si_dev;
+#else
     /* Sensor interface type */
     uint8_t si_type;
 
@@ -518,14 +541,15 @@ struct sensor_itf {
     /* Sensor address */
     uint16_t si_addr;
 
+    /* Mutex for interface access */
+    struct os_mutex *si_lock;
+#endif
+
     /* Sensor interface low int pin */
     uint8_t si_low_pin;
 
     /* Sensor interface high int pin */
     uint8_t si_high_pin;
-
-    /* Mutex for interface access */
-    struct os_mutex *si_lock;
 
     /* Sensor interface interrupts pins */
     /* XXX We should probably remove low/high pins and replace it with those
@@ -616,6 +640,14 @@ struct sensor {
 
     /* The next sensor in the global sensor list. */
     SLIST_ENTRY(sensor) s_next;
+};
+
+/**
+ * Read context for calling user function with argument
+ */
+struct sensor_read_ctx {
+    sensor_data_func_t user_func;
+    void *user_arg;
 };
 
 /**
@@ -816,7 +848,7 @@ sensor_set_type_mask(struct sensor *sensor, sensor_type_t mask)
 static inline sensor_type_t
 sensor_check_type(struct sensor *sensor, sensor_type_t type)
 {
-    return (sensor->s_types & sensor->s_mask & type);
+    return (sensor_type_t)(sensor->s_types & sensor->s_mask & type);
 }
 
 /**
@@ -942,7 +974,8 @@ struct sensor *sensor_mgr_find_next_bytype(sensor_type_t type, struct sensor *se
  *
  * @return 0 on success, non-zero error code on failure
  */
-struct sensor *sensor_mgr_find_next_bydevname(char *devname, struct sensor *prev_cursor);
+struct sensor *sensor_mgr_find_next_bydevname(const char *devname,
+                                              struct sensor *prev_cursor);
 
 /**
  * Check if sensor type matches
@@ -961,7 +994,7 @@ int sensor_mgr_match_bytype(struct sensor *sensor, void *);
  * @param poll_rate The poll rate in milli seconds
  */
 int
-sensor_set_poll_rate_ms(char *devname, uint32_t poll_rate);
+sensor_set_poll_rate_ms(const char *devname, uint32_t poll_rate);
 
 /**
  * Set the sensor poll rate multiple based on the device name, sensor type
@@ -970,7 +1003,7 @@ sensor_set_poll_rate_ms(char *devname, uint32_t poll_rate);
  * @param stt The sensor type trait
  */
 int
-sensor_set_n_poll_rate(char *devname, struct sensor_type_traits *stt);
+sensor_set_n_poll_rate(const char *devname, struct sensor_type_traits *stt);
 
 /**
  * Transmit OIC trigger
@@ -1017,7 +1050,7 @@ sensor_get_type_traits_bytype(sensor_type_t type, struct sensor *sensor);
  * @return NULL on failure, sensor struct on success
  */
 struct sensor *
-sensor_get_type_traits_byname(char *, struct sensor_type_traits **,
+sensor_get_type_traits_byname(const char *, struct sensor_type_traits **,
                               sensor_type_t);
 
 /**
@@ -1029,7 +1062,7 @@ sensor_get_type_traits_byname(char *, struct sensor_type_traits **,
  * @return 0 on success, non-zero on failure
  */
 int
-sensor_set_thresh(char *devname, struct sensor_type_traits *stt);
+sensor_set_thresh(const char *devname, struct sensor_type_traits *stt);
 
 /**
  * Clears the low threshold for a sensor
@@ -1040,7 +1073,7 @@ sensor_set_thresh(char *devname, struct sensor_type_traits *stt);
  * @return 0 on success, non-zero on failure
  */
 int
-sensor_clear_low_thresh(char *devname, sensor_type_t type);
+sensor_clear_low_thresh(const char *devname, sensor_type_t type);
 
 /**
  * Clears the high threshold for a sensor
@@ -1051,7 +1084,7 @@ sensor_clear_low_thresh(char *devname, sensor_type_t type);
  * @return 0 on success, non-zero on failure
  */
 int
-sensor_clear_high_thresh(char *devname, sensor_type_t type);
+sensor_clear_high_thresh(const char *devname, sensor_type_t type);
 
 /**
  * Puts a notification event on the sensor manager evq
@@ -1078,6 +1111,14 @@ sensor_mgr_put_interrupt_evt(struct sensor *sensor);
  */
 void
 sensor_mgr_put_read_evt(void *arg);
+
+/**
+ * Resets the sensor
+ *
+ * @param Ptr to sensor
+ */
+int
+sensor_reset(struct sensor *sensor);
 
 #if MYNEWT_VAL(SENSOR_CLI)
 /**

@@ -16,8 +16,6 @@
 # under the License.
 #
 
-# Package: fs/nffs
-
 syscfg.defs:
     NFFS_FLASH_AREA:
         description: 'Flash area to use for NFFS.'
@@ -35,3 +33,21 @@ syscfg.defs:
             Number of areas to allocate in the NFFS disk.  A smaller number is
             used if the flash hardware cannot support this value.
         value: 8
+    NFFS_SYSINIT_STAGE:
+        description: >
+            Sysinit stage for NFFS functionality.
+        value: 200
+
+    ### Log settings.
+
+    NFFS_LOG_MOD:
+        description: 'Numeric module ID to use for NFFS log messages.'
+        value: 5
+    NFFS_LOG_LVL:
+        description: 'Minimum level for the NFFS log.'
+        value: 1
+
+syscfg.logs:
+    NFFS_LOG:
+        module: MYNEWT_VAL(NFFS_LOG_MOD)
+        level: MYNEWT_VAL(NFFS_LOG_LVL)

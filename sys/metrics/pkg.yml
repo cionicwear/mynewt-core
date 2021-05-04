@@ -27,11 +27,11 @@ pkg.keywords:
 pkg.deps:
     - kernel/os
     - sys/log/full
-    - encoding/tinycbor
+    - "@apache-mynewt-core/encoding/tinycbor"
 pkg.apis:
     - metrics
 pkg.deps.METRICS_CLI:
     - sys/shell
 
 pkg.init:
-      metrics_pkg_init: 500
+      metrics_pkg_init: 'MYNEWT_VAL(METRICS_SYSINIT_STAGE)'

@@ -24,6 +24,7 @@
 #include "os/mynewt.h"
 #include "console/console.h"
 #include "testutil/testutil.h"
+#include "taskpool/taskpool.h"
 
 #include "runtest/runtest.h"
 #include "runtest_priv.h"
@@ -56,17 +57,7 @@ static struct os_event run_test_event = {
     .ev_cb = runtest_evt_fn,
 };
 
-struct runtest_task {
-    struct os_task task;
-    char name[sizeof "taskX"];
-    OS_TASK_STACK_DEFINE_NOSTATIC(stack, MYNEWT_VAL(RUNTEST_STACK_SIZE));
-};
-
-static struct runtest_task runtest_tasks[MYNEWT_VAL(RUNTEST_NUM_TASKS)];
-
 #define RUNTEST_BUILD_ID 
-
-static int runtest_next_task_idx;
 
 /**
  * Retrieves the event queue used by the runtest package.
@@ -107,56 +98,12 @@ runtest_total_fails_get(void)
     return runtest_total_fails;
 }
 
-struct os_task *
-runtest_init_task(os_task_func_t task_handler, uint8_t prio)
-{
-    struct os_task *task;
-    os_stack_t *stack;
-    char *name;
-    int rc;
-
-    if (runtest_next_task_idx >= MYNEWT_VAL(RUNTEST_NUM_TASKS)) {
-        TEST_ASSERT_FATAL(0, "No more test tasks");
-        return NULL;
-    }
-
-    task = &runtest_tasks[runtest_next_task_idx].task;
-    stack = runtest_tasks[runtest_next_task_idx].stack;
-    name = runtest_tasks[runtest_next_task_idx].name;
-
-    strcpy(name, "task");
-    name[4] = '0' + runtest_next_task_idx;
-    name[5] = '\0';
-
-    rc = os_task_init(task, name, task_handler, NULL,
-                      prio, OS_WAIT_FOREVER, stack,
-                      MYNEWT_VAL(RUNTEST_STACK_SIZE));
-    TEST_ASSERT_FATAL(rc == 0);
-
-    runtest_next_task_idx++;
-
-    return task;
-}
-
-static void
-runtest_reset(void)
-{
-    int rc;
-
-    while (runtest_next_task_idx > 0) {
-        runtest_next_task_idx--;
-
-        rc = os_task_remove(&runtest_tasks[runtest_next_task_idx].task);
-        assert(rc == OS_OK);
-    }
-}
-
+#if MYNEWT_VAL(RUNTEST_LOG)
 static void
 runtest_log_result(const char *msg, bool passed)
 {
-#if MYNEWT_VAL(RUNTEST_LOG)
-    /* Must log valid json with a strlen less than LOG_PRINTF_MAX_ENTRY_LEN */
-    char buf[LOG_PRINTF_MAX_ENTRY_LEN];
+    /* Must log valid json with a strlen less than MODLOG_MAX_PRINTF_LEN */
+    char buf[MYNEWT_VAL(MODLOG_MAX_PRINTF_LEN)];
     char *n;
     int n_len;
     char *s;
@@ -165,34 +112,39 @@ runtest_log_result(const char *msg, bool passed)
     int m_len;
     int len;
 
-    /* str length of {"k":"","n":"","s":"","m":"","r":1}<token> */
-    len = 35 + strlen(runtest_token);
+    /* str length of {"k":"","n":"","s":"","m":"","r":1}<token> plus three
+     * null-terminators.
+     */
+    len = 38 + strlen(runtest_token);
 
     /* How much of the test name can we log? */
     n_len = strlen(tu_case_name);
-    if (len + n_len >= LOG_PRINTF_MAX_ENTRY_LEN) {
-        n_len = LOG_PRINTF_MAX_ENTRY_LEN - len - 1;
+    if (len + n_len >= MYNEWT_VAL(MODLOG_MAX_PRINTF_LEN)) {
+        n_len = MYNEWT_VAL(MODLOG_MAX_PRINTF_LEN) - len - 1;
     }
     len += n_len;
     n = buf;
-    strncpy(n, tu_case_name, n_len + 1);
+    strncpy(n, tu_case_name, n_len);
+    n[n_len] = '\0';
 
     /* How much of the suite name can we log? */
     s_len = strlen(runtest_current_ts->ts_name);
-    if (len + s_len >= LOG_PRINTF_MAX_ENTRY_LEN) {
-        s_len = LOG_PRINTF_MAX_ENTRY_LEN - len - 1;
+    if (len + s_len >= MYNEWT_VAL(MODLOG_MAX_PRINTF_LEN)) {
+        s_len = MYNEWT_VAL(MODLOG_MAX_PRINTF_LEN) - len - 1;
     }
     len += s_len;
     s = n + n_len + 2;
-    strncpy(s, runtest_current_ts->ts_name, s_len + 1);
+    strncpy(s, runtest_current_ts->ts_name, s_len);
+    s[s_len] = '\0';
 
     /* How much of the message can we log? */
     m_len = strlen(msg);
-    if (len + m_len >= LOG_PRINTF_MAX_ENTRY_LEN) {
-        m_len = LOG_PRINTF_MAX_ENTRY_LEN - len - 1;
+    if (len + m_len >= MYNEWT_VAL(MODLOG_MAX_PRINTF_LEN)) {
+        m_len = MYNEWT_VAL(MODLOG_MAX_PRINTF_LEN) - len - 1;
     }
     m = s + s_len + 2;
-    strncpy(m, msg, m_len + 1);
+    strncpy(m, msg, m_len);
+    m[m_len] = '\0';
 
     /* XXX Hack to allow the idle task to run and update the timestamp. */
     os_time_delay(1);
@@ -202,26 +154,23 @@ runtest_log_result(const char *msg, bool passed)
         runtest_total_fails++;
     }
 
-    MODLOG_INFO(
-        LOG_MODULE_TEST,
+    TEST_LOG_INFO(
         "{\"k\":\"%s\",\"n\":\"%s\",\"s\":\"%s\",\"m\":\"%s\",\"r\":%d}",
         runtest_token, n, s, m, passed);
-#endif
 }
 
 static void
-runtest_pass(char *msg, void *arg)
+runtest_pass(const char *msg, void *arg)
 {
-    runtest_reset();
     runtest_log_result(msg, true);
 }
 
 static void
-runtest_fail(char *msg, void *arg)
+runtest_fail(const char *msg, void *arg)
 {
-    runtest_reset();
     runtest_log_result(msg, false);
 }
+#endif
 
 static struct ts_suite *
 runtest_find_test(const char *suite_name)
@@ -237,13 +186,20 @@ runtest_find_test(const char *suite_name)
     return NULL;
 }
 
+/* XXX Deprecated.  Remove after next release. */
+struct os_task *
+runtest_init_task(os_task_func_t task_handler, uint8_t prio)
+{
+    return taskpool_alloc_assert(task_handler, prio);
+}
+
 static void
 runtest_test_complete(void)
 {
 #if MYNEWT_VAL(RUNTEST_LOG)
     if (runtest_total_tests > 0) {
-        MODLOG_INFO(LOG_MODULE_TEST, "%s Done", runtest_token);
-        MODLOG_INFO(LOG_MODULE_TEST,
+        TEST_LOG_INFO("%s Done", runtest_token);
+        TEST_LOG_INFO(
                     "%s TESTBENCH TEST %s - Tests run:%d pass:%d fail:%d %s",
                     RUNTEST_PREFIX,
                     runtest_total_fails ? "FAILED" : "PASSED",
@@ -264,13 +220,7 @@ runtest_evt_fn(struct os_event *ev)
     runtest_total_tests = 0;
     runtest_total_fails = 0;
 
-    tu_suite_set_pass_cb(runtest_pass, NULL);
-    tu_suite_set_fail_cb(runtest_fail, NULL);
-
     if (ev != NULL) {
-        ts_config.ts_print_results = 0;
-        ts_config.ts_system_assert = 0;
-
         runtest_all = runtest_test_name[0] == '\0' ||
                       strcmp(runtest_test_name, "all") == 0;
 
@@ -317,7 +267,7 @@ runtest_run(const char *test_name, const char *token)
 }
 
 /*
- * Package init routine to register newtmgr "run" commands
+ * Package init routine to register mgmt "run" commands
  */
 void
 runtest_init(void)
@@ -326,8 +276,6 @@ runtest_init(void)
 
     /* Ensure this function only gets called by sysinit. */
     SYSINIT_ASSERT_ACTIVE();
-
-    runtest_next_task_idx = 0;
 
 #if MYNEWT_VAL(RUNTEST_LOG)
     rc = cbmem_init(&runtest_cbmem, runtest_cbmem_buf,
@@ -347,13 +295,19 @@ runtest_init(void)
     shell_cmd_register(&runtest_cmd_struct);
 #endif
 
-#if MYNEWT_VAL(RUNTEST_NEWTMGR)
-    rc = runtest_nmgr_register_group();
+#if MYNEWT_VAL(RUNTEST_MGMT)
+    rc = runtest_mgmt_register_group();
     SYSINIT_PANIC_ASSERT(rc == 0);
 #endif
 
     rc = os_mutex_init(&runtest_mtx);
     SYSINIT_PANIC_ASSERT(rc == 0);
+
+    tu_config.ts_system_assert = 0;
+#if MYNEWT_VAL(RUNTEST_LOG)
+    tu_set_pass_cb(runtest_pass, NULL);
+    tu_set_fail_cb(runtest_fail, NULL);
+#endif
 
     /* Use the main event queue by default. */
     runtest_evq_set(os_eventq_dflt_get());

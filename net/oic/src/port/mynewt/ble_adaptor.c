@@ -32,6 +32,8 @@
 #include "oic/messaging/coap/coap.h"
 #include "oic/port/oc_connectivity.h"
 #include "oic/port/mynewt/ble.h"
+#include "oic/port/mynewt/stream.h"
+#include "messaging/coap/observe.h"
 #include "host/ble_hs.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
@@ -39,10 +41,13 @@
 static uint8_t oc_ep_gatt_size(const struct oc_endpoint *oe);
 static void oc_send_buffer_gatt(struct os_mbuf *m);
 static char *oc_log_ep_gatt(char *ptr, int maxlen, const struct oc_endpoint *);
-enum oc_resource_properties
+static enum oc_resource_properties
 oc_get_trans_security_gatt(const struct oc_endpoint *oe_ble);
 static int oc_connectivity_init_gatt(void);
-void oc_connectivity_shutdown_gatt(void);
+static void oc_gatt_conn_ev(struct oc_endpoint *oe, int type);
+static void oc_connectivity_shutdown_gatt(void);
+static bool oc_ble_ep_match(const void *ep, const void *ep_desc);
+static void oc_ble_ep_fill(void *ep, const void *ep_desc);
 
 static const struct oc_transport oc_gatt_transport = {
     .ot_flags = OC_TRANSPORT_USE_TCP,
@@ -54,6 +59,7 @@ static const struct oc_transport oc_gatt_transport = {
     .ot_init = oc_connectivity_init_gatt,
     .ot_shutdown = oc_connectivity_shutdown_gatt
 };
+static struct oc_conn_cb oc_gatt_conn_cb;
 
 static uint8_t oc_gatt_transport_id;
 
@@ -111,17 +117,29 @@ STATS_NAME_START(oc_ble_stats)
     STATS_NAME(oc_ble_stats, oerr)
 STATS_NAME_END(oc_ble_stats)
 
-static STAILQ_HEAD(, os_mbuf_pkthdr) oc_ble_reass_q;
+struct oc_ble_ep_desc {
+    uint16_t conn_handle;
+    uint8_t srv_idx;
+};
+
+static struct oc_stream_reassembler oc_ble_r = {
+    .pkt_q = STAILQ_HEAD_INITIALIZER(oc_ble_r.pkt_q),
+    .ep_match = oc_ble_ep_match,
+    .ep_fill = oc_ble_ep_fill,
+    .endpoint_size = sizeof(struct oc_endpoint_ble),
+};
 
 #if (MYNEWT_VAL(OC_SERVER) == 1)
 /*
- * BLE nmgr attribute handles for service
+ * BLE mgmt attribute handles for service
  */
 #define OC_BLE_SRV_CNT		2
 static struct {
     uint16_t req;
     uint16_t rsp;
 } oc_ble_srv_handles[OC_BLE_SRV_CNT];
+
+#define OC_BLE_SRV_NONE     UINT8_MAX
 
 static int oc_gatt_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                    struct ble_gatt_access_ctxt *ctxt, void *arg);
@@ -202,6 +220,14 @@ oc_endpoint_is_gatt(const struct oc_endpoint *oe)
     return oe->ep.oe_type == oc_gatt_transport_id;
 }
 
+int
+oc_endpoint_gatt_conn_eq(const struct oc_endpoint *oe1,
+                         const struct oc_endpoint *oe2)
+{
+    return ((struct oc_endpoint_ble *)oe1)->conn_handle ==
+           ((struct oc_endpoint_ble *)oe2)->conn_handle;
+}
+
 static char *
 oc_log_ep_gatt(char *ptr, int maxlen, const struct oc_endpoint *oe)
 {
@@ -211,76 +237,76 @@ oc_log_ep_gatt(char *ptr, int maxlen, const struct oc_endpoint *oe)
     return ptr;
 }
 
-int
+static bool
+oc_ble_ep_match(const void *ep, const void *ep_desc)
+{
+    const struct oc_endpoint_ble *oe_ble;
+    const struct oc_ble_ep_desc *ble_desc;
+
+    oe_ble = ep;
+    ble_desc = ep_desc;
+
+    if (ble_desc->conn_handle != oe_ble->conn_handle) {
+        return false;
+    }
+
+    if (ble_desc->srv_idx != OC_BLE_SRV_NONE &&
+        ble_desc->srv_idx != oe_ble->srv_idx) {
+
+        return false;
+    }
+
+    return true;
+}
+
+static void
+oc_ble_ep_fill(void *ep, const void *ep_desc)
+{
+    const struct oc_ble_ep_desc *ble_desc;
+    struct oc_endpoint_ble *oe_ble;
+
+    oe_ble = ep;
+    ble_desc = ep_desc;
+
+    oe_ble->ep.oe_type = oc_gatt_transport_id;
+    oe_ble->ep.oe_flags = 0;
+    oe_ble->srv_idx = ble_desc->srv_idx;
+    oe_ble->conn_handle = ble_desc->conn_handle;
+}
+
+static int
 oc_ble_reass(struct os_mbuf *om1, uint16_t conn_handle, uint8_t srv_idx)
 {
+    struct oc_ble_ep_desc ep_desc;
     struct os_mbuf_pkthdr *pkt1;
-    struct oc_endpoint_ble *oe_ble;
     struct os_mbuf *om2;
-    struct os_mbuf_pkthdr *pkt2;
-    uint8_t hdr[6]; /* sizeof(coap_tcp_hdr32) */
+    int rc;
 
     pkt1 = OS_MBUF_PKTHDR(om1);
-    assert(pkt1);
 
     STATS_INC(oc_ble_stats, iseg);
     STATS_INCN(oc_ble_stats, ibytes, pkt1->omp_len);
 
-    OC_LOG(DEBUG, "oc_gatt rx seg %u-%x-%u\n", conn_handle,
+    OC_LOG_DEBUG("oc_gatt rx seg %u-%x-%u\n", conn_handle,
                  (unsigned)pkt1, pkt1->omp_len);
 
-    STAILQ_FOREACH(pkt2, &oc_ble_reass_q, omp_next) {
-        om2 = OS_MBUF_PKTHDR_TO_MBUF(pkt2);
-        oe_ble = (struct oc_endpoint_ble *)OC_MBUF_ENDPOINT(om2);
-        if (conn_handle == oe_ble->conn_handle && srv_idx == oe_ble->srv_idx) {
-            /*
-             * Data from same connection. Append.
-             */
-            os_mbuf_concat(om2, om1);
-            os_mbuf_copydata(om2, 0, sizeof(hdr), hdr);
+    ep_desc.conn_handle = conn_handle;
+    ep_desc.srv_idx = srv_idx;
 
-            if (coap_tcp_msg_size(hdr, sizeof(hdr)) <= pkt2->omp_len) {
-                STAILQ_REMOVE(&oc_ble_reass_q, pkt2, os_mbuf_pkthdr, omp_next);
-                STATS_INC(oc_ble_stats, iframe);
-                oc_recv_message(om2);
-            }
-            pkt1 = NULL;
-            break;
+    rc = oc_stream_reass(&oc_ble_r, om1, &ep_desc, &om2);
+    if (rc != 0) {
+        if (rc == SYS_ENOMEM) {
+            OC_LOG_ERROR("oc_gatt_rx: Could not allocate mbuf\n");
         }
+        STATS_INC(oc_ble_stats, ierr);
+        return rc;
     }
-    if (pkt1) {
-        /*
-         * New frame, need to add oc_endpoint_ble in the front.
-         * Check if there is enough space available. If not, allocate a
-         * new pkthdr.
-         */
-        if (OS_MBUF_USRHDR_LEN(om1) < sizeof(struct oc_endpoint_ble)) {
-            om2 = os_msys_get_pkthdr(0, sizeof(struct oc_endpoint_ble));
-            if (!om2) {
-                OC_LOG(ERROR, "oc_gatt_rx: Could not allocate mbuf\n");
-                STATS_INC(oc_ble_stats, ierr);
-                return -1;
-            }
-            OS_MBUF_PKTHDR(om2)->omp_len = pkt1->omp_len;
-            SLIST_NEXT(om2, om_next) = om1;
-        } else {
-            om2 = om1;
-        }
-        oe_ble = (struct oc_endpoint_ble *)OC_MBUF_ENDPOINT(om2);
-        oe_ble->ep.oe_type = oc_gatt_transport_id;
-        oe_ble->ep.oe_flags = 0;
-        oe_ble->srv_idx = srv_idx;
-        oe_ble->conn_handle = conn_handle;
-        pkt2 = OS_MBUF_PKTHDR(om2);
 
-        os_mbuf_copydata(om2, 0, sizeof(hdr), hdr);
-        if (coap_tcp_msg_size(hdr, sizeof(hdr)) > pkt2->omp_len) {
-            STAILQ_INSERT_TAIL(&oc_ble_reass_q, pkt2, omp_next);
-        } else {
-            STATS_INC(oc_ble_stats, iframe);
-            oc_recv_message(om2);
-        }
+    if (om2 != NULL) {
+        STATS_INC(oc_ble_stats, iframe);
+        oc_recv_message(om2);
     }
+
     return 0;
 }
 
@@ -333,39 +359,77 @@ oc_ble_coap_gatt_srv_init(void)
     return 0;
 }
 
+/*
+ * These are getting called from context of task getting BLE connection
+ * notifications.
+ */
 void
 oc_ble_coap_conn_new(uint16_t conn_handle)
 {
-    OC_LOG(DEBUG, "oc_gatt newconn %x\n", conn_handle);
+    struct oc_conn_ev *oce;
+    struct oc_endpoint_ble *oe_ble;
+
+    oce = oc_conn_ev_alloc();
+    assert(oce);
+    memset(&oce->oce_oe, 0, sizeof(oce->oce_oe));
+    oe_ble = (struct oc_endpoint_ble *)&oce->oce_oe;
+    oe_ble->ep.oe_type = oc_gatt_transport_id;
+    oe_ble->ep.oe_flags = 0;
+    oe_ble->conn_handle = conn_handle;
+
+    oc_conn_created(oce);
 }
 
 void
 oc_ble_coap_conn_del(uint16_t conn_handle)
 {
-    struct os_mbuf_pkthdr *pkt;
-    struct os_mbuf *m;
-    struct oc_endpoint_ble *oe_ble;
+    struct oc_ble_ep_desc ep_desc = {
+        .conn_handle = conn_handle,
+        .srv_idx = OC_BLE_SRV_NONE,
+    };
 
-    OC_LOG(DEBUG, "oc_gatt endconn %x\n", conn_handle);
-    STAILQ_FOREACH(pkt, &oc_ble_reass_q, omp_next) {
-        m = OS_MBUF_PKTHDR_TO_MBUF(pkt);
-        oe_ble = (struct oc_endpoint_ble *)OC_MBUF_ENDPOINT(m);
-        if (oe_ble->conn_handle == conn_handle) {
-            STAILQ_REMOVE(&oc_ble_reass_q, pkt, os_mbuf_pkthdr, omp_next);
-            os_mbuf_free_chain(m);
-            break;
-        }
-    }
+    oc_stream_conn_del(&oc_ble_r, &ep_desc);
 }
 
-int
-oc_connectivity_init_gatt(void)
+/*
+ * This runs in the context of task handling coap.
+ */
+static int
+oc_gatt_remove_obs(struct coap_observer *obs, void *arg)
 {
-    STAILQ_INIT(&oc_ble_reass_q);
+    if (oc_endpoint_gatt_conn_eq(&obs->endpoint, arg)) {
+        coap_remove_observer(obs);
+    }
     return 0;
 }
 
-void
+static void
+oc_gatt_conn_ev(struct oc_endpoint *oe, int type)
+{
+    if (oe->ep.oe_type != oc_gatt_transport_id) {
+        return;
+    }
+    if (type != OC_ENDPOINT_CONN_EV_CLOSE) {
+        return;
+    }
+
+    /*
+     * Remove CoAP observers (if any) registered for this connection.
+     */
+    coap_observer_walk(oc_gatt_remove_obs, oe);
+}
+
+static int
+oc_connectivity_init_gatt(void)
+{
+    if (oc_gatt_conn_cb.occ_func == NULL) {
+        oc_gatt_conn_cb.occ_func = oc_gatt_conn_ev;
+        oc_conn_cb_register(&oc_gatt_conn_cb);
+    }
+    return 0;
+}
+
+static void
 oc_connectivity_shutdown_gatt(void)
 {
     /* there is not unregister for BLE */
@@ -474,7 +538,7 @@ err:
 /**
  * Retrieves the specified BLE endpoint's transport layer security properties.
  */
-oc_resource_properties_t
+static oc_resource_properties_t
 oc_get_trans_security_gatt(const struct oc_endpoint *oe)
 {
     const struct oc_endpoint_ble *oe_ble;

@@ -23,7 +23,7 @@
 static STAILQ_HEAD(, os_dev) g_os_dev_list;
 
 static int
-os_dev_init(struct os_dev *dev, char *name, uint8_t stage,
+os_dev_init(struct os_dev *dev, const char *name, uint8_t stage,
         uint8_t priority, os_dev_init_func_t od_init, void *arg)
 {
     dev->od_name = name;
@@ -50,6 +50,7 @@ static int
 os_dev_add(struct os_dev *dev)
 {
     struct os_dev *cur_dev;
+    struct os_dev *prev_dev;
 
     /* If no devices present, insert into head */
     if (STAILQ_FIRST(&g_os_dev_list) == NULL) {
@@ -61,21 +62,23 @@ os_dev_add(struct os_dev *dev)
      * priority.  Keep sorted in this order for initialization
      * stage.
      */
-    cur_dev = NULL;
+    prev_dev = NULL;
     STAILQ_FOREACH(cur_dev, &g_os_dev_list, od_next) {
-        if (cur_dev->od_stage > dev->od_stage) {
-            continue;
-        }
-
-        if (dev->od_priority >= cur_dev->od_priority) {
+        if (dev == cur_dev) {
+            /* Do nothing */
+            return 0;
+        } else if (dev->od_stage < cur_dev->od_stage ||
+                   ((dev->od_stage == cur_dev->od_stage) &&
+                    (dev->od_priority < cur_dev->od_priority))) {
             break;
         }
+        prev_dev = cur_dev;
     }
 
-    if (cur_dev) {
-        STAILQ_INSERT_AFTER(&g_os_dev_list, cur_dev, dev, od_next);
+    if (prev_dev) {
+        STAILQ_INSERT_AFTER(&g_os_dev_list, prev_dev, dev, od_next);
     } else {
-        STAILQ_INSERT_TAIL(&g_os_dev_list, dev, od_next);
+        STAILQ_INSERT_HEAD(&g_os_dev_list, dev, od_next);
     }
 
     return (0);
@@ -108,7 +111,7 @@ err:
 }
 
 int
-os_dev_create(struct os_dev *dev, char *name, uint8_t stage,
+os_dev_create(struct os_dev *dev, const char *name, uint8_t stage,
         uint8_t priority, os_dev_init_func_t od_init, void *arg)
 {
     int rc;
@@ -185,7 +188,7 @@ err:
 }
 
 struct os_dev *
-os_dev_lookup(char *name)
+os_dev_lookup(const char *name)
 {
     struct os_dev *dev;
 
@@ -199,7 +202,7 @@ os_dev_lookup(char *name)
 }
 
 struct os_dev *
-os_dev_open(char *devname, uint32_t timo, void *arg)
+os_dev_open(const char *devname, uint32_t timo, void *arg)
 {
     struct os_dev *dev;
     os_sr_t sr;
@@ -237,6 +240,11 @@ os_dev_close(struct os_dev *dev)
 {
     int rc;
     os_sr_t sr;
+
+    if (dev == NULL) {
+        rc = OS_EINVAL;
+        goto err;
+    }
 
     if (dev->od_handlers.od_close) {
         rc = dev->od_handlers.od_close(dev);
@@ -318,5 +326,17 @@ void
 os_dev_reset(void)
 {
     STAILQ_INIT(&g_os_dev_list);
+}
+
+void
+os_dev_walk(int (*walk_func)(struct os_dev *, void *), void *arg)
+{
+    struct os_dev *dev;
+
+    STAILQ_FOREACH(dev, &g_os_dev_list, od_next) {
+        if (walk_func(dev, arg)) {
+            break;
+        }
+    }
 }
 

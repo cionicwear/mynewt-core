@@ -1,9 +1,9 @@
 /*********************************************************************
 *                    SEGGER Microcontroller GmbH                     *
-*       Solutions for real time microcontroller applications         *
+*                        The Embedded Experts                        *
 **********************************************************************
 *                                                                    *
-*            (c) 1995 - 2018 SEGGER Microcontroller GmbH             *
+*            (c) 1995 - 2019 SEGGER Microcontroller GmbH             *
 *                                                                    *
 *       www.segger.com     Support: support@segger.com               *
 *                                                                    *
@@ -21,20 +21,10 @@
 *                                                                    *
 * Redistribution and use in source and binary forms, with or         *
 * without modification, are permitted provided that the following    *
-* conditions are met:                                                *
+* condition is met:                                                  *
 *                                                                    *
 * o Redistributions of source code must retain the above copyright   *
-*   notice, this list of conditions and the following disclaimer.    *
-*                                                                    *
-* o Redistributions in binary form must reproduce the above          *
-*   copyright notice, this list of conditions and the following      *
-*   disclaimer in the documentation and/or other materials provided  *
-*   with the distribution.                                           *
-*                                                                    *
-* o Neither the name of SEGGER Microcontroller GmbH         *
-*   nor the names of its contributors may be used to endorse or      *
-*   promote products derived from this software without specific     *
-*   prior written permission.                                        *
+*   notice, this condition and the following disclaimer.             *
 *                                                                    *
 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND             *
 * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,        *
@@ -56,7 +46,7 @@ File    : SEGGER_RTT.h
 Purpose : Implementation of SEGGER real-time transfer which allows
           real-time communication on targets which support debugger 
           memory accesses while the CPU is running.
-Revision: $Rev: 11303 $
+Revision: $Rev: 17697 $
 ----------------------------------------------------------------------
 */
 
@@ -64,6 +54,65 @@ Revision: $Rev: 11303 $
 #define SEGGER_RTT_H
 
 #include "SEGGER_RTT_Conf.h"
+
+
+
+/*********************************************************************
+*
+*       Defines, defaults
+*
+**********************************************************************
+*/
+#ifndef RTT_USE_ASM
+  #if (defined __SES_ARM)                       // SEGGER Embedded Studio
+    #define _CC_HAS_RTT_ASM_SUPPORT 1
+  #elif (defined __CROSSWORKS_ARM)              // Rowley Crossworks
+    #define _CC_HAS_RTT_ASM_SUPPORT 1
+  #elif (defined __GNUC__)                      // GCC
+    #define _CC_HAS_RTT_ASM_SUPPORT 1
+  #elif (defined __clang__)                     // Clang compiler
+    #define _CC_HAS_RTT_ASM_SUPPORT 1
+  #elif (defined __IASMARM__)                   // IAR assembler
+    #define _CC_HAS_RTT_ASM_SUPPORT 1
+  #elif (defined __ICCARM__)                    // IAR compiler
+    #define _CC_HAS_RTT_ASM_SUPPORT 1
+  #else
+    #define _CC_HAS_RTT_ASM_SUPPORT 0
+  #endif
+  #if (defined __ARM_ARCH_7M__)                 // Cortex-M3/4
+    #define _CORE_HAS_RTT_ASM_SUPPORT 1
+  #elif (defined __ARM_ARCH_7EM__)              // Cortex-M7
+    #define _CORE_HAS_RTT_ASM_SUPPORT 1
+  #elif (defined __ARM_ARCH_8M_MAIN__)          // Cortex-M33
+    #define _CORE_HAS_RTT_ASM_SUPPORT 1
+  #elif (defined __ARM7M__)                     // IAR Cortex-M3/4
+    #if (__CORE__ == __ARM7M__)
+      #define _CORE_HAS_RTT_ASM_SUPPORT 1
+    #else
+      #define _CORE_HAS_RTT_ASM_SUPPORT 0
+    #endif
+  #elif (defined __ARM7EM__)                    // IAR Cortex-M7
+    #if (__CORE__ == __ARM7EM__)
+      #define _CORE_HAS_RTT_ASM_SUPPORT 1
+    #else
+      #define _CORE_HAS_RTT_ASM_SUPPORT 0
+    #endif
+  #else
+    #define _CORE_HAS_RTT_ASM_SUPPORT 0
+  #endif
+  //
+  // If IDE and core support the ASM version, enable ASM version by default
+  //
+  #if (_CC_HAS_RTT_ASM_SUPPORT && _CORE_HAS_RTT_ASM_SUPPORT)
+    #define RTT_USE_ASM                           (1)
+  #else
+    #define RTT_USE_ASM                           (0)
+  #endif
+#endif
+
+#ifndef SEGGER_RTT_ASM  // defined when SEGGER_RTT.h is included from assembly file
+#include <stdlib.h>
+#include <stdarg.h>
 
 /*********************************************************************
 *
@@ -154,15 +203,35 @@ int          SEGGER_RTT_WaitKey                 (void);
 unsigned     SEGGER_RTT_Write                   (unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
 unsigned     SEGGER_RTT_WriteNoLock             (unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
 unsigned     SEGGER_RTT_WriteSkipNoLock         (unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
+unsigned     SEGGER_RTT_ASM_WriteSkipNoLock     (unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
 unsigned     SEGGER_RTT_WriteString             (unsigned BufferIndex, const char* s);
 void         SEGGER_RTT_WriteWithOverwriteNoLock(unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
 unsigned     SEGGER_RTT_PutChar                 (unsigned BufferIndex, char c);
 unsigned     SEGGER_RTT_PutCharSkip             (unsigned BufferIndex, char c);
 unsigned     SEGGER_RTT_PutCharSkipNoLock       (unsigned BufferIndex, char c);
+unsigned     SEGGER_RTT_GetAvailWriteSpace      (unsigned BufferIndex);
+unsigned     SEGGER_RTT_GetBytesInBuffer        (unsigned BufferIndex);
 //
 // Function macro for performance optimization
 //
 #define      SEGGER_RTT_HASDATA(n)       (_SEGGER_RTT.aDown[n].WrOff - _SEGGER_RTT.aDown[n].RdOff)
+
+#if RTT_USE_ASM
+  #define SEGGER_RTT_WriteSkipNoLock  SEGGER_RTT_ASM_WriteSkipNoLock
+#endif
+
+/*********************************************************************
+*
+*       RTT transfer functions to send RTT data via other channels.
+*
+**********************************************************************
+*/
+unsigned     SEGGER_RTT_ReadUpBuffer            (unsigned BufferIndex, void* pBuffer, unsigned BufferSize);
+unsigned     SEGGER_RTT_ReadUpBufferNoLock      (unsigned BufferIndex, void* pData, unsigned BufferSize);
+unsigned     SEGGER_RTT_WriteDownBuffer         (unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
+unsigned     SEGGER_RTT_WriteDownBufferNoLock   (unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
+
+#define      SEGGER_RTT_HASDATA_UP(n)    (_SEGGER_RTT.aUp[n].WrOff - _SEGGER_RTT.aUp[n].RdOff)
 
 /*********************************************************************
 *
@@ -170,8 +239,8 @@ unsigned     SEGGER_RTT_PutCharSkipNoLock       (unsigned BufferIndex, char c);
 *
 **********************************************************************
 */
-int     SEGGER_RTT_SetTerminal        (char TerminalId);
-int     SEGGER_RTT_TerminalOut        (char TerminalId, const char* s);
+int     SEGGER_RTT_SetTerminal        (unsigned char TerminalId);
+int     SEGGER_RTT_TerminalOut        (unsigned char TerminalId, const char* s);
 
 /*********************************************************************
 *
@@ -180,9 +249,13 @@ int     SEGGER_RTT_TerminalOut        (char TerminalId, const char* s);
 **********************************************************************
 */
 int SEGGER_RTT_printf(unsigned BufferIndex, const char * sFormat, ...);
+int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pParamList);
+
 #ifdef __cplusplus
   }
 #endif
+
+#endif // ifndef(SEGGER_RTT_ASM)
 
 /*********************************************************************
 *
@@ -194,10 +267,10 @@ int SEGGER_RTT_printf(unsigned BufferIndex, const char * sFormat, ...);
 //
 // Operating modes. Define behavior if buffer is full (not enough space for entire message)
 //
-#define SEGGER_RTT_MODE_NO_BLOCK_SKIP         (0U)     // Skip. Do not block, output nothing. (Default)
-#define SEGGER_RTT_MODE_NO_BLOCK_TRIM         (1U)     // Trim: Do not block, output as much as fits.
-#define SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL    (2U)     // Block: Wait until there is space in the buffer.
-#define SEGGER_RTT_MODE_MASK                  (3U)
+#define SEGGER_RTT_MODE_NO_BLOCK_SKIP         (0)     // Skip. Do not block, output nothing. (Default)
+#define SEGGER_RTT_MODE_NO_BLOCK_TRIM         (1)     // Trim: Do not block, output as much as fits.
+#define SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL    (2)     // Block: Wait until there is space in the buffer.
+#define SEGGER_RTT_MODE_MASK                  (3)
 
 //
 // Control sequences, based on ANSI.

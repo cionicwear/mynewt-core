@@ -28,14 +28,16 @@
 
 struct conf_handler_head conf_handlers;
 
-static os_event_fn conf_ev_fn_load;
-
 static struct os_mutex conf_mtx;
+
+#if MYNEWT_VAL(OS_SCHEDULING)
+static os_event_fn conf_ev_fn_load;
 
 /* OS event - causes persisted config values to be loaded at startup. */
 static struct os_event conf_ev_load = {
     .ev_cb = conf_ev_fn_load,
 };
+#endif
 
 void
 conf_init(void)
@@ -53,8 +55,8 @@ conf_init(void)
     rc = conf_cli_register();
     SYSINIT_PANIC_ASSERT(rc == 0);
 #endif
-#if MYNEWT_VAL(CONFIG_NEWTMGR)
-    rc = conf_nmgr_register();
+#if MYNEWT_VAL(CONFIG_MGMT)
+    rc = conf_mgmt_register();
     SYSINIT_PANIC_ASSERT(rc == 0);
 #endif
 
@@ -62,7 +64,9 @@ conf_init(void)
      * processed.  This gives main() a chance to configure the underlying
      * storage first.
      */
+#if MYNEWT_VAL(OS_SCHEDULING)
     os_eventq_put(os_eventq_dflt_get(), &conf_ev_load);
+#endif
 }
 
 void
@@ -86,11 +90,13 @@ conf_register(struct conf_handler *handler)
     return 0;
 }
 
+#if MYNEWT_VAL(OS_SCHEDULING)
 static void
 conf_ev_fn_load(struct os_event *ev)
 {
     conf_ensure_loaded();
 }
+#endif
 
 /*
  * Find conf_handler based on name.
@@ -146,19 +152,20 @@ conf_parse_and_lookup(char *name, int *name_argc, char *name_argv[])
 int
 conf_value_from_str(char *val_str, enum conf_type type, void *vp, int maxlen)
 {
-    int32_t val;
-    int64_t val64;
+    int64_t val;
+    uint64_t uval;
     char *eptr;
 
     if (!val_str) {
         goto err;
     }
     switch (type) {
+    case CONF_BOOL:
     case CONF_INT8:
     case CONF_INT16:
     case CONF_INT32:
-    case CONF_BOOL:
-        val = strtol(val_str, &eptr, 0);
+    case CONF_INT64:
+        val = strtoll(val_str, &eptr, 0);
         if (*eptr != '\0') {
             goto err;
         }
@@ -168,25 +175,50 @@ conf_value_from_str(char *val_str, enum conf_type type, void *vp, int maxlen)
             }
             *(bool *)vp = val;
         } else if (type == CONF_INT8) {
-            if (val < INT8_MIN || val > UINT8_MAX) {
+            if (val < INT8_MIN || val > INT8_MAX) {
                 goto err;
             }
             *(int8_t *)vp = val;
         } else if (type == CONF_INT16) {
-            if (val < INT16_MIN || val > UINT16_MAX) {
+            if (val < INT16_MIN || val > INT16_MAX) {
                 goto err;
             }
             *(int16_t *)vp = val;
         } else if (type == CONF_INT32) {
+            if (val < INT32_MIN || val > INT32_MAX) {
+                goto err;
+            }
             *(int32_t *)vp = val;
+        } else {
+            *(int64_t *)vp = val;
         }
         break;
-    case CONF_INT64:
-        val64 = strtoll(val_str, &eptr, 0);
+    case CONF_UINT8:
+    case CONF_UINT16:
+    case CONF_UINT32:
+    case CONF_UINT64:
+        uval = strtoull(val_str, &eptr, 0);
         if (*eptr != '\0') {
             goto err;
         }
-        *(int64_t *)vp = val64;
+        if (type == CONF_UINT8) {
+            if (uval > UINT8_MAX) {
+                goto err;
+            }
+            *(uint8_t *)vp = uval;
+        } else if (type == CONF_UINT16) {
+            if (uval > UINT16_MAX) {
+                goto err;
+            }
+            *(uint16_t *)vp = uval;
+        } else if (type == CONF_UINT32) {
+            if (uval > UINT32_MAX) {
+                goto err;
+            }
+            *(uint32_t *)vp = uval;
+        } else {
+            *(uint64_t *)vp = uval;
+        }
         break;
     case CONF_STRING:
         val = strlen(val_str);
@@ -222,29 +254,45 @@ conf_bytes_from_str(char *val_str, void *vp, int *len)
 char *
 conf_str_from_value(enum conf_type type, void *vp, char *buf, int buf_len)
 {
-    int32_t val;
+    int64_t val;
+    uint64_t uval;
 
     if (type == CONF_STRING) {
         return vp;
     }
     switch (type) {
+    case CONF_BOOL:
     case CONF_INT8:
     case CONF_INT16:
     case CONF_INT32:
-    case CONF_BOOL:
+    case CONF_INT64:
         if (type == CONF_BOOL) {
             val = *(bool *)vp;
         } else if (type == CONF_INT8) {
             val = *(int8_t *)vp;
         } else if (type == CONF_INT16) {
             val = *(int16_t *)vp;
-        } else {
+        } else if (type == CONF_INT32) {
             val = *(int32_t *)vp;
+        } else {
+            val = *(int64_t *)vp;
         }
-        snprintf(buf, buf_len, "%ld", (long)val);
+        snprintf(buf, buf_len, "%lld", val);
         return buf;
-    case CONF_INT64:
-        snprintf(buf, buf_len, "%lld", *(long long *)vp);
+    case CONF_UINT8:
+    case CONF_UINT16:
+    case CONF_UINT32:
+    case CONF_UINT64:
+        if (type == CONF_UINT8) {
+            uval = *(uint8_t *)vp;
+        } else if (type == CONF_UINT16) {
+            uval = *(uint16_t *)vp;
+        } else if (type == CONF_UINT32) {
+            uval = *(uint32_t *)vp;
+        } else {
+            uval = *(uint64_t *)vp;
+        }
+        snprintf(buf, buf_len, "%llu", uval);
         return buf;
     default:
         return NULL;
@@ -261,6 +309,84 @@ conf_str_from_bytes(void *vp, int vp_len, char *buf, int buf_len)
     return buf;
 }
 
+/**
+ * Executes a conf_handler's "get" callback and returns the result.
+ */
+static char *
+conf_get_cb(struct conf_handler *ch, int argc, char **argv, char *val,
+            int val_len_max)
+{
+    if (ch->ch_ext) {
+        if (ch->ch_get_ext != NULL) {
+            return ch->ch_get_ext(argc, argv, val, val_len_max, ch->ch_arg);
+        }
+    } else {
+        if (ch->ch_get != NULL) {
+            return ch->ch_get(argc, argv, val, val_len_max);
+        }
+    }
+
+    return NULL;
+}
+
+/**
+ * Executes a conf_handler's "set" callback and returns the result.
+ */
+static int
+conf_set_cb(struct conf_handler *ch, int argc, char **argv, char *val)
+{
+    if (ch->ch_ext) {
+        if (ch->ch_set_ext != NULL) {
+            return ch->ch_set_ext(argc, argv, val, ch->ch_arg);
+        }
+    } else {
+        if (ch->ch_set != NULL) {
+            return ch->ch_set(argc, argv, val);
+        }
+    }
+
+    return OS_ERROR;
+}
+
+/**
+ * Executes a conf_handler's "commit" callback and returns the result.
+ */
+static int
+conf_commit_cb(struct conf_handler *ch)
+{
+    if (ch->ch_ext) {
+        if (ch->ch_commit_ext != NULL) {
+            return ch->ch_commit_ext(ch->ch_arg);
+        }
+    } else {
+        if (ch->ch_commit != NULL) {
+            return ch->ch_commit();
+        }
+    }
+
+    return 0;
+}
+
+/**
+ * Executes a conf_handler's "export" callback and returns the result.
+ */
+int
+conf_export_cb(struct conf_handler *ch, conf_export_func_t export_func,
+               conf_export_tgt_t tgt)
+{
+    if (ch->ch_ext) {
+        if (ch->ch_export_ext != NULL) {
+            return ch->ch_export_ext(export_func, tgt, ch->ch_arg);
+        }
+    } else {
+        if (ch->ch_export != NULL) {
+            return ch->ch_export(export_func, tgt);
+        }
+    }
+
+    return 0;
+}
+
 int
 conf_set_value(char *name, char *val_str)
 {
@@ -275,7 +401,9 @@ conf_set_value(char *name, char *val_str)
         rc = OS_INVALID_PARM;
         goto out;
     }
-    rc = ch->ch_set(name_argc - 1, &name_argv[1], val_str);
+
+    rc = conf_set_cb(ch, name_argc - 1, &name_argv[1], val_str);
+
 out:
     conf_unlock();
     return rc;
@@ -301,14 +429,13 @@ conf_get_value(char *name, char *buf, int buf_len)
         goto out;
     }
 
-    if (!ch->ch_get) {
-        goto out;
-    }
-    rval = ch->ch_get(name_argc - 1, &name_argv[1], buf, buf_len);
+    rval = conf_get_cb(ch, name_argc - 1, &name_argv[1], buf, buf_len);
+
 out:
     conf_unlock();
     return rval;
 }
+
 
 int
 conf_commit(char *name)
@@ -326,16 +453,12 @@ conf_commit(char *name)
             rc = OS_INVALID_PARM;
             goto out;
         }
-        if (ch->ch_commit) {
-            rc = ch->ch_commit();
-        } else {
-            rc = 0;
-        }
+        rc = conf_commit_cb(ch);
     } else {
         rc = 0;
         SLIST_FOREACH(ch, &conf_handlers, ch_list) {
             if (ch->ch_commit) {
-                rc2 = ch->ch_commit();
+                rc2 = conf_commit_cb(ch);
                 if (!rc) {
                     rc = rc2;
                 }

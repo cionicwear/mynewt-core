@@ -97,7 +97,7 @@ oc_send_buffer(struct os_mbuf *m)
     if (ot) {
         ot->ot_tx_ucast(m);
     } else {
-        OC_LOG(ERROR, "Unknown transport option %u\n", oe->ep.oe_type);
+        OC_LOG_ERROR("Unknown transport option %u\n", oe->ep.oe_type);
         os_mbuf_free_chain(m);
     }
 }
@@ -150,7 +150,7 @@ oc_get_trans_security(const struct oc_endpoint *oe)
             return 0;
         }
     }
-    OC_LOG(ERROR, "Unknown transport option %u\n", oe->ep.oe_type);
+    OC_LOG_ERROR("Unknown transport option %u\n", oe->ep.oe_type);
     return 0;
 }
 
@@ -172,20 +172,25 @@ oc_connectivity_shutdown(void)
 int
 oc_connectivity_init(void)
 {
-    int rc = -1;
+    int rc;
     int i;
     const struct oc_transport *ot;
+
+    oc_conn_init();
 
     for (i = 0; i < OC_TRANSPORT_MAX; i++) {
         if (!oc_transports[i]) {
             continue;
         }
+
         ot = oc_transports[i];
-        if (ot->ot_init() == 0) {
-            rc = 0;
+        rc = ot->ot_init();
+        if (rc != 0) {
+            return -1;
         }
     }
-    return rc;
+
+    return 0;
 }
 
 void

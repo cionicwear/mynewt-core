@@ -52,6 +52,12 @@ fake_write(struct fs_file *file, const void *data, int len)
 }
 
 static int
+fake_flush(struct fs_file *file)
+{
+    return FS_EUNINIT;
+}
+
+static int
 fake_seek(struct fs_file *file, uint32_t offset)
 {
     return FS_EUNINIT;
@@ -122,6 +128,7 @@ struct fs_ops not_initialized_ops = {
     .f_close         = &fake_close,
     .f_read          = &fake_read,
     .f_write         = &fake_write,
+    .f_flush         = &fake_flush,
     .f_seek          = &fake_seek,
     .f_getpos        = &fake_getpos,
     .f_filelen       = &fake_filelen,
@@ -187,6 +194,13 @@ fs_open(const char *filename, uint8_t access_flags, struct fs_file **out_file)
 }
 
 int
+fs_mkfs(const char *disk, uint8_t format)
+{
+    struct fs_ops *fops = fops_from_filename(disk);
+    return fops->f_mkfs(disk, format);
+}
+
+int
 fs_close(struct fs_file *file)
 {
     struct fs_ops *fops = fops_from_file(file);
@@ -233,4 +247,11 @@ fs_unlink(const char *filename)
 {
     struct fs_ops *fops = fops_from_filename(filename);
     return fops->f_unlink(filename);
+}
+
+int
+fs_flush(struct fs_file *file)
+{
+    struct fs_ops *fops = fops_from_file(file);
+    return fops->f_flush(file);
 }

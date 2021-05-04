@@ -18,6 +18,7 @@
  */
 
 #include <stdint.h>
+#include "os/mynewt.h"
 #include "mcu/cortex_m4.h"
 #include "hal/hal_system.h"
 #include "am_mcu_apollo.h"
@@ -32,13 +33,13 @@ hal_system_init(void)
 void
 hal_system_reset(void)
 {
+
+#if MYNEWT_VAL(HAL_SYSTEM_RESET_CB)
+    hal_system_reset_cb();
+#endif
+
     while (1) {
-        if (hal_debugger_connected()) {
-            /*
-             * If debugger is attached, breakpoint here.
-             */
-            asm("bkpt");
-        }
+        HAL_DEBUG_BREAK();
         NVIC_SystemReset();
     }
 }

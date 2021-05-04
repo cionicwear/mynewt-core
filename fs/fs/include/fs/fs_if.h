@@ -36,6 +36,7 @@ struct fs_ops {
     int (*f_read)(struct fs_file *file, uint32_t len, void *out_data,
       uint32_t *out_len);
     int (*f_write)(struct fs_file *file, const void *data, int len);
+    int (*f_flush)(struct fs_file *file);
 
     int (*f_seek)(struct fs_file *file, uint32_t offset);
     uint32_t (*f_getpos)(const struct fs_file *file);
@@ -44,7 +45,7 @@ struct fs_ops {
     int (*f_unlink)(const char *filename);
     int (*f_rename)(const char *from, const char *to);
     int (*f_mkdir)(const char *path);
-
+    int (*f_mkfs)(const char *path, uint8_t format);
     int (*f_opendir)(const char *path, struct fs_dir **out_dir);
     int (*f_readdir)(struct fs_dir *dir, struct fs_dirent **out_dirent);
     int (*f_closedir)(struct fs_dir *dir);

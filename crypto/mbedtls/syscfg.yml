@@ -16,8 +16,6 @@
 # under the License.
 #
 
-# Package: crypto/mbedtls
-
 syscfg.defs:
   # Enabled curves
   MBEDTLS_ECP_DP_SECP192R1:
@@ -46,8 +44,15 @@ syscfg.defs:
     value: 0
 
   # Ciphers
+  MBEDTLS_AES_ALT:
+    description: 'Set to enable HW based AES'
+    value: 0
   MBEDTLS_AES_C:
     value: 1
+  MBEDTLS_AES_ROM_TABLES:
+    value: 0
+  MBEDTLS_AES_FEWER_TABLES:
+    value: 0
   MBEDTLS_ARC4_C:
     value: 0
   MBEDTLS_BLOWFISH_C:
@@ -91,6 +96,11 @@ syscfg.defs:
     value: 0
 
   # Hash functions
+  MBEDTLS_SHA256_ALT:
+    description: 'Set to enable HW based HASH'
+    value: 0
+  MBEDTLS_SHA256_C:
+    value: 1
   MBEDTLS_MD5_C:
     value: 0
   MBEDTLS_SHA1_C:
@@ -114,6 +124,11 @@ syscfg.defs:
 
   MBEDTLS_ENTROPY_C:
     value: 1
+
+  # Default value for hardware backed entropy source.
+  # Override from app's syscfg
+  MBEDTLS_ENTROPY_HARDWARE_ALT:
+    value: 0
 
   # PKCS#1 v1.5 not supported by MCUBoot
   MBEDTLS_PKCS1_V15:

@@ -16,8 +16,6 @@
 # under the License.
 #
 
-# Package: hw/bsp/nrf52dk
-
 syscfg.defs:
     I2C_0:
         description: 'I2C interface 0'
@@ -66,5 +64,9 @@ syscfg.defs:
             - "!MCU_FLASH_STYLE_ST"
     MCU_UART_POLLER_PRIO:
         description: 'Priority of native UART poller task.'
+        type: task_priority
+        value: 1
+    MCU_TIMER_POLLER_PRIO:
+        description: 'Priority of native HAL timer task.'
         type: task_priority
         value: 0

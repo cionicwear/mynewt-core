@@ -26,6 +26,7 @@
 
 #include <os/queue.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,6 +67,14 @@ typedef enum conf_type {
     CONF_DOUBLE,
     /** Boolean */
     CONF_BOOL,
+    /** 8-bit unsigned integer */
+    CONF_UINT8,
+    /** 16-bit unsigned integer */
+    CONF_UINT16,
+    /** 32-bit unsigned integer */
+    CONF_UINT32,
+    /** 64-bit unsigned integer */
+    CONF_UINT64,
 } __attribute__((__packed__)) conf_type_t;
 
 /**
@@ -106,6 +115,7 @@ typedef enum conf_export_tgt conf_export_tgt_t;
  * @return A pointer to val or NULL if error.
  */
 typedef char *(*conf_get_handler_t)(int argc, char **argv, char *val, int val_len_max);
+typedef char *(*conf_get_handler_ext_t)(int argc, char **argv, char *val, int val_len_max, void *arg);
 
 /**
  * Set the configuration variable pointed to by argc and argv.  See
@@ -120,6 +130,7 @@ typedef char *(*conf_get_handler_t)(int argc, char **argv, char *val, int val_le
  * @return 0 on success, non-zero error code on failure.
  */
 typedef int (*conf_set_handler_t)(int argc, char **argv, char *val);
+typedef int (*conf_set_handler_ext_t)(int argc, char **argv, char *val, void *arg);
 
 /**
  * Commit shadow configuration state to the active configuration.
@@ -127,6 +138,7 @@ typedef int (*conf_set_handler_t)(int argc, char **argv, char *val);
  * @return 0 on success, non-zero error code on failure.
  */
 typedef int (*conf_commit_handler_t)(void);
+typedef int (*conf_commit_handler_ext_t)(void *arg);
 
 /**
  * Called per-configuration variable being exported.
@@ -146,7 +158,9 @@ typedef void (*conf_export_func_t)(char *name, char *val);
  * @return 0 on success, non-zero error code on failure.
  */
 typedef int (*conf_export_handler_t)(conf_export_func_t export_func,
-        conf_export_tgt_t tgt);
+                                     conf_export_tgt_t tgt);
+typedef int (*conf_export_handler_ext_t)(conf_export_func_t export_func,
+                                         conf_export_tgt_t tgt, void *arg);
 
 /**
  * Configuration handler, used to register a config item/subtree.
@@ -157,14 +171,40 @@ struct conf_handler {
      * The name of the conifguration item/subtree
      */
     char *ch_name;
+
+    /**
+     * Whether to use the extended callbacks.
+     * false: standard
+     * true:  extended
+     */
+    bool ch_ext;
+
     /** Get configuration value */
-    conf_get_handler_t ch_get;
+    union {
+        conf_get_handler_t ch_get;
+        conf_get_handler_ext_t ch_get_ext;
+    };
+
     /** Set configuration value */
-    conf_set_handler_t ch_set;
+    union {
+        conf_set_handler_t ch_set;
+        conf_set_handler_ext_t ch_set_ext;
+    };
+
     /** Commit configuration value */
-    conf_commit_handler_t ch_commit;
+    union {
+        conf_commit_handler_t ch_commit;
+        conf_commit_handler_ext_t ch_commit_ext;
+    };
+
     /** Export configuration value */
-    conf_export_handler_t ch_export;
+    union {
+        conf_export_handler_t ch_export;
+        conf_export_handler_ext_t ch_export_ext;
+    };
+
+    /** Custom argument that gets passed to the extended callbacks */
+    void *ch_arg;
 };
 
 void conf_init(void);
@@ -187,6 +227,16 @@ int conf_register(struct conf_handler *cf);
  * @return 0 on success, non-zero on failure.
  */
 int conf_load(void);
+
+/**
+ * Load configuration from a specific registered persistence source.
+ * Handlers will be called for configuration subtree for
+ * encountered values.
+ *
+ * @param name of the configuration subtree.
+ * @return 0 on success, non-zero on failure.
+ */
+int conf_load_one(char *name);
 
 /**
  * @brief Loads the configuration if it hasn't been loaded since reboot.
@@ -344,6 +394,28 @@ char *conf_str_from_bytes(void *vp, int vp_len, char *buf, int buf_len);
  */
 #define CONF_VALUE_SET(str, type, val)                                  \
     conf_value_from_str((str), (type), &(val), sizeof(val))
+
+/**
+ * @brief Locks the config package.
+ *
+ * If another task tries to read or write a setting while the config package is
+ * locked, the operation will block until the package is unlocked.  The locking
+ * task is permitted to read and write settings as usual.  A call to
+ * `conf_lock()` should always be followed by `conf_unlock()`.
+ *
+ * Typical usage of the config API does not require manual locking.
+ * This function is only needed for unusual use cases such as temporarily
+ * changing the destination medium for an isolated series of writes.
+ */
+void conf_lock(void);
+
+/**
+ * @brief Unlocks the config package.
+ *
+ * This function reverts the effects of the `conf_lock()` function.  Typical
+ * usage of the config API does not require manual locking.
+ */
+void conf_unlock(void);
 
 #ifdef __cplusplus
 }

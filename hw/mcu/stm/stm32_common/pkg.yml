@@ -27,3 +27,36 @@ pkg.keywords:
 pkg.deps:
     - "@apache-mynewt-core/hw/hal"
     - "@apache-mynewt-core/hw/cmsis-core"
+
+pkg.deps.UART_0:
+    - "@apache-mynewt-core/hw/drivers/uart/uart_hal"
+pkg.deps.UART_1:
+    - "@apache-mynewt-core/hw/drivers/uart/uart_hal"
+pkg.deps.UART_2:
+    - "@apache-mynewt-core/hw/drivers/uart/uart_hal"
+
+pkg.deps.PWM_0:
+    - "@apache-mynewt-core/hw/drivers/pwm/pwm_stm32"
+pkg.deps.PWM_1:
+    - "@apache-mynewt-core/hw/drivers/pwm/pwm_stm32"
+pkg.deps.PWM_2:
+    - "@apache-mynewt-core/hw/drivers/pwm/pwm_stm32"
+
+pkg.deps.ETH_0:
+    - "@apache-mynewt-core/hw/drivers/lwip/stm32_eth"
+
+pkg.deps.TRNG:
+    - "@apache-mynewt-core/hw/drivers/trng/trng_stm32"
+
+pkg.deps.CRYPTO:
+    - "@apache-mynewt-core/hw/drivers/crypto/crypto_stm32"
+
+pkg.deps.HASH:
+    - "@apache-mynewt-core/hw/drivers/hash/hash_stm32"
+
+pkg.deps.ADC_0:
+    - "@apache-mynewt-core/hw/drivers/adc/adc_stm32f4"
+pkg.deps.ADC_1:
+    - "@apache-mynewt-core/hw/drivers/adc/adc_stm32f4"
+pkg.deps.ADC_2:
+    - "@apache-mynewt-core/hw/drivers/adc/adc_stm32f4"

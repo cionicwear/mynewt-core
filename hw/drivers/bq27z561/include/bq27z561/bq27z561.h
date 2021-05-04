@@ -2,7 +2,7 @@
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * resarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
@@ -24,7 +24,7 @@
 #include "battery/battery_drv.h"
 
 #ifdef __cplusplus
-#extern "C" {
+extern "C" {
 #endif
 
 /* The i2c address of the device */
@@ -162,11 +162,13 @@ struct bq27z561_itf
     struct os_mutex *itf_lock;
 };
 
+#if !MYNEWT_VAL(BUS_DRIVER_PRESENT)
 struct bq27z561_init_arg
 {
     struct bq27z561_itf itf;
     struct os_dev *battery;
 };
+#endif
 
 /* BQ27Z561 device */
 struct bq27z561
@@ -177,8 +179,10 @@ struct bq27z561
     /* Configuration values */
     struct bq27z561_cfg bq27_cfg;
 
+#if !MYNEWT_VAL(BUS_DRIVER_PRESENT)
     /* Interface */
     struct bq27z561_itf bq27_itf;
+#endif
 
     /* Device initialization complete flag */
     uint8_t bq27_initialized;
@@ -558,6 +562,40 @@ bq27z561_err_t bq27x561_rd_alt_mfg_cmd(struct bq27z561 *dev, uint16_t cmd,
 
 bq27z561_err_t bq27x561_wr_alt_mfg_cmd(struct bq27z561 *dev, uint16_t cmd,
                                        uint8_t *buf, int len);
+
+
+
+/**
+ * bq27z561 write flash
+ *
+ * @param dev pointer to device
+ * @param Address location
+ * @param The buffer of data to be written
+ * @param The length of data to be written
+ *
+ * @return int 0: success, -1 error
+ */
+bq27z561_err_t bq27z561_wr_flash(struct bq27z561 *dev, uint16_t addr, 
+                                 uint8_t *buf, int buflen);
+
+/**
+ * bq27x561 write flash. This function is deprecated due to naming convention.
+ *
+ * @param dev pointer to device
+ * @param Address location
+ * @param The buffer of data to be written
+ * @param The length of data to be written
+ *
+ * @return int 0: success, -1 error
+ */
+__attribute__((deprecated))
+static inline bq27z561_err_t bq27x561_wr_flash(struct bq27z561 *dev, 
+                                               uint16_t addr, uint8_t *buf, 
+                                               int buflen)
+{
+    return bq27z561_wr_flash(dev, addr, buf, buflen);
+}
+
 /**
  * bq27z561 rd std reg word
  *
@@ -603,6 +641,23 @@ int bq27z561_init(struct os_dev * dev, void * arg);
  * @return 0 on success, non-zero on failure.
  */
 int bq27z561_shell_init(void);
+#endif
+
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+/**
+ * Create I2C bus node for BQ27Z561
+ *
+ * @param node         Bus node
+ * @param name         Device name
+ * @param i2c_cfg      I2C node configuration
+ * @param battery_dev  Battery device
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int
+bq27z561_create_i2c_dev(struct bus_i2c_node *node, const char *name,
+                        const struct bus_i2c_node_cfg *i2c_cfg,
+                        struct os_dev *battery_dev);
 #endif
 
 #ifdef __cplusplus

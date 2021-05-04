@@ -90,7 +90,8 @@ uart_console_queue_char(struct uart_dev *uart_dev, uint8_t ch)
 {
     int sr;
 
-    if ((uart_dev->ud_dev.od_flags & OS_DEV_F_STATUS_OPEN) == 0) {
+    if (((uart_dev->ud_dev.od_flags & OS_DEV_F_STATUS_OPEN) == 0) ||
+	((uart_dev->ud_dev.od_flags & OS_DEV_F_STATUS_SUSPENDED) != 0)) {
         return;
     }
 
@@ -153,12 +154,8 @@ uart_console_non_blocking_mode(void)
 }
 
 int
-console_out(int c)
+console_out_nolock(int c)
 {
-    if (g_silence_console) {
-        return c;
-    }
-
     /* Assure that there is a write cb installed; this enables to debug
      * code that is faulting before the console was initialized.
      */
@@ -168,9 +165,6 @@ console_out(int c)
 
     if ('\n' == c) {
         write_char_cb(uart_dev, '\r');
-        console_is_midline = 0;
-    } else {
-        console_is_midline = 1;
     }
     write_char_cb(uart_dev, c);
     uart_start_tx(uart_dev);
@@ -268,6 +262,21 @@ int
 uart_console_is_init(void)
 {
     return uart_dev != NULL;
+}
+
+int
+uart_console_deinit(void)
+{
+    struct os_dev *dev;
+    dev = os_dev_lookup(MYNEWT_VAL(CONSOLE_UART_DEV));
+    if (dev) {
+        /* Force close now */
+        os_dev_close(dev);
+        uart_dev = NULL;
+    } else {
+        return SYS_ENODEV;
+    }
+    return 0;
 }
 
 int

@@ -45,26 +45,9 @@
 #include <oic/oc_api.h>
 #include <oic/oc_gatt.h>
 #include "json_test/json_test.h"
-#include "os_test/os_test.h"
+#include "cbmem_test/cbmem_test.h"
 
 #include "testutil/testutil.h"
-
-#if MYNEWT_VAL(CONFIG_NFFS)
-#include <fs/fs.h>
-#include <nffs/nffs.h>
-#include "nffs/nffs_test.h"
-#endif /* NFFS */
-
-#if MYNEWT_VAL(CONFIG_FCB)
-#include <fcb/fcb.h>
-/*#include "../fcb/fcb_test.h"*/
-#endif /* FCB */
-
-#include "bootutil/bootutil_test.h"
-
-#include <stddef.h>
-#include <config/config_file.h>
-#include "mbedtls/mbedtls_test.h"
 
 #if MYNEWT_VAL(RUNTEST_CLI)
 #include "runtest/runtest.h"
@@ -158,9 +141,7 @@ main(int argc, char **argv)
      * Register the tests that can be run by lookup
      * - each test is added to the ts_suites slist
      */
-    TEST_SUITE_REGISTER(os_mempool_test_suite);
-    TEST_SUITE_REGISTER(os_mutex_test_suite);
-    TEST_SUITE_REGISTER(os_sem_test_suite);
+    TEST_SUITE_REGISTER(cbmem_test_suite);
     TEST_SUITE_REGISTER(test_json_suite);
 
     testbench_test_init(); /* initialize globals include blink duty cycle */
@@ -169,7 +150,7 @@ main(int argc, char **argv)
                  TESTTASK_PRIO, OS_WAIT_FOREVER, teststack,
                  TESTTASK_STACK_SIZE);
 
-    MODLOG_INFO(LOG_MODULE_TEST, "testbench app initialized");
+    TEST_LOG_INFO("testbench app initialized");
 
     while (1) {
         os_eventq_run(os_eventq_dflt_get());

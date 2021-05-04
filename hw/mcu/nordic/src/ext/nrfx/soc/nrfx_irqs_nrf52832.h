@@ -1,21 +1,21 @@
-/**
- * Copyright (c) 2017 - 2018, Nordic Semiconductor ASA
+/*
+ * Copyright (c) 2017 - 2020, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -75,6 +75,7 @@ extern "C" {
 #endif
 
 // NFCT_IRQn
+#define nrfx_nfct_irq_handler       NFCT_IRQHandler
 
 // GPIOTE_IRQn
 #define nrfx_gpiote_irq_handler     GPIOTE_IRQHandler
@@ -95,6 +96,7 @@ extern "C" {
 #define nrfx_rtc_0_irq_handler      RTC0_IRQHandler
 
 // TEMP_IRQn
+#define nrfx_temp_irq_handler       TEMP_IRQHandler
 
 // RNG_IRQn
 #define nrfx_rng_irq_handler        RNG_IRQHandler
@@ -104,7 +106,7 @@ extern "C" {
 // CCM_AAR_IRQn
 
 // WDT_IRQn
-#define nrfx_wdt_irq_handler        WDT_IRQHandler
+#define nrfx_wdt_0_irq_handler      WDT_IRQHandler
 
 // RTC1_IRQn
 #define nrfx_rtc_1_irq_handler      RTC1_IRQHandler
@@ -121,22 +123,22 @@ extern "C" {
 #endif
 
 // SWI0_EGU0_IRQn
-#define nrfx_swi_0_irq_handler      SWI0_EGU0_IRQHandler
+#define nrfx_egu_0_irq_handler      SWI0_EGU0_IRQHandler
 
 // SWI1_EGU1_IRQn
-#define nrfx_swi_1_irq_handler      SWI1_EGU1_IRQHandler
+#define nrfx_egu_1_irq_handler      SWI1_EGU1_IRQHandler
 
 // SWI2_EGU2_IRQn
-#define nrfx_swi_2_irq_handler      SWI2_EGU2_IRQHandler
+#define nrfx_egu_2_irq_handler      SWI2_EGU2_IRQHandler
 
 // SWI3_EGU3_IRQn
-#define nrfx_swi_3_irq_handler      SWI3_EGU3_IRQHandler
+#define nrfx_egu_3_irq_handler      SWI3_EGU3_IRQHandler
 
 // SWI4_EGU4_IRQn
-#define nrfx_swi_4_irq_handler      SWI4_EGU4_IRQHandler
+#define nrfx_egu_4_irq_handler      SWI4_EGU4_IRQHandler
 
 // SWI5_EGU5_IRQn
-#define nrfx_swi_5_irq_handler      SWI5_EGU5_IRQHandler
+#define nrfx_egu_5_irq_handler      SWI5_EGU5_IRQHandler
 
 // TIMER3_IRQn
 #define nrfx_timer_3_irq_handler    TIMER3_IRQHandler

@@ -77,8 +77,31 @@ struct stm32_hal_spi_cfg {
 
 #define STM32_HAL_TIMER_MAX     (3)
 
-/* hal_trng */
+/* hw/drivers/trng */
 #include "stm32f7xx_hal_rng.h"
+
+/* hw/drivers/crypto */
+#include "stm32f7xx_hal_cryp.h"
+#include "stm32f7xx_hal_rcc_ex.h"
+
+/* hal_flash */
+#include "stm32f7xx_hal_def.h"
+#include "stm32f7xx_hal_flash.h"
+#include "stm32f7xx_hal_flash_ex.h"
+#define STM32_HAL_FLASH_INIT()        \
+    do {                              \
+        HAL_FLASH_Unlock();           \
+    } while (0)
+#define FLASH_PROGRAM_TYPE FLASH_TYPEPROGRAM_BYTE
+#define STM32_HAL_FLASH_CLEAR_ERRORS()            \
+    do {                                          \
+        __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP |   \
+                FLASH_FLAG_OPERR |                \
+                FLASH_FLAG_WRPERR |               \
+                FLASH_FLAG_PGAERR |               \
+                FLASH_FLAG_PGPERR |               \
+                FLASH_FLAG_ERSERR);               \
+    } while (0)
 
 #ifdef __cplusplus
 }

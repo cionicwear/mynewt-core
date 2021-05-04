@@ -26,9 +26,10 @@ pkg.keywords:
 
 pkg.deps:
     - "@apache-mynewt-core/sys/config"
+    - "@apache-mynewt-core/util/scfg"
 
 pkg.req_apis:
     - bootloader
 
 pkg.init:
-    split_app_init: 500
+    split_app_init: 'MYNEWT_VAL(SPLIT_APP_SYSINIT_STAGE)'

@@ -24,7 +24,7 @@ pkg.homepage: "https://www.iotivity.org/"
 pkg.keywords:
 
 pkg.deps:
-    - "@apache-mynewt-core/encoding/cborattr"
+    - "@apache-mynewt-mcumgr/cborattr"
     - "@apache-mynewt-core/encoding/tinycbor"
     - "@apache-mynewt-core/kernel/os"
     - "@apache-mynewt-core/sys/log/modlog"
@@ -54,9 +54,10 @@ pkg.cflags:
     - "-I@apache-mynewt-core/net/oic/include/oic"
 
 pkg.init:
-    oc_init: 300
-    oc_register_ip6: 301
-    oc_register_ip4: 301
-    oc_register_serial: 301
-    oc_register_gatt: 301
-    oc_register_lora: 301
+    oc_init: 'MYNEWT_VAL(OC_SYSINIT_STAGE_MAIN)'
+    oc_register_ip6: 'MYNEWT_VAL(OC_SYSINIT_STAGE_IP6)'
+    oc_register_ip4: 'MYNEWT_VAL(OC_SYSINIT_STAGE_IP4)'
+    oc_register_serial: 'MYNEWT_VAL(OC_SYSINIT_STAGE_SERIAL)'
+    oc_register_gatt: 'MYNEWT_VAL(OC_SYSINIT_STAGE_GATT)'
+    oc_register_lora: 'MYNEWT_VAL(OC_SYSINIT_STAGE_LORA)'
+    oc_register_tcp4: 'MYNEWT_VAL(OC_SYSINIT_STAGE_TCP4)'

@@ -1,6 +1,6 @@
 /*
  
-Copyright (c) 2009-2018 ARM Limited. All rights reserved.
+Copyright (c) 2009-2020 ARM Limited. All rights reserved.
 
     SPDX-License-Identifier: Apache-2.0
 
@@ -39,7 +39,7 @@ NOTICE: This file has been modified by Nordic Semiconductor ASA.
     .equ    Stack_Size, __STACK_SIZE
 #else
     .align 3
-    .equ    Stack_Size, 8192
+    .equ    Stack_Size, 4096
 #endif
     .globl __StackTop
     .globl __StackLimit
@@ -56,7 +56,7 @@ __StackTop:
 #elif defined(__HEAP_SIZE)
     .equ Heap_Size, __HEAP_SIZE
 #else
-    .equ    Heap_Size, 8192
+    .equ Heap_Size, 4096
 #endif
     .globl __HeapBase
     .globl __HeapLimit
@@ -68,7 +68,7 @@ __HeapBase:
 __HeapLimit:
     .size __HeapLimit, . - __HeapLimit
 
-    .section .isr_vector
+    .section .isr_vector, "ax"
     .align 2
     .globl __isr_vector
 __isr_vector:
@@ -222,24 +222,26 @@ Reset_Handler:
  *      __etext: LMA of start of the section to copy from. Usually end of text
  *      __data_start__: VMA of start of the section to copy to.
  *      __bss_start__: VMA of end of the section to copy to. Normally __data_end__ is used, but by using __bss_start__
- *                    the user can add their own initialized data section before BSS section with the INTERT AFTER command.
+ *                    the user can add their own initialized data section before BSS section with the INSERT AFTER command.
  *
  * All addresses must be aligned to 4 bytes boundary.
  */
+#ifndef __STARTUP_SKIP_ETEXT
     ldr r1, =__etext
     ldr r2, =__data_start__
     ldr r3, =__bss_start__
 
-    subs r3, r2
+    subs r3, r3, r2
     ble .L_loop1_done
 
 .L_loop1:
-    subs r3, #4
+    subs r3, r3, #4
     ldr r0, [r1,r3]
     str r0, [r2,r3]
     bgt .L_loop1
 
 .L_loop1_done:
+#endif
 
 /* This part of work usually is done in C library startup code. Otherwise,
  * define __STARTUP_CLEAR_BSS to enable it in this startup. This section
@@ -257,11 +259,11 @@ Reset_Handler:
 
     movs r0, 0
 
-    subs r2, r1
+    subs r2, r2, r1
     ble .L_loop3_done
 
 .L_loop3:
-    subs r2, #4
+    subs r2, r2, #4
     str r0, [r1, r2]
     bgt .L_loop3
 

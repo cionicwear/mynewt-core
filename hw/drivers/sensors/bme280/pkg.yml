@@ -18,7 +18,7 @@
 #
 
 pkg.name: hw/drivers/sensors/bme280
-pkg.description: Driver for the BME280 light to digital sensor
+pkg.description: Driver for the BME280 humidity and pressure sensor
 pkg.author: "Apache Mynewt <dev@mynewt.apache.org>"
 pkg.homepage: "https://mynewt.apache.org"
 pkg.keywords:
@@ -33,8 +33,12 @@ pkg.deps:
     - "@apache-mynewt-core/hw/sensor"
     - "@apache-mynewt-core/sys/log/modlog"
 
+pkg.deps.!BUS_DRIVER_PRESENT:
+    - "@apache-mynewt-core/hw/util/i2cn"
+
 pkg.req_apis:
     - stats
 
 pkg.deps.BME280_CLI:
     - "@apache-mynewt-core/util/parse"
+

@@ -28,8 +28,12 @@ pkg.deps:
     - "@apache-mynewt-core/kernel/os"
     - "@apache-mynewt-core/hw/hal"
     - "@apache-mynewt-core/hw/battery"
-    - "@apache-mynewt-core/hw/util/i2cn"
     - "@apache-mynewt-core/sys/log/modlog"
+
+pkg.deps.!BUS_DRIVER_PRESENT:
+    - "@apache-mynewt-core/hw/util/i2cn"
+pkg.deps.BUS_DRIVER_PRESENT:
+    - "@apache-mynewt-core/hw/bus/drivers/i2c_common"
 
 pkg.req_apis:
     - stats
@@ -38,4 +42,4 @@ pkg.deps.BQ27Z561_CLI:
     - "@apache-mynewt-core/util/parse"
 
 pkg.init:
-    bq27z561_pkg_init: 500
+    bq27z561_pkg_init: 'MYNEWT_VAL(BQ27Z561_SYSINIT_STAGE)'

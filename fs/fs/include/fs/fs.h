@@ -34,6 +34,7 @@ struct fs_file;
 struct fs_dir;
 struct fs_dirent;
 
+int fs_mkfs(const char *disk, uint8_t format);
 int fs_open(const char *filename, uint8_t access_flags, struct fs_file **);
 int fs_close(struct fs_file *);
 int fs_read(struct fs_file *, uint32_t len, void *out_data, uint32_t *out_len);
@@ -52,6 +53,7 @@ int fs_closedir(struct fs_dir *);
 int fs_dirent_name(const struct fs_dirent *, size_t max_len,
   char *out_name, uint8_t *out_name_len);
 int fs_dirent_is_dir(const struct fs_dirent *);
+int fs_flush(struct fs_file *);
 
 /**
  * File access flags.
@@ -79,9 +81,9 @@ int fs_dirent_is_dir(const struct fs_dirent *);
 #define FS_EACCESS      12  /* Operation prohibited by file open mode */
 #define FS_EUNINIT      13  /* File system not initialized */
 
-#define FS_NMGR_ID_FILE     0
+#define FS_MGMT_ID_FILE     0
 
-#define FS_NMGR_MAX_NAME    64
+#define FS_MGMT_MAX_NAME    64
 
 #ifdef __cplusplus
 }

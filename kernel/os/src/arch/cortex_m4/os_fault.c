@@ -147,12 +147,10 @@ __assert_func(const char *file, int line, const char *func, const char *e)
     log_reboot(&lri);
 #endif
 
-    if (hal_debugger_connected()) {
-       /*
-        * If debugger is attached, breakpoint before the trap.
-        */
-       asm("bkpt");
-    }
+#if MYNEWT_VAL(OS_ASSERT_CB)
+    os_assert_cb();
+#endif
+
     SCB->ICSR = SCB_ICSR_NMIPENDSET_Msk;
     asm("isb");
     hal_system_reset();
@@ -166,6 +164,9 @@ os_default_irq(struct trap_frame *tf)
 #endif
 #if MYNEWT_VAL(OS_COREDUMP)
     struct coredump_regs regs;
+#endif
+#if MYNEWT_VAL(OS_CRASH_RESTORE_REGS)
+    uint32_t orig_sp;
 #endif
 
     console_blocking_mode();
@@ -199,5 +200,43 @@ os_default_irq(struct trap_frame *tf)
     trap_to_coredump(tf, &regs);
     coredump_dump(&regs, sizeof(regs));
 #endif
+
+#if MYNEWT_VAL(OS_CRASH_RESTORE_REGS)
+    if (((SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk) < 16) &&
+                                            hal_debugger_connected()) {
+        if ((tf->lr & 0x10) == 0) {
+            /*
+             * Extended frame
+             */
+            orig_sp = ((uint32_t)tf->ef) + 0x68;
+            if (tf->ef->psr & (1 << 9)) {
+                orig_sp += 4;
+            }
+        } else {
+            orig_sp = ((uint32_t)tf->ef) + 0x20;
+            if ((SCB->CCR & SCB_CCR_STKALIGN_Msk) & tf->ef->psr & (1 << 9)) {
+                orig_sp += 4;
+            }
+        }
+
+        console_printf("Use 'set $pc = 0x%08lx' to restore PC in gdb\n",
+                       tf->ef->pc);
+
+        __asm volatile (
+            "mov sp, %[stack_ptr]\n"
+            "mov r0, %[regs1]\n"
+            "ldm r0, {r4-r11}\n"
+            "mov r0, %[regs2]\n"
+            "ldm r0, {r0-r3,r12,lr}\n"
+            "bkpt"
+            :
+            : [regs1] "r" (&tf->r4),
+              [regs2] "r" (tf->ef),
+              [stack_ptr] "r" (orig_sp)
+            : "r0"
+        );
+    }
+#endif
+
     hal_system_reset();
 }

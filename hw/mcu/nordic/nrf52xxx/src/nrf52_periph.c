@@ -24,6 +24,19 @@
 #include "hal/hal_i2c.h"
 #include "hal/hal_spi.h"
 #include "bsp/bsp.h"
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+#include "bus/bus.h"
+#if MYNEWT_VAL(I2C_0) || MYNEWT_VAL(I2C_1)
+#if MYNEWT_VAL(MCU_BUS_DRIVER_I2C_USE_TWIM)
+#include "bus/drivers/i2c_nrf52_twim.h"
+#else
+#include "bus/drivers/i2c_hal.h"
+#endif
+#endif
+#if MYNEWT_VAL(SPI_0_MASTER) || MYNEWT_VAL(SPI_1_MASTER) || MYNEWT_VAL(SPI_2_MASTER) || MYNEWT_VAL(SPI_3_MASTER)
+#include "bus/drivers/spi_hal.h"
+#endif
+#endif
 #include "nrfx.h"
 #if MYNEWT_VAL(ADC_0)
 #include "adc/adc.h"
@@ -37,9 +50,17 @@
 #include "trng/trng.h"
 #include "trng_nrf52/trng_nrf52.h"
 #endif
+#if MYNEWT_VAL(CRYPTO)
+#include "crypto/crypto.h"
+#include "crypto_nrf52/crypto_nrf52.h"
+#endif
 #if MYNEWT_VAL(UART_0) || MYNEWT_VAL(UART_1)
 #include "uart/uart.h"
 #include "uart_hal/uart_hal.h"
+#endif
+#if MYNEWT_VAL(TEMP)
+#include "temp/temp.h"
+#include "temp_nrf52/temp_nrf52.h"
 #endif
 
 #if MYNEWT_VAL(ADC_0)
@@ -66,6 +87,10 @@ static struct pwm_dev os_bsp_pwm3;
 static struct trng_dev os_bsp_trng;
 #endif
 
+#if MYNEWT_VAL(CRYPTO)
+static struct crypto_dev os_bsp_crypto;
+#endif
+
 #if MYNEWT_VAL(UART_0)
 static struct uart_dev os_bsp_uart0;
 static const struct nrf52_uart_cfg os_bsp_uart0_cfg = {
@@ -86,27 +111,55 @@ static const struct nrf52_uart_cfg os_bsp_uart1_cfg = {
 #endif
 
 #if MYNEWT_VAL(I2C_0)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+static const struct bus_i2c_dev_cfg i2c0_cfg = {
+    .i2c_num = 0,
+    .pin_sda = MYNEWT_VAL(I2C_0_PIN_SDA),
+    .pin_scl = MYNEWT_VAL(I2C_0_PIN_SCL),
+};
+static struct bus_i2c_dev i2c0_bus;
+#else
 static const struct nrf52_hal_i2c_cfg hal_i2c0_cfg = {
     .scl_pin = MYNEWT_VAL(I2C_0_PIN_SCL),
     .sda_pin = MYNEWT_VAL(I2C_0_PIN_SDA),
     .i2c_frequency = MYNEWT_VAL(I2C_0_FREQ_KHZ),
 };
 #endif
+#endif
 #if MYNEWT_VAL(I2C_1)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+static const struct bus_i2c_dev_cfg i2c1_cfg = {
+    .i2c_num = 1,
+    .pin_sda = MYNEWT_VAL(I2C_1_PIN_SDA),
+    .pin_scl = MYNEWT_VAL(I2C_1_PIN_SCL),
+};
+static struct bus_i2c_dev i2c1_bus;
+#else
 static const struct nrf52_hal_i2c_cfg hal_i2c1_cfg = {
     .scl_pin = MYNEWT_VAL(I2C_1_PIN_SCL),
     .sda_pin = MYNEWT_VAL(I2C_1_PIN_SDA),
     .i2c_frequency = MYNEWT_VAL(I2C_1_FREQ_KHZ),
 };
 #endif
+#endif
 
 #if MYNEWT_VAL(SPI_0_MASTER)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+static const struct bus_spi_dev_cfg spi0_cfg = {
+    .spi_num = 0,
+    .pin_sck = MYNEWT_VAL(SPI_0_MASTER_PIN_SCK),
+    .pin_mosi = MYNEWT_VAL(SPI_0_MASTER_PIN_MOSI),
+    .pin_miso = MYNEWT_VAL(SPI_0_MASTER_PIN_MISO),
+};
+static struct bus_spi_hal_dev spi0_bus;
+#else
 static const struct nrf52_hal_spi_cfg os_bsp_spi0m_cfg = {
     .sck_pin      = MYNEWT_VAL(SPI_0_MASTER_PIN_SCK),
     .mosi_pin     = MYNEWT_VAL(SPI_0_MASTER_PIN_MOSI),
     .miso_pin     = MYNEWT_VAL(SPI_0_MASTER_PIN_MISO),
     /* For SPI master, SS pin is controlled as regular GPIO */
 };
+#endif
 #endif
 #if MYNEWT_VAL(SPI_0_SLAVE)
 static const struct nrf52_hal_spi_cfg os_bsp_spi0s_cfg = {
@@ -117,12 +170,22 @@ static const struct nrf52_hal_spi_cfg os_bsp_spi0s_cfg = {
 };
 #endif
 #if MYNEWT_VAL(SPI_1_MASTER)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+static const struct bus_spi_dev_cfg spi1_cfg = {
+    .spi_num = 1,
+    .pin_sck = MYNEWT_VAL(SPI_1_MASTER_PIN_SCK),
+    .pin_mosi = MYNEWT_VAL(SPI_1_MASTER_PIN_MOSI),
+    .pin_miso = MYNEWT_VAL(SPI_1_MASTER_PIN_MISO),
+};
+static struct bus_spi_hal_dev spi1_bus;
+#else
 static const struct nrf52_hal_spi_cfg os_bsp_spi1m_cfg = {
     .sck_pin      = MYNEWT_VAL(SPI_1_MASTER_PIN_SCK),
     .mosi_pin     = MYNEWT_VAL(SPI_1_MASTER_PIN_MOSI),
     .miso_pin     = MYNEWT_VAL(SPI_1_MASTER_PIN_MISO),
     /* For SPI master, SS pin is controlled as regular GPIO */
 };
+#endif
 #endif
 #if MYNEWT_VAL(SPI_1_SLAVE)
 static const struct nrf52_hal_spi_cfg os_bsp_spi1s_cfg = {
@@ -133,12 +196,22 @@ static const struct nrf52_hal_spi_cfg os_bsp_spi1s_cfg = {
 };
 #endif
 #if MYNEWT_VAL(SPI_2_MASTER)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+static const struct bus_spi_dev_cfg spi2_cfg = {
+    .spi_num = 2,
+    .pin_sck = MYNEWT_VAL(SPI_2_MASTER_PIN_SCK),
+    .pin_mosi = MYNEWT_VAL(SPI_2_MASTER_PIN_MOSI),
+    .pin_miso = MYNEWT_VAL(SPI_2_MASTER_PIN_MISO),
+};
+static struct bus_spi_dev spi2_bus;
+#else
 static const struct nrf52_hal_spi_cfg os_bsp_spi2m_cfg = {
     .sck_pin      = MYNEWT_VAL(SPI_2_MASTER_PIN_SCK),
     .mosi_pin     = MYNEWT_VAL(SPI_2_MASTER_PIN_MOSI),
     .miso_pin     = MYNEWT_VAL(SPI_2_MASTER_PIN_MISO),
     /* For SPI master, SS pin is controlled as regular GPIO */
 };
+#endif
 #endif
 #if MYNEWT_VAL(SPI_2_SLAVE)
 static const struct nrf52_hal_spi_cfg os_bsp_spi2s_cfg = {
@@ -147,6 +220,28 @@ static const struct nrf52_hal_spi_cfg os_bsp_spi2s_cfg = {
     .miso_pin     = MYNEWT_VAL(SPI_2_SLAVE_PIN_MISO),
     .ss_pin       = MYNEWT_VAL(SPI_2_SLAVE_PIN_SS),
 };
+#endif
+#if MYNEWT_VAL(SPI_3_MASTER)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+static const struct bus_spi_dev_cfg spi3_cfg = {
+    .spi_num = 3,
+    .pin_sck = MYNEWT_VAL(SPI_3_MASTER_PIN_SCK),
+    .pin_mosi = MYNEWT_VAL(SPI_3_MASTER_PIN_MOSI),
+    .pin_miso = MYNEWT_VAL(SPI_3_MASTER_PIN_MISO),
+};
+static struct bus_spi_dev spi3_bus;
+#else
+static const struct nrf52_hal_spi_cfg os_bsp_spi3m_cfg = {
+    .sck_pin      = MYNEWT_VAL(SPI_3_MASTER_PIN_SCK),
+    .mosi_pin     = MYNEWT_VAL(SPI_3_MASTER_PIN_MOSI),
+    .miso_pin     = MYNEWT_VAL(SPI_3_MASTER_PIN_MISO),
+    /* For SPI master, SS pin is controlled as regular GPIO */
+};
+#endif
+#endif
+
+#if MYNEWT_VAL(TEMP)
+static struct temperature_dev os_bsp_temp;
 #endif
 
 static void
@@ -251,6 +346,21 @@ nrf52_periph_create_trng(void)
 }
 
 static void
+nrf52_periph_create_crypto(void)
+{
+    int rc;
+
+    (void)rc;
+
+#if MYNEWT_VAL(CRYPTO)
+    rc = os_dev_create(&os_bsp_crypto.dev, "crypto",
+                       OS_DEV_INIT_PRIMARY, OS_DEV_INIT_PRIO_DEFAULT,
+                       nrf52_crypto_dev_init, NULL);
+    assert(rc == 0);
+#endif
+}
+
+static void
 nrf52_periph_create_uart(void)
 {
     int rc;
@@ -279,12 +389,36 @@ nrf52_periph_create_i2c(void)
     (void)rc;
 
 #if MYNEWT_VAL(I2C_0)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+#if MYNEWT_VAL(MCU_BUS_DRIVER_I2C_USE_TWIM)
+    rc = bus_i2c_nrf52_twim_dev_create("i2c0", &i2c0_bus,
+                                       (struct bus_i2c_dev_cfg *)&i2c0_cfg);
+    assert(rc == 0);
+#else
+    rc = bus_i2c_hal_dev_create("i2c0", &i2c0_bus,
+                                (struct bus_i2c_dev_cfg *)&i2c0_cfg);
+    assert(rc == 0);
+#endif
+#else
     rc = hal_i2c_init(0, (void *)&hal_i2c0_cfg);
     assert(rc == 0);
 #endif
+#endif
 #if MYNEWT_VAL(I2C_1)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+#if MYNEWT_VAL(MCU_BUS_DRIVER_I2C_USE_TWIM)
+    rc = bus_i2c_nrf52_twim_dev_create("i2c1", &i2c1_bus,
+                                       (struct bus_i2c_dev_cfg *)&i2c1_cfg);
+    assert(rc == 0);
+#else
+    rc = bus_i2c_hal_dev_create("i2c1", &i2c1_bus,
+                                (struct bus_i2c_dev_cfg *)&i2c1_cfg);
+    assert(rc == 0);
+#endif
+#else
     rc = hal_i2c_init(1, (void *)&hal_i2c1_cfg);
     assert(rc == 0);
+#endif
 #endif
 }
 
@@ -296,27 +430,70 @@ nrf52_periph_create_spi(void)
     (void)rc;
 
 #if MYNEWT_VAL(SPI_0_MASTER)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_spi_hal_dev_create("spi0",
+                                &spi0_bus, (struct bus_spi_dev_cfg *)&spi0_cfg);
+    assert(rc == 0);
+#else
     rc = hal_spi_init(0, (void *)&os_bsp_spi0m_cfg, HAL_SPI_TYPE_MASTER);
     assert(rc == 0);
+#endif
 #endif
 #if MYNEWT_VAL(SPI_0_SLAVE)
     rc = hal_spi_init(0, (void *)&os_bsp_spi0s_cfg, HAL_SPI_TYPE_SLAVE);
     assert(rc == 0);
 #endif
 #if MYNEWT_VAL(SPI_1_MASTER)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_spi_hal_dev_create("spi1", &spi1_bus,
+                                (struct bus_spi_dev_cfg *)&spi1_cfg);
+    assert(rc == 0);
+#else
     rc = hal_spi_init(1, (void *)&os_bsp_spi1m_cfg, HAL_SPI_TYPE_MASTER);
     assert(rc == 0);
+#endif
 #endif
 #if MYNEWT_VAL(SPI_1_SLAVE)
     rc = hal_spi_init(1, (void *)&os_bsp_spi1s_cfg, HAL_SPI_TYPE_SLAVE);
     assert(rc == 0);
 #endif
 #if MYNEWT_VAL(SPI_2_MASTER)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_spi_hal_dev_create("spi2", &spi2_bus,
+                                (struct bus_spi_dev_cfg *)&spi2_cfg);
+    assert(rc == 0);
+#else
     rc = hal_spi_init(2, (void *)&os_bsp_spi2m_cfg, HAL_SPI_TYPE_MASTER);
     assert(rc == 0);
 #endif
+#endif
 #if MYNEWT_VAL(SPI_2_SLAVE)
     rc = hal_spi_init(2, (void *)&os_bsp_spi2s_cfg, HAL_SPI_TYPE_SLAVE);
+    assert(rc == 0);
+#endif
+#if MYNEWT_VAL(SPI_3_MASTER)
+#if MYNEWT_VAL(BUS_DRIVER_PRESENT)
+    rc = bus_spi_hal_dev_create("spi3", &spi3_bus,
+                                (struct bus_spi_dev_cfg *)&spi3_cfg);
+    assert(rc == 0);
+#else
+    rc = hal_spi_init(3, (void *)&os_bsp_spi3m_cfg, HAL_SPI_TYPE_MASTER);
+    assert(rc == 0);
+#endif
+#endif
+}
+
+static void
+nrf52_periph_create_temp(void)
+{
+    int rc;
+
+    (void)rc;
+
+#if MYNEWT_VAL(TEMP)
+    rc = os_dev_create(&os_bsp_temp.dev, "temp",
+                       OS_DEV_INIT_KERNEL, OS_DEV_INIT_PRIO_DEFAULT,
+                       nrf52_temp_dev_init, NULL);
     assert(rc == 0);
 #endif
 }
@@ -328,7 +505,9 @@ nrf52_periph_create(void)
     nrf52_periph_create_adc();
     nrf52_periph_create_pwm();
     nrf52_periph_create_trng();
+    nrf52_periph_create_crypto();
     nrf52_periph_create_uart();
     nrf52_periph_create_i2c();
     nrf52_periph_create_spi();
+    nrf52_periph_create_temp();
 }

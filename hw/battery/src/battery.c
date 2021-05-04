@@ -151,23 +151,6 @@ battery_pkg_init(void)
 }
 
 int
-battery_mgr_register(struct battery *battery)
-{
-    int i;
-
-    os_mutex_pend(&battery_manager.bm_lock, OS_WAIT_FOREVER);
-
-    for (i = 0; i < BATTERY_MAX_COUNT; ++i) {
-        if (battery_manager.bm_batteries[i] == NULL) {
-            battery_manager.bm_batteries[i] = battery;
-        }
-    }
-    os_mutex_release(&battery_manager.bm_lock);
-
-    return 0;
-}
-
-int
 battery_mgr_get_battery_count(void)
 {
     int i;
@@ -314,6 +297,10 @@ battery_find_property(struct os_dev *battery,
             if (prop) {
                 struct battery_property *p =
                     calloc(1, sizeof(struct battery_property));
+                if (!p) {
+                    /* If an allocation fails, return NULL */
+                    return NULL;
+                }
                 if (prop->bp_prop_num == 0) {
                     prop->bp_prop_num = ++bat->b_all_property_count;
                     assert(bat->b_all_property_count <= BATTERY_MAX_PROPERTY_COUNT);
@@ -331,6 +318,7 @@ battery_find_property(struct os_dev *battery,
             }
         }
     }
+
     return res;
 }
 
@@ -502,15 +490,29 @@ battery_mgr_poll_battery(struct battery *battery)
 int
 battery_set_poll_rate_ms(struct os_dev *battery, uint32_t poll_rate)
 {
+    return battery_set_poll_rate_ms_delay(battery, poll_rate, 0);
+}
+
+int
+battery_set_poll_rate_ms_delay(struct os_dev *battery, uint32_t poll_rate,
+    uint32_t start_delay)
+{
     struct battery *bat = (struct battery *)battery;
 
-    if ((poll_rate == 0) || (bat == NULL)) {
+    if (bat == NULL) {
         return -1;
+    }
+
+    if (poll_rate == 0) {
+        bat->b_poll_rate = 0;
+        os_callout_stop(&battery_manager.bm_poll_callout);
+        return 0;
     }
 
     bat->b_poll_rate = poll_rate;
     bat->b_next_run = os_time_get();
-    os_callout_reset(&battery_manager.bm_poll_callout, 0);
+    os_callout_reset(&battery_manager.bm_poll_callout,
+                     os_time_ms_to_ticks32(start_delay));
 
     return 0;
 }
@@ -808,11 +810,14 @@ battery_init(struct os_dev *dev, void *arg)
 
     OS_DEV_SETHANDLERS(dev, battery_open, battery_close);
 
+    os_mutex_pend(&battery_manager.bm_lock, OS_WAIT_FOREVER);
     for (i = 0; i < BATTERY_MAX_COUNT; ++i) {
         if (battery_manager.bm_batteries[i] == NULL) {
             break;
         }
     }
+    os_mutex_release(&battery_manager.bm_lock);
+
     assert(i < BATTERY_MAX_COUNT);
     battery_manager.bm_batteries[i] = bat;
 

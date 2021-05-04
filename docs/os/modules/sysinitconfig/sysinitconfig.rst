@@ -1,4 +1,4 @@
-Compile-Time Configuration and Initialization
+Compile-Time Configuration
 -----------------------------------------------
 
 .. toctree::
@@ -6,10 +6,10 @@ Compile-Time Configuration and Initialization
 
    sysconfig_error
 
-This guide describes how Mynewt manages system configuration and
-initialization. It shows you how to tell Mynewt to use default or
-customized values to initialize packages that you develop or use to
-build a target. This guide:
+This guide describes how Mynewt manages system configuration.  It shows
+you how to tell Mynewt to use default or customized values to
+configure packages that you develop or use to build a target. This
+guide:
 
 -  Assumes you have read the
    :ref:`concepts` section that describes
@@ -17,9 +17,6 @@ build a target. This guide:
    ``syscfg.yml`` files.
 -  Assumes you have read the Mynewt :doc:`../../../newt/newt_operation` and are familiar with how newt
    determines package dependencies for your target build.
--  Covers only the system initialization for hardware independent
-   packages. It does not cover the Board Support Package (BSP) and other
-   hardware dependent system initialization.
 
 .. contents::
    :local:
@@ -28,8 +25,6 @@ build a target. This guide:
 Mynewt defines several configuration parameters in the ``pkg.yml`` and
 ``syscfg.yml`` files. The newt tool uses this information to:
 
--  Generate a system initialization function that calls all the
-   package-specific system initialization functions.
 -  Generate a system configuration header file that contains all the
    package configuration settings and values.
 -  Display the system configuration settings and values in the
@@ -352,6 +347,47 @@ use the flash area named ``FLASH_AREA_NFFS`` in the ``syscfg.yml`` file.
     syscfg.vals:
         NFFS_FLASH_AREA: FLASH_AREA_NFFS
 
+Conditional Settings
+~~~~~~~~~~~~~~~~~~~~
+
+Setings in most Mynewt YAML files can be made conditional on syscfg
+settings.  For example, a package might depend on a second package
+*only if a syscfg setting has a particular value*.  The condition can
+be the value of a single syscfg setting or an arbitrary expression
+involving many settings.
+
+Examples of Conditional Settings
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Example 6
+`````````
+
+In this example, a package depends on ``lib/pkg2`` only if
+``MY_SETTING`` has a true value.
+
+
+.. code-block:: yaml
+
+    pkg.deps.MY_SETTING:
+        # Only depend on pkg2 if MY_SETTING is true.
+        - lib/pkg2
+
+A setting is "true" if it has a value other than 0 or the empty string.
+Undefined settings are not true.
+
+Example 7
+`````````
+
+In this example, a package overrides the setting ``FOO`` only if
+``BAR`` is greater than 5 and ``BAZ`` is not true.
+
+
+.. code-block:: yaml
+
+    syscfg.vals.'(BAR > 5 && !BAZ):
+        # Only override FOO if BAR is greater than 5 and BAZ is untrue.
+        FOO: 35
+
 Generated syscfg.h and Referencing System Configuration Settings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -471,204 +507,3 @@ when the setting value is non-zero.
         SYSINIT_PANIC_ASSERT(rc == 0);
     #endif
     }
-
-System Initialization
-~~~~~~~~~~~~~~~~~~~~~
-
-During system startup, Mynewt creates a default event queue and a main
-task to process events from this queue. You can override the
-``OS_MAIN_TASK_PRIO`` and ``OS_MAIN_TASK_STACK_SIZE`` setting values
-defined by the ``kernel/os`` package to specify different task priority
-and stack size values.
-
-Your application's ``main()`` function executes in the context of the
-main task and must perform the following:
-
--  At the start of ``main()``, call the Mynewt ``sysinit()`` function to
-   initialize the packages before performing any other processing.
--  At the end of ``main()``, wait for and dispatch events from the
-   default event queue in an infinite loop.
-
-**Note:** You must include the ``sysinit/sysinit.h`` header file to
-access the ``sysinit()`` function.
-
-Here is an example of a ``main()`` function:
-
-.. code-block:: cpp
-
-    int
-    main(int argc, char **argv)
-    {
-        /* First, call sysinit() to perform the system and package initialization */
-        sysinit();
-
-        /* ... other application initialization processing ... */
-
-        /*  Last, process events from the default event queue.  */
-        while (1) {
-           os_eventq_run(os_eventq_dflt_get());
-        }
-        /* main never returns */
-    }
-
-Specifying Package Initialization Functions
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The ``sysinit()`` function calls the ``sysinit_app()`` function to
-perform system initialization for the packages in the target. You can,
-optionally, specify one or more package initialization functions that
-``sysinit_app()`` calls to initialize a package.
-
-A package initialization function must have the following prototype:
-
-.. code-block:: cpp
-
-    void init_func_name(void)
-
-Package initialization functions are called in stages to ensure that
-lower priority packages are initialized before higher priority packages.
-A stage is an integer value, 0 or higher, that specifies when an
-initialization function is called. Mynewt calls the package
-initialization functions in increasing stage number order. The call
-order for initialization functions with the same stage number depends on
-the order the packages are processed, and you cannot rely on a specific
-call order for these functions.
-
-You use the ``pkg.init`` parameter in the ``pkg.yml`` file to specify an
-initialization function and the stage number to call the function. You
-can specify multiple initialization functions, with a different stage
-number for each function, for the parameter values. This feature allows
-packages with interdependencies to perform initialization in multiple
-stages.
-
-The ``pkg.init`` parameter has the following syntax in the ``pkg.yml``
-file:
-
-.. code-block:: yaml
-
-    pkg.init:
-        pkg_init_func1_name: pkg_init_func1_stage
-        pkg_init_func2_name: pkg_init_func2_stage
-
-                  ...
-
-        pkg_init_funcN_name: pkg_init_funcN_stage
-
-where ``pkg_init_func#_name`` is the C function name of an
-initialization function, and ``pkg_init_func#_stage`` is an integer
-value, 0 or higher, that indicates the stage when the
-``pkg_init_func#_name`` function is called.
-
-**Note:** The ``pkg.init_function`` and ``pkg.init_stage`` parameters
-introduced in a previous release for specifying a package initialization
-function and a stage number are deprecated and have been retained to
-support the legacy format. They will not be maintained for future
-releases and we recommend that you migrate to use the ``pkg.init``
-parameter.
-
-Generated sysinit_app() Function
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The newt tool processes the ``pkg.init`` parameters in all the
-``pkg.yml`` files for a target, generates the ``sysinit_app()`` function
-in the ``<target-path>/generated/src/<target-name>-sysinit_app.c`` file,
-and includes the file in the build. Here is an example ``sysinit_app()``
-function:
-
-.. code-block:: cpp
-
-    /**
-     * This file was generated by Apache Newt (incubating) version: 1.0.0-dev
-     */
-
-    #if !SPLIT_LOADER
-
-    void split_app_init(void);
-    void os_pkg_init(void);
-    void imgmgr_module_init(void);
-
-    /* ... */
-
-    void stats_module_init(void);
-
-    void
-    sysinit_app(void)
-    {
-
-        /*** Stage 0 */
-        /* 0.0: kernel/os */
-        os_pkg_init();
-
-        /*** Stage 2 */
-        /* 2.0: sys/flash_map */
-        flash_map_init();
-
-        /*** Stage 10 */
-        /* 10.0: sys/stats/full */
-        stats_module_init();
-
-        /*** Stage 20 */
-        /* 20.0: sys/console/full */
-        console_pkg_init();
-
-        /*** Stage 100 */
-        /* 100.0: sys/log/full */
-        log_init();
-        /* 100.1: sys/mfg */
-        mfg_init();
-
-        /* ... */
-
-        /*** Stage 300 */
-        /* 300.0: sys/config */
-        config_pkg_init();
-
-        /*** Stage 500 */
-        /* 500.0: sys/id */
-        id_init();
-        /* 500.1: sys/shell */
-        shell_init();
-
-        /* ... */
-
-        /* 500.4: mgmt/imgmgr */
-        imgmgr_module_init();
-
-        /*** Stage 501 */
-        /* 501.0: mgmt/newtmgr/transport/nmgr_shell */
-        nmgr_shell_pkg_init();
-    }
-    #endif
-
-Conditional Configurations
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can use the system configuration setting values to conditionally
-specify parameter values in ``pkg.yml`` and ``syscfg.yml`` files. The
-syntax is:
-
-.. code-block:: yaml
-
-    parameter_name.PKGA_SYSCFG_NAME:
-         parameter_value
-
-This specifies that ``parameter_value`` is only set for
-``parameter_name`` if the ``PKGA_SYSCFG_NAME`` configuration setting
-value is non-zero. Here is an example from the ``libs/os`` package
-``pkg.yml`` file:
-
-.. code-block:: yaml
-
-    pkg.deps:
-        - "@apache-mynewt-core/sys/sysinit"
-        - "@apache-mynewt-core/util/mem"
-
-    pkg.deps.OS_CLI
-        - "@apache-mynewt-core/sys/shell"
-
-This example specifies that the ``os`` package depends on the
-``sysinit`` and ``mem`` packages, and also depends on the ``shell``
-package when ``OS_CLI`` is enabled.
-
-The newt tool aborts the build when it detects circular conditional
-dependencies.

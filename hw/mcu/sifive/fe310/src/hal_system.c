@@ -17,14 +17,24 @@
  * under the License.
  */
 
+#include "os/mynewt.h"
 #include "hal/hal_system.h"
+#include <platform.h>
 
 void
 hal_system_reset(void)
 {
-    while(1) {
-        if (hal_debugger_connected()) {
-            asm ("ebreak");
+    extern void _reset_handler(void);
+#if MYNEWT_VAL(HAL_SYSTEM_RESET_CB)
+    hal_system_reset_cb();
+#endif
+
+    while (1) {
+        HAL_DEBUG_BREAK();
+        if (MYNEWT_VAL(HAL_SYSTEM_RESET_FULL)) {
+            ((void (*)(void))SPI0_MEM_ADDR)();
+        } else {
+            _reset_handler();
         }
     }
 }
@@ -32,5 +42,9 @@ hal_system_reset(void)
 int
 hal_debugger_connected(void)
 {
-    return 0;
+    /*
+     * This always on domain register is now used to detect debugger
+     * connection. openocd scripts sets magic value 0x5151A2BC when connected.
+     */
+    return AON_REG(AON_BACKUP15) == 0x5151A2BC;
 }

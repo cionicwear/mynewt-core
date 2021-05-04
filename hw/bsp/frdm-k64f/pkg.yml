@@ -62,3 +62,15 @@ pkg.deps.UART_4:
 
 pkg.deps.UART_5:
     - "@apache-mynewt-core/hw/drivers/uart/uart_hal"
+
+pkg.deps.TRNG:
+    - "@apache-mynewt-core/hw/drivers/trng/trng_k64f"
+
+pkg.deps.CRYPTO:
+    - "@apache-mynewt-core/hw/drivers/crypto/crypto_k64f"
+
+pkg.deps.ENC_FLASH_DEV:
+    - "@apache-mynewt-core/hw/drivers/flash/enc_flash/ef_crypto"
+
+pkg.deps.HASH:
+    - "@apache-mynewt-core/hw/drivers/hash/hash_k64f"

@@ -24,6 +24,7 @@
 
 #include "hal/hal_os_tick.h"
 #include "hal/hal_bsp.h"
+#include "hal/hal_system.h"
 #include "hal/hal_watchdog.h"
 
 #if MYNEWT_VAL(RTT)
@@ -44,8 +45,14 @@ OS_TASK_STACK_DEFINE(g_idle_task_stack, OS_IDLE_STACK_SIZE);
 
 uint32_t g_os_idle_ctr;
 
-static struct os_task os_main_task;
-OS_TASK_STACK_DEFINE(os_main_stack, OS_MAIN_STACK_SIZE);
+struct os_task g_os_main_task;
+OS_TASK_STACK_DEFINE(g_os_main_stack, OS_MAIN_STACK_SIZE);
+
+/*
+ * Double the interval timer to allow proper timer check-in.
+ */
+#define OS_MAIN_TASK_TIMER_TICKS \
+    os_time_ms_to_ticks32(MYNEWT_VAL(OS_MAIN_TASK_SANITY_ITVL_MS)) * 2
 
 #if MYNEWT_VAL(OS_WATCHDOG_MONITOR)
 
@@ -62,10 +69,11 @@ OS_TASK_STACK_DEFINE(os_main_stack, OS_MAIN_STACK_SIZE);
 static struct hal_timer os_wdog_monitor;
 #endif
 
+#if MYNEWT_VAL(WATCHDOG_INTERVAL) > 0
 #if MYNEWT_VAL(WATCHDOG_INTERVAL) - 200 < MYNEWT_VAL(SANITY_INTERVAL)
 #error "Watchdog interval - 200 < sanity interval"
 #endif
-
+#endif
 
 /* Default zero.  Set by the architecture specific code when os is started.
  */
@@ -90,27 +98,32 @@ os_idle_task(void *arg)
     os_time_t iticks, sticks, cticks;
     os_time_t sanity_last;
     os_time_t sanity_itvl_ticks;
+    os_time_t sanity_to_next;
 
     sanity_itvl_ticks = (MYNEWT_VAL(SANITY_INTERVAL) * OS_TICKS_PER_SEC) / 1000;
     sanity_last = 0;
 
+#if MYNEWT_VAL(WATCHDOG_INTERVAL) > 0
     hal_watchdog_tickle();
 #if MYNEWT_VAL(OS_WATCHDOG_MONITOR)
     os_cputime_timer_stop(&os_wdog_monitor);
     os_cputime_timer_relative(&os_wdog_monitor, OS_WDOG_MONITOR_TMO);
+#endif
 #endif
 
     while (1) {
         ++g_os_idle_ctr;
 
         now = os_time_get();
-        if (OS_TIME_TICK_GT(now, sanity_last + sanity_itvl_ticks)) {
+        if (OS_TIME_TICK_GEQ(now, sanity_last + sanity_itvl_ticks)) {
             os_sanity_run();
+#if MYNEWT_VAL(WATCHDOG_INTERVAL) > 0
             /* Tickle the watchdog after successfully running sanity */
             hal_watchdog_tickle();
 #if MYNEWT_VAL(OS_WATCHDOG_MONITOR)
             os_cputime_timer_stop(&os_wdog_monitor);
             os_cputime_timer_relative(&os_wdog_monitor, OS_WDOG_MONITOR_TMO);
+#endif
 #endif
             sanity_last = now;
         }
@@ -120,10 +133,17 @@ os_idle_task(void *arg)
         sticks = os_sched_wakeup_ticks(now);
         cticks = os_callout_wakeup_ticks(now);
         iticks = min(sticks, cticks);
-        /* Wakeup in time to run sanity as well from the idle context,
-         * as the idle task does not schedule itself.
+
+        /*
+         * Need to wake up on time for next sanity check. Make sure next sanity
+         * happens on next interval in case it was already performed on current
+         * tick.
          */
-        iticks = min(iticks, ((sanity_last + sanity_itvl_ticks) - now));
+        sanity_to_next = sanity_last + sanity_itvl_ticks - now;
+        if ((int)sanity_to_next <= 0) {
+            sanity_to_next += sanity_itvl_ticks;
+        }
+        iticks = min(iticks, sanity_to_next);
 
         if (iticks < MIN_IDLE_TICKS) {
             iticks = 0;
@@ -196,12 +216,14 @@ os_init_idle_task(void)
     rc = os_sanity_init();
     assert(rc == 0);
 
+#if MYNEWT_VAL(WATCHDOG_INTERVAL) > 0
     rc = hal_watchdog_init(MYNEWT_VAL(WATCHDOG_INTERVAL));
     assert(rc == 0);
 
 #if MYNEWT_VAL(OS_WATCHDOG_MONITOR)
     os_cputime_timer_init(&os_wdog_monitor, os_wdog_monitor_tmo, NULL);
     os_cputime_timer_relative(&os_wdog_monitor, OS_WDOG_MONITOR_TMO);
+#endif
 #endif
 }
 
@@ -226,11 +248,13 @@ os_init(int (*main_fn)(int argc, char **arg))
     assert(err == OS_OK);
 
     if (main_fn) {
-        err = os_task_init(&os_main_task, "main", os_main, main_fn,
-                           OS_MAIN_TASK_PRIO, OS_WAIT_FOREVER, os_main_stack,
-                           OS_STACK_ALIGN(OS_MAIN_STACK_SIZE));
+        err = os_task_init(&g_os_main_task, "main", os_main, main_fn,
+                   OS_MAIN_TASK_PRIO,
+                   (OS_MAIN_TASK_TIMER_TICKS == 0) ? OS_WAIT_FOREVER : OS_MAIN_TASK_TIMER_TICKS,
+                   g_os_main_stack, OS_STACK_ALIGN(OS_MAIN_STACK_SIZE));
         assert(err == 0);
     }
+
     /* Call bsp related OS initializations */
     hal_bsp_init();
 
@@ -247,14 +271,35 @@ os_start(void)
 #if MYNEWT_VAL(OS_SCHEDULING)
     os_error_t err;
 
+#if MYNEWT_VAL(WATCHDOG_INTERVAL) > 0
     /* Enable the watchdog prior to starting the OS */
     hal_watchdog_enable();
+#endif
 
     err = os_arch_os_start();
     assert(err == OS_OK);
 #else
     assert(0);
 #endif
+}
+
+void
+os_reboot(int reason)
+{
+    sysdown(reason);
+}
+
+void
+os_system_reset(void)
+{
+#if MYNEWT_VAL(WATCHDOG_INTERVAL) > 0
+    /* Tickle watchdog just before re-entering bootloader.  Depending on what
+     * the system has been doing lately, the watchdog timer might be close to
+     * firing.
+     */
+    hal_watchdog_tickle();
+#endif
+    hal_system_reset();
 }
 
 void
@@ -268,6 +313,7 @@ os_pkg_init(void)
     err = os_dev_initialize_all(OS_DEV_INIT_KERNEL);
     assert(err == OS_OK);
 
+    os_mempool_module_init();
     os_msys_init();
 }
 

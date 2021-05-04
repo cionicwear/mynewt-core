@@ -44,12 +44,23 @@ extern "C" {
 #include <stdbool.h>
 #include <inttypes.h>
 
+#include "syscfg/syscfg.h"
+
 struct flash_area {
     uint8_t fa_id;
     uint8_t fa_device_id;
     uint16_t pad16;
     uint32_t fa_off;
     uint32_t fa_size;
+};
+
+struct flash_sector_range {
+    struct flash_area fsr_flash_area;
+    uint32_t fsr_range_start;
+    uint16_t fsr_first_sector;
+    uint16_t fsr_sector_count;
+    uint32_t fsr_sector_size;
+    uint8_t fsr_align;
 };
 
 extern const struct flash_area *flash_map;
@@ -66,7 +77,8 @@ void flash_map_init(void);
  */
 int flash_area_open(uint8_t id, const struct flash_area **);
 
-void flash_area_close(const struct flash_area *);
+/** nothing to do for now */
+#define flash_area_close(flash_area)
 
 /*
  * Read/write/erase. Offset is relative from beginning of flash area.
@@ -107,6 +119,12 @@ uint32_t flash_area_erased_val(const struct flash_area *fa);
 int flash_area_to_sectors(int idx, int *cnt, struct flash_area *ret);
 
 /*
+ * Given flash map area id, return info about sectors within the area.
+ */
+int flash_area_to_sector_ranges(int id, int *cnt,
+  struct flash_sector_range *ret);
+
+/*
  * Get-next interface for obtaining info about sectors.
  * To start the get-next walk, call with *sec_id set to -1.
  */
@@ -114,6 +132,14 @@ int flash_area_getnext_sector(int id, int *sec_id, struct flash_area *ret);
 
 int flash_area_id_from_image_slot(int slot);
 int flash_area_id_to_image_slot(int area_id);
+
+#if MYNEWT_VAL(SELFTEST)
+/**
+ * Adds areas from the hardcoded flash map that aren't present in, and don't
+ * overlap with, the manufacturing flash map.  Only exposed to unit tests.
+ */
+void flash_map_add_new_dflt_areas_extern(void);
+#endif
 
 #ifdef __cplusplus
 }

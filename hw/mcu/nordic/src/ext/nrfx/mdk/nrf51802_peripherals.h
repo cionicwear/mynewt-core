@@ -1,6 +1,6 @@
 /*
 
-Copyright (c) 2010 - 2018, Nordic Semiconductor ASA All rights reserved.
+Copyright (c) 2010 - 2020, Nordic Semiconductor ASA All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -35,11 +35,19 @@ POSSIBILITY OF SUCH DAMAGE.
 #define _NRF51802_PERIPHERALS_H
 
 
+/* Clock Peripheral */
+#define CLOCK_PRESENT
+#define CLOCK_COUNT 1
+
 /* Power Peripheral */
 #define POWER_PRESENT
 #define POWER_COUNT 1
 
 #define POWER_FEATURE_RAMON_REGISTERS_PRESENT
+
+/* Non-Volatile Memory Controller */
+#define NVMC_PRESENT
+#define NVMC_COUNT 1
 
 /* Software Interrupts */
 #define SWI_PRESENT
@@ -51,6 +59,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define P0_PIN_NUM 32
 
+#define P0_FEATURE_PINS_PRESENT 0xFFFFFFFFUL
+
 /* MPU and BPROT */
 #define BPROT_PRESENT
 
@@ -60,6 +70,8 @@ POSSIBILITY OF SUCH DAMAGE.
 /* Radio */
 #define RADIO_PRESENT
 #define RADIO_COUNT 1
+
+#define RADIO_TXPOWER_TXPOWER_Max RADIO_TXPOWER_TXPOWER_Pos4dBm
 
 /* Accelerated Address Resolver */
 #define AAR_PRESENT
