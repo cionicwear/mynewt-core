@@ -141,6 +141,10 @@ syscfg.defs:
         description: SDMMC clock source
         value: 0
 
+    STM32_FMC_CLOCK_SEL:
+        description: FMC clock source
+        value: 0
+
     STM32_USB_CLOCK_SEL:
         description: USB clock source
         value: 0
