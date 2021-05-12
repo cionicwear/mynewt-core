@@ -236,7 +236,7 @@ SystemClock_Config(void)
     PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_UART4
                               |RCC_PERIPHCLK_USART6|RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_USART3
                               |RCC_PERIPHCLK_UART5|RCC_PERIPHCLK_UART7
-                              |RCC_PERIPHCLK_UART8 | RCC_PERIPHCLK_ADC | RCC_PERIPHCLK_FMC;
+                              |RCC_PERIPHCLK_UART8 | RCC_PERIPHCLK_ADC;
     PeriphClkInitStruct.PLL2.PLL2M = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLM);
     PeriphClkInitStruct.PLL2.PLL2N = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLN);
     PeriphClkInitStruct.PLL2.PLL2P = MYNEWT_VAL(STM32_CLOCK_PLL2_PLLP);
@@ -265,6 +265,11 @@ SystemClock_Config(void)
 #if MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL)
     PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_SDMMC;
     PeriphClkInitStruct.SdmmcClockSelection = MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL);
+#endif
+
+#if MYNEWT_VAL(STM32_FMC_CLOCK_SEL)
+    PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_FMC;
+    PeriphClkInitStruct.FmcClockSelection = MYNEWT_VAL(STM32_FMC_CLOCK_SEL);
 #endif
 
 #if MYNEWT_VAL(STM32_USB_CLOCK_SEL)
