@@ -47,12 +47,16 @@ hal_system_start(void *img_start)
     img_data = (uint32_t *)img_data_addr;
 
     asm volatile (".syntax unified        \n"
+                  /* Reset MSPLIM */
+                  "    mov  r0, #0        \n"
+                  "    msr  msplim, r0    \n"
                   /* 1st word is stack pointer */
                   "    msr  msp, %0       \n"
                   /* 2nd word is a reset handler (image entry) */
                   "    bx   %1            \n"
                   : /* no output */
-                  : "r" (img_data[0]), "r" (img_data[1]));
+                  : "r" (img_data[0]), "r" (img_data[1])
+                  : "r0");
 }
 
 void
@@ -75,8 +79,10 @@ hal_system_restart(void *img_start)
 }
 
 #if MYNEWT_VAL(BOOT_CUSTOM_START) && MCUBOOT_MYNEWT
-#define IMAGE_TLV_AES_NONCE   0x50
-#define IMAGE_TLV_SECRET_ID   0x60
+#define IMAGE_TLV_AES_NONCE_LEGACY   0x50
+#define IMAGE_TLV_SECRET_ID_LEGACY   0x60
+#define IMAGE_TLV_AES_NONCE   0xa1
+#define IMAGE_TLV_SECRET_ID   0xa2
 
 sec_text_ram_core void
 boot_custom_start(uintptr_t flash_base, struct boot_rsp *rsp)
@@ -117,7 +123,8 @@ boot_custom_start(uintptr_t flash_base, struct boot_rsp *rsp)
             break;
         }
 
-        if (type == IMAGE_TLV_AES_NONCE) {
+        if ((type == IMAGE_TLV_AES_NONCE) ||
+            (type == IMAGE_TLV_AES_NONCE_LEGACY)) {
             assert(len == 8);
 
             rc = flash_area_read(fap, off, buf, len);
@@ -126,7 +133,8 @@ boot_custom_start(uintptr_t flash_base, struct boot_rsp *rsp)
             nonce[0] = __builtin_bswap32(*(uint32_t *)buf);
             nonce[1] = __builtin_bswap32(*(uint32_t *)(buf + 4));
             has_aes_nonce = true;
-        } else if (type == IMAGE_TLV_SECRET_ID) {
+        } else if ((type == IMAGE_TLV_SECRET_ID) ||
+                   (type == IMAGE_TLV_SECRET_ID_LEGACY)) {
             assert(len == 4);
 
             rc = flash_area_read(fap, off, buf, len);

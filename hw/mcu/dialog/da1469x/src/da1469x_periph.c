@@ -27,7 +27,11 @@
 
 #if MYNEWT_VAL(UART_0) || MYNEWT_VAL(UART_1) || MYNEWT_VAL(UART_2)
 #include "uart/uart.h"
+#if MYNEWT_VAL(UART_HAL)
 #include "uart_hal/uart_hal.h"
+#else
+#include "uart_da1469x/uart_da1469x.h"
+#endif
 #endif
 #if MYNEWT_VAL(BUS_DRIVER_PRESENT)
 #include "bus/bus.h"
@@ -67,7 +71,7 @@ static struct crypto_dev os_bsp_crypto;
 
 #if MYNEWT_VAL(SPI_0_MASTER) || MYNEWT_VAL(SPI_1_MASTER)
 #if MYNEWT_VAL(BUS_DRIVER_PRESENT)
-#include "bus/drivers/spi_hal.h"
+#include "bus/drivers/spi_da1469x.h"
 #else
 #include "hal/hal_spi.h"
 #endif
@@ -89,7 +93,11 @@ static struct crypto_dev os_bsp_crypto;
 #endif
 
 #if MYNEWT_VAL(UART_0)
+#if MYNEWT_VAL(UART_HAL)
 static struct uart_dev os_bsp_uart0;
+#else
+static struct da1469x_uart_dev os_bsp_uart0;
+#endif
 static const struct da1469x_uart_cfg os_bsp_uart0_cfg = {
     .pin_tx = MYNEWT_VAL(UART_0_PIN_TX),
     .pin_rx = MYNEWT_VAL(UART_0_PIN_RX),
@@ -99,7 +107,11 @@ static const struct da1469x_uart_cfg os_bsp_uart0_cfg = {
 };
 #endif
 #if MYNEWT_VAL(UART_1)
+#if MYNEWT_VAL(UART_HAL)
 static struct uart_dev os_bsp_uart1;
+#else
+static struct da1469x_uart_dev os_bsp_uart1;
+#endif
 static const struct da1469x_uart_cfg os_bsp_uart1_cfg = {
     .pin_tx = MYNEWT_VAL(UART_1_PIN_TX),
     .pin_rx = MYNEWT_VAL(UART_1_PIN_RX),
@@ -109,7 +121,11 @@ static const struct da1469x_uart_cfg os_bsp_uart1_cfg = {
 };
 #endif
 #if MYNEWT_VAL(UART_2)
+#if MYNEWT_VAL(UART_HAL)
 static struct uart_dev os_bsp_uart2;
+#else
+static struct da1469x_uart_dev os_bsp_uart2;
+#endif
 static const struct da1469x_uart_cfg os_bsp_uart2_cfg = {
     .pin_tx = MYNEWT_VAL(UART_2_PIN_TX),
     .pin_rx = MYNEWT_VAL(UART_2_PIN_RX),
@@ -175,7 +191,7 @@ static const struct bus_spi_dev_cfg spi0_cfg = {
     .pin_mosi = MYNEWT_VAL(SPI_0_MASTER_PIN_MOSI),
     .pin_miso = MYNEWT_VAL(SPI_0_MASTER_PIN_MISO),
 };
-static struct bus_spi_hal_dev spi0_bus;
+static struct bus_spi_dev spi0_bus;
 #else
 static const struct da1469x_hal_spi_cfg hal_spi0_cfg = {
     .pin_sck = MYNEWT_VAL(SPI_0_MASTER_PIN_SCK),
@@ -199,7 +215,7 @@ static const struct bus_spi_dev_cfg spi1_cfg = {
     .pin_mosi = MYNEWT_VAL(SPI_1_MASTER_PIN_MOSI),
     .pin_miso = MYNEWT_VAL(SPI_1_MASTER_PIN_MISO),
 };
-static struct bus_spi_hal_dev spi1_bus;
+static struct bus_spi_dev spi1_bus;
 #else
 static const struct da1469x_hal_spi_cfg hal_spi1_cfg = {
     .pin_sck = MYNEWT_VAL(SPI_1_MASTER_PIN_SCK),
@@ -334,6 +350,26 @@ da1469x_periph_create_adc(void)
 #endif
 }
 
+#if MYNEWT_VAL(UART_0) || MYNEWT_VAL(UART_1) || MYNEWT_VAL(UART_2)
+#if MYNEWT_VAL(UART_HAL)
+static int
+da1469x_uart_create(struct uart_dev *dev, const char *name, uint8_t priority,
+                    const struct da1469x_uart_cfg *cfg)
+{
+    return os_dev_create(&dev->ud_dev, name,
+                         OS_DEV_INIT_PRIMARY, priority, uart_hal_init,
+                         (void *)cfg);
+}
+#else
+static int
+da1469x_uart_create(struct da1469x_uart_dev *dev, const char *name, uint8_t priority,
+                    const struct da1469x_uart_cfg *cfg)
+{
+    return da1469x_uart_dev_create(dev, name, priority, cfg);
+}
+#endif
+#endif
+
 static void
 da1469x_periph_create_uart(void)
 {
@@ -342,21 +378,15 @@ da1469x_periph_create_uart(void)
     (void)rc;
 
 #if MYNEWT_VAL(UART_0)
-    rc = os_dev_create(&os_bsp_uart0.ud_dev, "uart0",
-                       OS_DEV_INIT_PRIMARY, 0, uart_hal_init,
-                       (void *)&os_bsp_uart0_cfg);
+    rc = da1469x_uart_create(&os_bsp_uart0, "uart0", 0, &os_bsp_uart0_cfg);
     assert(rc == 0);
 #endif
 #if MYNEWT_VAL(UART_1)
-    rc = os_dev_create(&os_bsp_uart1.ud_dev, "uart1",
-                       OS_DEV_INIT_PRIMARY, 1, uart_hal_init,
-                       (void *)&os_bsp_uart1_cfg);
+    rc = da1469x_uart_create(&os_bsp_uart1, "uart1", 1, &os_bsp_uart1_cfg);
     assert(rc == 0);
 #endif
 #if MYNEWT_VAL(UART_2)
-    rc = os_dev_create(&os_bsp_uart1.ud_dev, "uart2",
-                       OS_DEV_INIT_PRIMARY, 2, uart_hal_init,
-                       (void *)&os_bsp_uart2_cfg);
+    rc = da1469x_uart_create(&os_bsp_uart2, "uart2", 2, &os_bsp_uart2_cfg);
     assert(rc == 0);
 #endif
 }
@@ -410,8 +440,8 @@ da1469x_periph_create_spi(void)
 
 #if MYNEWT_VAL(SPI_0_MASTER)
 #if MYNEWT_VAL(BUS_DRIVER_PRESENT)
-    rc = bus_spi_hal_dev_create("spi0", &spi0_bus,
-                                (struct bus_spi_dev_cfg *)&spi0_cfg);
+    rc = bus_spi_da1469x_dev_create("spi0", &spi0_bus,
+                                    (struct bus_spi_dev_cfg *)&spi0_cfg);
     assert(rc == 0);
 #else
     rc = hal_spi_init(0, (void *)&hal_spi0_cfg, HAL_SPI_TYPE_MASTER);
@@ -421,8 +451,8 @@ da1469x_periph_create_spi(void)
 
 #if MYNEWT_VAL(SPI_1_MASTER)
 #if MYNEWT_VAL(BUS_DRIVER_PRESENT)
-    rc = bus_spi_hal_dev_create("spi1", &spi1_bus,
-                                (struct bus_spi_dev_cfg *)&spi1_cfg);
+    rc = bus_spi_da1469x_dev_create("spi1", &spi1_bus,
+                                    (struct bus_spi_dev_cfg *)&spi1_cfg);
     assert(rc == 0);
 #else
     rc = hal_spi_init(1, (void *)&hal_spi1_cfg, HAL_SPI_TYPE_MASTER);

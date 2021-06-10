@@ -77,6 +77,16 @@ extern "C" {
 #define INT32_MAX   0x7FFFFFFF
 #endif
 
+#ifdef OS_TICKS_PER_SEC
+#warning "OS_TICKS_PER_SEC should be configured in syscfg"
+#else
+#if MYNEWT_VAL(OS_TICKS_PER_SEC)
+#define OS_TICKS_PER_SEC        MYNEWT_VAL(OS_TICKS_PER_SEC)
+#else
+#error "Application, BSP or target must specify OS_TICKS_PER_SEC syscfg value"
+#endif
+#endif
+
 typedef uint32_t os_time_t;
 typedef int32_t os_stime_t;
 #define OS_TIME_MAX UINT32_MAX
@@ -226,10 +236,10 @@ int os_settimeofday(struct os_timeval *utctime, struct os_timezone *tz);
 
 /**
  * Get the current time of day.  Returns the time of day in UTC
- * into the tv argument, and returns the timezone (if set) into
+ * into the utctime argument, and returns the timezone (if set) into
  * tz.
  *
- * @param tv The structure to put the UTC time of day into
+ * @param utctime The structure to put the UTC time of day into
  * @param tz The structure to put the timezone information into
  *
  * @return 0 on success, non-zero on failure

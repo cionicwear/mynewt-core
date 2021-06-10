@@ -70,7 +70,8 @@ static struct hal_spi_settings mmc_settings = {
     .data_mode  = HAL_SPI_MODE0,
     /* XXX: MMC initialization accepts clocks in the range 100-400KHz */
     /* TODO: switch to high-speed aka 25MHz after initialization. */
-    .baudrate   = 100,
+    /* Currently the lowest clock acceptable is 125KHz */
+    .baudrate   = 125,
     .word_size  = HAL_SPI_WORD_SIZE_8BIT,
 };
 
@@ -207,7 +208,10 @@ mmc_init(int spi_num, void *spi_cfg, int ss_pin)
     }
 
     hal_spi_set_txrx_cb(mmc->spi_num, NULL, NULL);
-    hal_spi_enable(mmc->spi_num);
+    rc = hal_spi_enable(mmc->spi_num);
+    if (rc) {
+        return (rc);
+    }
 
     /**
      * NOTE: The state machine below follows:
@@ -220,8 +224,8 @@ mmc_init(int spi_num, void *spi_cfg, int ss_pin)
 
     hal_gpio_write(mmc->ss_pin, 0);
 
-    /* send the required >= 74 clock cycles */
-    for (i = 0; i < 74; i++) {
+    /* send the required >= 74 clock cycles (10 bytes, 80 clock cycles). */
+    for (i = 0; i < 10; i++) {
         hal_spi_tx_val(mmc->spi_num, 0xff);
     }
 
