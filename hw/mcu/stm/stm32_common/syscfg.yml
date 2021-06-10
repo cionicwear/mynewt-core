@@ -386,64 +386,7 @@ syscfg.defs:
         description: 'SS pin for SPI_6'
         value: -1
 
-    SPI_4_MASTER:
-        description: 'SPI 4 master'
-        value:  0
-        restrictions:
-            - "!SPI_4_SLAVE"
-    SPI_4_SLAVE:
-        description: 'SPI 4 slave'
-        value:  0
-        restrictions:
-            - "!SPI_4_MASTER"
-    SPI_4:
-        description: 'SPI 4 enabled'
-        value: 'MYNEWT_VAL_SPI_4_MASTER || MYNEWT_VAL_SPI_4_SLAVE'
-    SPI_4_CUSTOM_CFG:
-        description: 'Allow SPI_4 configuration override'
-        value: 0
-    SPI_4_PIN_SCK:
-        description: 'SCK pin for SPI_4'
-        value: ''
-    SPI_4_PIN_MOSI:
-        description: 'MOSI pin for SPI_4'
-        value: ''
-    SPI_4_PIN_MISO:
-        description: 'MISO pin for SPI_4'
-        value: ''
-    SPI_4_PIN_SS:
-        description: 'SS pin for SPI_4'
-        value: ''
-
-    SPI_5_MASTER:
-        description: 'SPI 5 master'
-        value:  0
-        restrictions:
-            - "!SPI_5_SLAVE"
-    SPI_5_SLAVE:
-        description: 'SPI 5 slave'
-        value:  0
-        restrictions:
-            - "!SPI_5_MASTER"
-    SPI_5:
-        description: 'SPI 5 enabled'
-        value: 'MYNEWT_VAL_SPI_5_MASTER || MYNEWT_VAL_SPI_5_SLAVE'
-    SPI_5_CUSTOM_CFG:
-        description: 'Allow SPI_5 configuration override'
-        value: 0
-    SPI_5_PIN_SCK:
-        description: 'SCK pin for SPI_5'
-        value: ''
-    SPI_5_PIN_MOSI:
-        description: 'MOSI pin for SPI_5'
-        value: ''
-    SPI_5_PIN_MISO:
-        description: 'MISO pin for SPI_5'
-        value: ''
-    SPI_5_PIN_SS:
-        description: 'SS pin for SPI_5'
-        value: ''
-
+   
     I2C_0:
         description: 'I2C (TWI) interface 0'
         value:  0
