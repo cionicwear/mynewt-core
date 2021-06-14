@@ -222,11 +222,11 @@ flash_sync(const struct lfs_config *c)
 static lfs_t *g_lfs = NULL;
 static bool g_lfs_alloc_done = false;
 
-#define READ_SIZE (MYNEWT_VAL(MCU_FLASH_MIN_WRITE_SIZE) * 2)
+#define READ_SIZE (MYNEWT_VAL(LITTLEFS_READ_SIZE))
 static uint8_t read_buffer[READ_SIZE];
-#define WRITE_SIZE (MYNEWT_VAL(MCU_FLASH_MIN_WRITE_SIZE) * 2)
+#define WRITE_SIZE (MYNEWT_VAL(LITTLEFS_WRITE_SIZE))
 static uint8_t prog_buffer[WRITE_SIZE];
-#define CACHE_SIZE 8
+#define CACHE_SIZE (MYNEWT_VAL(LITTLEFS_CACHE_SIZE))
 static uint8_t __attribute__((aligned(4))) lookahead_buffer[CACHE_SIZE];
 static struct lfs_config g_lfs_cfg = {
     .context = NULL,
@@ -242,7 +242,7 @@ static struct lfs_config g_lfs_cfg = {
     .block_size = MYNEWT_VAL(LITTLEFS_BLOCK_SIZE),
     .block_count = MYNEWT_VAL(LITTLEFS_BLOCK_COUNT),
     .block_cycles = 500,
-    .cache_size = 16,
+    .cache_size = CACHE_SIZE,
     .lookahead_size = CACHE_SIZE,
     .read_buffer = read_buffer,
     .prog_buffer = prog_buffer,
@@ -280,10 +280,13 @@ littlefs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_fi
     struct littlefs_file *file = NULL;
     int flags;
     int rc;
+    char *filepath;
 
     if (!path || !out_fs_file) {
         return FS_EINVAL;
     }
+
+    filepath = disk_filepath_from_path(path);
 
     out_file = NULL;
 
@@ -323,7 +326,7 @@ littlefs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_fi
     }
 
     littlefs_lock();
-    rc = lfs_file_open(g_lfs, out_file, path, flags);
+    rc = lfs_file_open(g_lfs, out_file, filepath, flags);
     littlefs_unlock();
     if (rc != LFS_ERR_OK) {
         rc = littlefs_to_vfs_error(rc);
@@ -466,6 +469,8 @@ littlefs_read(struct fs_file *fs_file, uint32_t len, void *out_data,
         return FS_EOK;
     }
 
+    *out_len = len;
+
     file = ((struct littlefs_file *) fs_file)->file;
     lfs = ((struct littlefs_file *) fs_file)->lfs;
 
@@ -523,13 +528,16 @@ static int
 littlefs_unlink(const char *path)
 {
     int rc;
+    char *filepath = NULL;
 
     if (!path) {
         return FS_EINVAL;
     }
 
+    filepath = disk_filepath_from_path(path);
+
     littlefs_lock();
-    rc = lfs_remove(g_lfs, path);
+    rc = lfs_remove(g_lfs, filepath);
     littlefs_unlock();
 
     return littlefs_to_vfs_error(rc);
@@ -555,13 +563,16 @@ static int
 littlefs_mkdir(const char *path)
 {
     int rc;
+    char *filepath = NULL;
 
     if (!path) {
         return FS_EINVAL;
     }
 
+    filepath = disk_filepath_from_path(path);
+    
     littlefs_lock();
-    rc = lfs_mkdir(g_lfs, path);
+    rc = lfs_mkdir(g_lfs, filepath);
     littlefs_unlock();
 
     return littlefs_to_vfs_error(rc);
@@ -572,11 +583,14 @@ littlefs_opendir(const char *path, struct fs_dir **out_fs_dir)
 {
     lfs_dir_t *out_dir = NULL;
     struct littlefs_dir *dir = NULL;
+    char *filepath = NULL;
     int rc;
 
     if (!path || !out_fs_dir) {
         return FS_EINVAL;
     }
+
+    filepath = disk_filepath_from_path(path);
 
     out_dir = NULL;
 
@@ -593,7 +607,7 @@ littlefs_opendir(const char *path, struct fs_dir **out_fs_dir)
     }
 
     littlefs_lock();
-    rc = lfs_dir_open(g_lfs, out_dir, path);
+    rc = lfs_dir_open(g_lfs, out_dir, filepath);
     littlefs_unlock();
     if (rc < 0) {
         rc = littlefs_to_vfs_error(rc);

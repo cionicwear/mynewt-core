@@ -46,6 +46,27 @@ syscfg.defs:
             Skip sysinit based initialization when enabled.
         value: 0
 
+    LITTLEFS_READ_SIZE:
+        description: >
+            Read buffer size
+        value:
+        restrictions:
+            - $notnull
+    
+    LITTLEFS_WRITE_SIZE:
+        description: >
+            Write buffer size
+        value:
+        restrictions:
+            - $notnull
+
+    LITTLEFS_CACHE_SIZE:
+        description: >
+            Cache buffer size
+        value:
+        restrictions:
+            - $notnull
+
     LITTLEFS_SYSINIT_STAGE:
         description: >
             Sysinit stage for littlefs functionality.
