@@ -22,3 +22,7 @@ syscfg.defs:
         description: >
             Sysinit stage for FATFS functionality.
         value: 200
+    FATFS_HANDLE_BLOCK:
+        description: >
+            If sets to 1, the glue won't translate memory block to address
+        value: 0
