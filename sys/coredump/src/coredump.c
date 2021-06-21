@@ -40,7 +40,7 @@ dump_core_tlv(const struct flash_area *fa, uint32_t *off,
     *off += tlv->ct_len;
 }
 
-void
+__attribute__((weak)) void
 coredump_dump(void *regs, int regs_sz)
 {
     struct coredump_header hdr;
