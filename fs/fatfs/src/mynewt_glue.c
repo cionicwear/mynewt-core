@@ -456,7 +456,9 @@ static int
 fatfs_mkfs(const char *disk, uint8_t format)
 {
     FRESULT res;
+    char *disk_p = (char *)disk;
     uint8_t work_buffer[512];
+    disk_p[strlen(disk)-1] = 0;
     res = f_mkfs(disk, FM_FAT32, 0,work_buffer, 512);
     return res;
 }
