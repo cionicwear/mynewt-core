@@ -50,7 +50,7 @@ struct coredump_header {
     uint32_t ch_size;                   /* Size of everything */
 };
 
-void coredump_dump(void *regs, int regs_sz);
+__attribute__((weak)) void coredump_dump(void *regs, int regs_sz);
 
 /*
  * Set this to non-zero to prevent coredump from taking place.
