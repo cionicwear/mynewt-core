@@ -49,6 +49,7 @@ static int littlefs_file_len(const struct fs_file *fs_file, uint32_t *out_len);
 static int littlefs_unlink(const char *path);
 static int littlefs_rename(const char *from, const char *to);
 static int littlefs_mkdir(const char *path);
+static int littlefs_mkfs(const char *disk, uint8_t format);
 static int littlefs_opendir(const char *path, struct fs_dir **out_fs_dir);
 static int littlefs_readdir(struct fs_dir *dir, struct fs_dirent **out_dirent);
 static int littlefs_closedir(struct fs_dir *dir);
@@ -88,6 +89,7 @@ static struct fs_ops littlefs_ops = {
     .f_unlink = littlefs_unlink,
     .f_rename = littlefs_rename,
     .f_mkdir = littlefs_mkdir,
+    .f_mkfs = littlefs_mkfs,
 
     .f_opendir = littlefs_opendir,
     .f_readdir = littlefs_readdir,
@@ -799,6 +801,13 @@ littlefs_reformat(void)
 
     return lfs_format(g_lfs, &g_lfs_cfg);
 }
+
+static int
+littlefs_mkfs(const char *disk, uint8_t format)
+{
+    return littlefs_reformat();
+}
+
 
 int
 littlefs_init(void)
