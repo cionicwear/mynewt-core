@@ -549,13 +549,18 @@ static int
 littlefs_rename(const char *from, const char *to)
 {
     int rc;
+    char *from_f = NULL;
+    char *to_f = NULL;
 
     if (!from || !to) {
         return FS_EINVAL;
     }
 
+    from_f = disk_filepath_from_path(from);
+    to_f = disk_filepath_from_path(to);
+
     littlefs_lock();
-    rc = lfs_rename(g_lfs, from, to);
+    rc = lfs_rename(g_lfs, from_f, to_f);
     littlefs_unlock();
 
     return littlefs_to_vfs_error(rc);
