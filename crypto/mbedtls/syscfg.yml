@@ -17,13 +17,19 @@
 #
 
 syscfg.defs:
-  # Enabled curves
+  # Eliptic curves
+  MBEDTLS_ECP_ALT:
+    description: 'Enable alternative EC point implementation'
+    value: 0
+  MBEDTLS_ECP_RESTARTABLE:
+    description: 'Enable EC non-blocking operation'
+    value: 0
   MBEDTLS_ECP_DP_SECP192R1:
     value: 0
   MBEDTLS_ECP_DP_SECP224R1:
-    value: 1
-  MBEDTLS_ECP_DP_SECP256R1:
     value: 0
+  MBEDTLS_ECP_DP_SECP256R1:
+    value: 1
   MBEDTLS_ECP_DP_SECP384R1:
     value: 0
   MBEDTLS_ECP_DP_SECP521R1:
@@ -42,6 +48,27 @@ syscfg.defs:
     value: 0
   MBEDTLS_ECP_DP_CURVE25519:
     value: 0
+  MBEDTLS_ECJPAKE_C:
+    value: 0
+
+  # ECDH
+  MBEDTLS_ECDH_GEN_PUBLIC_ALT:
+    description: 'ECDH alternative public key generation implementation'
+    value: 0
+  MBEDTLS_ECDH_COMPUTE_SHARED_ALT:
+    description: 'ECDH alternative shared secret generation implementation'
+    value: 0
+
+  # ECDSA
+  MBEDTLS_ECDSA_SIGN_ALT:
+    description: 'ECDSA alternative sign implementation'
+    value: 0
+  MBEDTLS_ECDSA_VERIFY_ALT:
+    description: 'ECDSA alternative verify implementation'
+    value: 0
+  MBEDTLS_ECDSA_GENKEY_ALT:
+    description: 'ECDSA alternative genkey implementation'
+    value: 0
 
   # Ciphers
   MBEDTLS_AES_ALT:
@@ -54,6 +81,8 @@ syscfg.defs:
   MBEDTLS_AES_FEWER_TABLES:
     value: 0
   MBEDTLS_ARC4_C:
+    value: 0
+  MBEDTLS_ARIA_C:
     value: 0
   MBEDTLS_BLOWFISH_C:
     value: 0
@@ -78,6 +107,8 @@ syscfg.defs:
     value: 0
 
   # MAC
+  MBEDTLS_CMAC_C:
+    value: 0
   MBEDTLS_POLY1305_C:
     value: 0
 
@@ -101,6 +132,10 @@ syscfg.defs:
     value: 0
   MBEDTLS_SHA256_C:
     value: 1
+  MBEDTLS_MD2_C:
+    value: 0
+  MBEDTLS_MD4_C:
+    value: 0
   MBEDTLS_MD5_C:
     value: 0
   MBEDTLS_SHA1_C:
@@ -152,4 +187,10 @@ syscfg.defs:
 
   # SSL/TLS support
   MBEDTLS_SSL_TLS_C:
+    value: 0
+
+  # MPI
+  MBEDTLS_MPI_MAX_SIZE:
+    value: 1024
+  MBEDTLS_BIGNUM_ALT:
     value: 0

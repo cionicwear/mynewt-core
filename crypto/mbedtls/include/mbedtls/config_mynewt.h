@@ -46,10 +46,18 @@ extern "C" {
 #undef MBEDTLS_SELF_TEST
 #endif
 
-#define MBEDTLS_SHA256_SMALLER       /* comes with performance hit */
-#define MBEDTLS_ENTROPY_HARDWARE_ALT /* hardware entropy source */
-#define MBEDTLS_NIST_KW_C            /* encrypted images with AES-KW */
-#define MBEDTLS_AES_ALT              /* enable HW based AES */
+#define MBEDTLS_SHA256_SMALLER          /* Comes with performance hit */
+#define MBEDTLS_ENTROPY_HARDWARE_ALT    /* Hardware entropy source */
+#define MBEDTLS_NIST_KW_C               /* Encrypted images with AES-KW */
+#define MBEDTLS_AES_ALT                 /* Enable HW based AES */
+#define MBEDTLS_ECP_ALT                 /* Enable for high-level EC HW accel */
+#define MBEDTLS_ECP_RESTARTABLE         /* Non-blocking EC operations */
+#define MBEDTLS_ECDH_GEN_PUBLIC_ALT     /* Enable ECDH public alternative */
+#define MBEDTLS_ECDH_COMPUTE_SHARED_ALT /* Enable ECDH shared alternative */
+#define MBEDTLS_ECDSA_SIGN_ALT          /* Enable alternative sign() */
+#define MBEDTLS_ECDSA_VERIFY_ALT        /* Enable alternative verify() */
+#define MBEDTLS_ECDSA_GENKEY_ALT        /* Enable alternative genkey() */
+#define MBEDTLS_BIGNUM_ALT              /* Enable alternative MPI implementation */
 
 /**
  * \name SECTION: Module configuration options
@@ -145,7 +153,31 @@ extern "C" {
 /* \} name SECTION: Module configuration options */
 
 
-/* enable support for configured curves only */
+#if MYNEWT_VAL(MBEDTLS_ECP_ALT) == 0
+#undef MBEDTLS_ECP_ALT
+#endif
+#if MYNEWT_VAL(MBEDTLS_ECP_RESTARTABLE) == 0
+#undef MBEDTLS_ECP_RESTARTABLE
+#endif
+
+#if MYNEWT_VAL(MBEDTLS_ECDH_GEN_PUBLIC_ALT) == 0
+#undef MBEDTLS_ECDH_GEN_PUBLIC_ALT
+#endif
+#if MYNEWT_VAL(MBEDTLS_ECDH_COMPUTE_SHARED_ALT) == 0
+#undef MBEDTLS_ECDH_COMPUTE_SHARED_ALT
+#endif
+
+#if MYNEWT_VAL(MBEDTLS_ECDSA_SIGN_ALT) == 0
+#undef MBEDTLS_ECDSA_SIGN_ALT
+#endif
+#if MYNEWT_VAL(MBEDTLS_ECDSA_VERIFY_ALT) == 0
+#undef MBEDTLS_ECDSA_VERIFY_ALT
+#endif
+#if MYNEWT_VAL(MBEDTLS_ECDSA_GENKEY_ALT) == 0
+#undef MBEDTLS_ECDSA_GENKEY_ALT
+#endif
+
+/* Enable support for configured curves only */
 #if MYNEWT_VAL(MBEDTLS_ECP_DP_SECP192R1) == 0
 #undef MBEDTLS_ECP_DP_SECP192R1_ENABLED
 #endif
@@ -183,6 +215,10 @@ extern "C" {
 #undef MBEDTLS_ECP_DP_CURVE25519_ENABLED
 #endif
 
+#if MYNEWT_VAL(MBEDTLS_ECJPAKE_C) == 0
+#undef MBEDTLS_ECJPAKE_C
+#endif
+
 #if MYNEWT_VAL(MBEDTLS_AES_ALT) == 0
 #undef MBEDTLS_AES_ALT
 #endif
@@ -201,6 +237,9 @@ extern "C" {
 #endif
 #if MYNEWT_VAL(MBEDTLS_ARC4_C) == 0
 #undef MBEDTLS_ARC4_C
+#endif
+#if MYNEWT_VAL(MBEDTLS_ARIA_C) == 0
+#undef MBEDTLS_ARIA_C
 #endif
 #if MYNEWT_VAL(MBEDTLS_BLOWFISH_C) == 0
 #undef MBEDTLS_BLOWFISH_C
@@ -225,6 +264,10 @@ extern "C" {
 
 #if MYNEWT_VAL(MBEDTLS_POLY1305_C) == 0
 #undef MBEDTLS_POLY1305_C
+#endif
+
+#if MYNEWT_VAL(MBEDTLS_CMAC_C) == 0
+#undef MBEDTLS_CMAC_C
 #endif
 
 #if MYNEWT_VAL(MBEDTLS_CIPHER_MODE_CBC) == 0
@@ -257,6 +300,12 @@ extern "C" {
 #endif
 #if MYNEWT_VAL(MBEDTLS_SHA256_C) == 0
 #undef MBEDTLS_SHA256_C
+#endif
+#if MYNEWT_VAL(MBEDTLS_MD2_C) == 0
+#undef MBEDTLS_MD2_C
+#endif
+#if MYNEWT_VAL(MBEDTLS_MD4_C) == 0
+#undef MBEDTLS_MD4_C
 #endif
 #if MYNEWT_VAL(MBEDTLS_MD5_C) == 0
 #undef MBEDTLS_MD5_C
@@ -327,6 +376,16 @@ extern "C" {
 #undef MBEDTLS_SSL_SRV_C
 #undef MBEDTLS_SSL_DTLS_ANTI_REPLAY
 #undef MBEDTLS_SSL_DTLS_BADMAC_LIMIT
+#endif
+
+#if MYNEWT_VAL(MBEDTLS_MPI_MAX_SIZE) == 0
+#define MBEDTLS_MPI_MAX_SIZE 1024
+#else
+#define MBEDTLS_MPI_MAX_SIZE MYNEWT_VAL(MBEDTLS_MPI_MAX_SIZE)
+#endif
+
+#if MYNEWT_VAL(MBEDTLS_BIGNUM_ALT) == 0
+#undef MBEDTLS_BIGNUM_ALT
 #endif
 
 #ifdef __cplusplus

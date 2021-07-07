@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 /* DMA peripheral can be one of following values */
-#define MCI_DMA_PERIPH_SPI              (0)
+#define MCU_DMA_PERIPH_SPI              (0)
 #define MCU_DMA_PERIPH_SPI2             (1)
 #define MCU_DMA_PERIPH_UART             (2)
 #define MCU_DMA_PERIPH_UART2            (3)
@@ -132,6 +132,34 @@ int da1469x_dma_release_channel(struct da1469x_dma_regs *chan);
 int da1469x_dma_configure(struct da1469x_dma_regs *chan,
                            const struct da1469x_dma_config *cfg,
                            da1469x_dma_interrupt_cb isr_cb, void *isr_arg);
+
+/**
+ * Start writing to peripheral with DMA
+ * Destination register with peripheral address should be setup before calling
+ * this function.
+ * It setup source address, the length of the transfer and starts DMA.
+ *
+ * @param chan - DMA registers from da1469x_dma_acquire_periph
+ * @param mem  - memory data pointer
+ * @param size - number of transfers
+ *
+ * @return 0 on success, negative value on failure
+ */
+int da1469x_dma_write_peripheral(struct da1469x_dma_regs *chan, const void *mem, uint16_t size);
+
+/**
+ * Start reading from peripheral with DMA
+ * Source register with peripheral address should be setup before calling
+ * this function.
+ * It setups destination address, the length of the transfer and starts DMA.
+ *
+ * @param chan - DMA registers from da1469x_dma_acquire_periph
+ * @param mem  - memory data pointer
+ * @param size - number of transfers
+ *
+ * @return 0 on success, negative value on failure
+ */
+int da1469x_dma_read_peripheral(struct da1469x_dma_regs *chan, void *mem, uint16_t size);
 
 #ifdef __cplusplus
 }

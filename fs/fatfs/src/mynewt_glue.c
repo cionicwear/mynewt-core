@@ -456,7 +456,9 @@ static int
 fatfs_mkfs(const char *disk, uint8_t format)
 {
     FRESULT res;
+    char *disk_p = (char *)disk;
     uint8_t work_buffer[512];
+    disk_p[strlen(disk)-1] = 0;
     res = f_mkfs(disk, FM_FAT32, 0,work_buffer, 512);
     return res;
 }
@@ -591,20 +593,21 @@ DRESULT
 disk_read(BYTE pdrv, BYTE* buff, DWORD sector, UINT count)
 {
     int rc;
-    uint32_t address;
     uint32_t num_bytes;
     struct disk_ops *dops;
 
-    /* NOTE: safe to assume sector size as 512 for now, see ffconf.h */
-    address = (uint32_t) sector * 512;
     num_bytes = (uint32_t) count * 512;
+#if !MYNEWT_VAL(FATFS_HANDLE_BLOCK)
+    /* NOTE: safe to assume sector size as 512 for now, see ffconf.h */
+    sector = (uint32_t) sector * 512;
+#endif
 
     dops = dops_from_handle(pdrv);
     if (dops == NULL) {
         return STA_NOINIT;
     }
 
-    rc = dops->read(pdrv, address, (void *) buff, num_bytes);
+    rc = dops->read(pdrv, sector, (void *) buff, num_bytes);
     if (rc < 0) {
         return STA_NOINIT;
     }
@@ -616,12 +619,14 @@ DRESULT
 disk_write(BYTE pdrv, const BYTE* buff, DWORD sector, UINT count)
 {
     int rc;
-    uint32_t address;
     uint32_t num_bytes;
     struct disk_ops *dops;
 
+#if !MYNEWT_VAL(FATFS_HANDLE_BLOCK)
     /* NOTE: safe to assume sector size as 512 for now, see ffconf.h */
-    address = (uint32_t) sector * 512;
+    sector = (uint32_t) sector * 512;
+#endif
+
     num_bytes = (uint32_t) count * 512;
 
     dops = dops_from_handle(pdrv);
@@ -629,7 +634,7 @@ disk_write(BYTE pdrv, const BYTE* buff, DWORD sector, UINT count)
         return STA_NOINIT;
     }
 
-    rc = dops->write(pdrv, address, (const void *) buff, num_bytes);
+    rc = dops->write(pdrv, sector, (const void *) buff, num_bytes);
     if (rc < 0) {
         return STA_NOINIT;
     }

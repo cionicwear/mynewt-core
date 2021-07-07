@@ -238,6 +238,10 @@ bus_dev_init_func(struct os_dev *odev, void *arg)
     /* XXX allow custom eventq */
     os_callout_init(&bdev->inactivity_tmo, os_eventq_dflt_get(),
                     bus_dev_inactivity_tmo_func, odev);
+    bdev->pm_mode = MYNEWT_VAL_CHOICE(BUS_PM_MODE, AUTO) ? BUS_PM_MODE_AUTO : BUS_PM_MODE_MANUAL;
+    if (MYNEWT_VAL_CHOICE(BUS_PM_MODE, AUTO)) {
+        bdev->pm_opts.pm_mode_auto.disable_tmo = MYNEWT_VAL(BUS_PM_INACTIVITY_TMO);
+    }
 #endif
 
 #if MYNEWT_VAL(BUS_STATS)
@@ -252,7 +256,9 @@ bus_dev_init_func(struct os_dev *odev, void *arg)
     odev->od_handlers.od_suspend = bus_dev_suspend_func;
     odev->od_handlers.od_resume = bus_dev_resume_func;
 
-    bus_dev_enable(bdev);
+    if (!MYNEWT_VAL(BUS_PM) || MYNEWT_VAL_CHOICE(BUS_PM_MODE, MANUAL)) {
+        bus_dev_enable(bdev);
+    }
 
     return 0;
 }
@@ -512,7 +518,7 @@ bus_node_unlock(struct os_dev *node)
     /* In auto PM we should disable bus device on last unlock */
     if ((bdev->pm_mode == BUS_PM_MODE_AUTO) &&
         (os_mutex_get_level(&bdev->lock) == 1)) {
-        if (bdev->pm_opts.pm_mode_auto.disable_tmo) {
+        if (bdev->pm_opts.pm_mode_auto.disable_tmo == 0) {
             bus_dev_disable(bdev);
         } else {
             os_callout_reset(&bdev->inactivity_tmo,

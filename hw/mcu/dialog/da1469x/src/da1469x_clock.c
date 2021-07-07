@@ -27,7 +27,16 @@
 #include "mcu/da1469x_pdc.h"
 #include "mcu/da1469x_clock.h"
 
+#define XTAL32M_FREQ    32000000
+#define RC32M_FREQ      32000000
+#define PLL_FREQ        96000000
+#define XTAL32K_FREQ       32768
+
 static uint32_t g_mcu_clock_rcx_freq;
+static uint32_t g_mcu_clock_rc32k_freq;
+static uint32_t g_mcu_clock_rc32m_freq;
+
+uint32_t SystemCoreClock = RC32M_FREQ;
 
 static inline bool
 da1469x_clock_is_xtal32m_settled(void)
@@ -42,12 +51,15 @@ da1469x_clock_sys_xtal32m_init(void)
     uint32_t reg;
     int xtalrdy_cnt;
 
-    /* Number of lp_clk cycles (~30.5us) */
-    xtalrdy_cnt = MYNEWT_VAL(MCU_CLOCK_XTAL32M_SETTLE_TIME_US) * 10 / 305;
+    /*
+     * Number of 256kHz clock cycles (~4.085us) assuming worst case when actual frequency is 244800.
+     * RC32M is in range <30.6, 32.6> so 256Khz can ba as low as 30.6MHz / 125 = 244.8kHz.
+     */
+    xtalrdy_cnt = MYNEWT_VAL(MCU_CLOCK_XTAL32M_SETTLE_TIME_US) * 1000 / 4085;
 
     reg = CRG_XTAL->XTALRDY_CTRL_REG;
-    reg &= ~(CRG_XTAL_XTALRDY_CTRL_REG_XTALRDY_CLK_SEL_Msk |
-             CRG_XTAL_XTALRDY_CTRL_REG_XTALRDY_CNT_Msk);
+    reg &= ~(CRG_XTAL_XTALRDY_CTRL_REG_XTALRDY_CNT_Msk);
+    reg |= CRG_XTAL_XTALRDY_CTRL_REG_XTALRDY_CLK_SEL_Msk;
     reg |= xtalrdy_cnt;
     CRG_XTAL->XTALRDY_CTRL_REG = reg;
 }
@@ -79,6 +91,8 @@ da1469x_clock_sys_xtal32m_switch(void)
     }
 
     while (!(CRG_TOP->CLK_CTRL_REG & CRG_TOP_CLK_CTRL_REG_RUNNING_AT_XTAL32M_Msk));
+
+    SystemCoreClock = XTAL32M_FREQ;
 }
 
 void
@@ -127,6 +141,10 @@ da1469x_clock_lp_xtal32k_switch(void)
     CRG_TOP->CLK_CTRL_REG = (CRG_TOP->CLK_CTRL_REG &
                              ~CRG_TOP_CLK_CTRL_REG_LP_CLK_SEL_Msk) |
                             (2 << CRG_TOP_CLK_CTRL_REG_LP_CLK_SEL_Pos);
+    /* If system is running on LP clock update SystemCoreClock */
+    if (CRG_TOP->CLK_CTRL_REG & CRG_TOP_CLK_CTRL_REG_RUNNING_AT_LP_CLK_Msk) {
+        SystemCoreClock = XTAL32K_FREQ;
+    }
 }
 
 void
@@ -141,17 +159,28 @@ da1469x_clock_lp_rcx_switch(void)
     CRG_TOP->CLK_CTRL_REG = (CRG_TOP->CLK_CTRL_REG &
                              ~CRG_TOP_CLK_CTRL_REG_LP_CLK_SEL_Msk) |
                             (1 << CRG_TOP_CLK_CTRL_REG_LP_CLK_SEL_Pos);
+
+    /* If system is running on LP clock update SystemCoreClock */
+    if (CRG_TOP->CLK_CTRL_REG & CRG_TOP_CLK_CTRL_REG_RUNNING_AT_LP_CLK_Msk) {
+        SystemCoreClock = g_mcu_clock_rcx_freq;
+    }
 }
 
-void
-da1469x_clock_lp_rcx_calibrate(void)
+/**
+ * Measure clock frequency
+ *
+ * @param clock_sel - clock to measure
+ *                  0 - RC32K
+ *                  1 - RC32M
+ *                  2 - XTAL32K
+ *                  3 - RCX
+ *                  4 - RCOSC
+ * @param ref_cnt - number of cycles used for measurement.
+ * @return  clock frequency
+ */
+static uint32_t
+da1469x_clock_calibrate(uint8_t clock_sel, uint16_t ref_cnt)
 {
-    /*
-     * XXX not sure what is a good value here, this is just some value that
-     *     seems to work fine; we need to check how accurate this is and perhaps
-     *     also make it configurable if necessary
-     */
-    const uint32_t ref_cnt = 100;
     uint32_t ref_val;
 
     da1469x_pd_acquire(MCU_PD_DOMAIN_PER);
@@ -160,7 +189,7 @@ da1469x_clock_lp_rcx_calibrate(void)
     assert(!(ANAMISC->CLK_REF_SEL_REG & ANAMISC_CLK_REF_SEL_REG_REF_CAL_START_Msk));
 
     ANAMISC->CLK_REF_CNT_REG = ref_cnt;
-    ANAMISC->CLK_REF_SEL_REG = (3 << ANAMISC_CLK_REF_SEL_REG_REF_CLK_SEL_Pos) |
+    ANAMISC->CLK_REF_SEL_REG = (clock_sel << ANAMISC_CLK_REF_SEL_REG_REF_CLK_SEL_Pos) |
                                ANAMISC_CLK_REF_SEL_REG_REF_CAL_START_Msk;
 
     while (ANAMISC->CLK_REF_SEL_REG & ANAMISC_CLK_REF_SEL_REG_REF_CAL_START_Msk);
@@ -169,7 +198,26 @@ da1469x_clock_lp_rcx_calibrate(void)
 
     da1469x_pd_release(MCU_PD_DOMAIN_PER);
 
-    g_mcu_clock_rcx_freq = 32000000 * ref_cnt / ref_val;
+    return 32000000 * ref_cnt / ref_val;
+}
+
+void
+da1469x_clock_lp_rcx_calibrate(void)
+{
+    g_mcu_clock_rcx_freq =
+        da1469x_clock_calibrate(3, MYNEWT_VAL(MCU_CLOCK_RCX_CAL_REF_CNT));
+}
+
+void
+da1469x_clock_lp_rc32k_calibrate(void)
+{
+    g_mcu_clock_rc32k_freq = da1469x_clock_calibrate(0, 100);
+}
+
+void
+da1469x_clock_lp_rc32m_calibrate(void)
+{
+    g_mcu_clock_rc32m_freq = da1469x_clock_calibrate(1, 100);
 }
 
 uint32_t
@@ -178,6 +226,22 @@ da1469x_clock_lp_rcx_freq_get(void)
     assert(g_mcu_clock_rcx_freq);
 
     return g_mcu_clock_rcx_freq;
+}
+
+uint32_t
+da1469x_clock_lp_rc32k_freq_get(void)
+{
+    assert(g_mcu_clock_rc32k_freq);
+
+    return g_mcu_clock_rc32k_freq;
+}
+
+uint32_t
+da1469x_clock_lp_rc32m_freq_get(void)
+{
+    assert(g_mcu_clock_rc32m_freq);
+
+    return g_mcu_clock_rc32m_freq;
 }
 
 void
@@ -245,6 +309,8 @@ da1469x_clock_pll_disable(void)
 {
     while (CRG_TOP->CLK_CTRL_REG & CRG_TOP_CLK_CTRL_REG_RUNNING_AT_PLL96M_Msk) {
         CRG_TOP->CLK_SWITCH2XTAL_REG = CRG_TOP_CLK_SWITCH2XTAL_REG_SWITCH2XTAL_Msk;
+
+        SystemCoreClock = XTAL32M_FREQ;
     }
 
     CRG_XTAL->PLL_SYS_CTRL1_REG &= ~(CRG_XTAL_PLL_SYS_CTRL1_REG_PLL_EN_Msk |
@@ -278,4 +344,6 @@ da1469x_clock_sys_pll_switch(void)
     CRG_TOP->CLK_CTRL_REG |= CRG_TOP_CLK_CTRL_REG_SYS_CLK_SEL_Msk;
 
     while (!(CRG_TOP->CLK_CTRL_REG & CRG_TOP_CLK_CTRL_REG_RUNNING_AT_PLL96M_Msk));
+
+    SystemCoreClock = PLL_FREQ;
 }

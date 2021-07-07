@@ -27,12 +27,25 @@
 extern "C" {
 #endif
 
-#define OS_TICKS_PER_SEC    (128)
-
 static inline void
 hal_debug_break(void)
 {
     __BKPT(1);
+}
+
+static inline void
+mcu_mtb_enable(void)
+{
+    *(uint32_t *)0xe0043004 |= (1 << 31);
+    __DSB();
+    __ISB();
+}
+
+static inline void
+mcu_mtb_disable(void)
+{
+    __ISB();
+    *(uint32_t *)0xe0043004 &= ~(1 << 31);
 }
 
 #ifdef __cplusplus

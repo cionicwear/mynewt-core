@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include "os/os_trace_api.h"
 #include "mcu/da1469x_dma.h"
+#include "mcu/da1469x_pd.h"
 #include "mcu/cmsis_nvic.h"
 #include "defs/error.h"
 
@@ -30,15 +31,21 @@
 #define MCU_DMA_CHAN_MAX            (8)
 #endif
 
-#define MCU_DMA_SET_MUX(_cidx, _periph)             \
-    do {                                            \
-        DMA->DMA_REQ_MUX_REG =                      \
-            (DMA->DMA_REQ_MUX_REG &                 \
-             ~(0xf << ((_cidx) * 2))) |             \
-            ((_periph) << ((_cidx) * 2));           \
-    } while (0)
-#define MCU_DMA_GET_MUX(_cidx)                      \
-    (DMA->DMA_REQ_MUX_REG >> ((_cidx) * 4) & 0xf)
+#define DA1469X_DMA_MUX_SHIFT(_cidx) (((_cidx) >> 1) * 4)
+
+/*
+ * Mux Bits 0:3, 4:7, 8:11, 12:15 correspond to selection in
+ * channels 0,1  2,3, 4,5 & 6,7. Use the shift macro above to
+ * determine the mask.
+ */
+#define MCU_DMA_GET_MUX(_cidx)                                                       \
+    ((DMA->DMA_REQ_MUX_REG >> DA1469X_DMA_MUX_SHIFT(_cidx)) & 0xf)
+
+#define MCU_DMA_SET_MUX(_cidx, _periph)                                              \
+    DMA->DMA_REQ_MUX_REG =                                                           \
+        ((DMA->DMA_REQ_MUX_REG & ~(0xf << DA1469X_DMA_MUX_SHIFT(_cidx)))             \
+         | ((_periph) & 0xf) << DA1469X_DMA_MUX_SHIFT(_cidx));                       \
+
 
 struct da1469x_dma_interrupt_cfg {
     da1469x_dma_interrupt_cb cb;
@@ -116,27 +123,40 @@ da1469x_dma_init(void)
 struct da1469x_dma_regs *
 da1469x_dma_acquire_single(int cidx)
 {
-    struct da1469x_dma_regs *chan;
+    struct da1469x_dma_regs *chan = NULL;
+    int sr;
 
     assert(cidx < MCU_DMA_CHAN_MAX);
 
+    OS_ENTER_CRITICAL(sr);
     if (cidx < 0) {
         cidx = find_free_single();
         if (cidx < 0) {
-            return NULL;
+            goto end_single;
         }
     } else if (g_da1469x_dma_acquired & (1 << cidx)) {
-        return NULL;
+        goto end_single;
+    }
+
+    if (!g_da1469x_dma_acquired) {
+        da1469x_pd_acquire(MCU_PD_DOMAIN_SYS);
     }
 
     g_da1469x_dma_acquired |= 1 << cidx;
 
     chan = MCU_DMA_CIDX2CHAN(cidx);
 
-    MCU_DMA_SET_MUX(cidx, MCU_DMA_PERIPH_NONE);
+    /*
+     * DMA_REQ_MUX_REG applies only to channels < 8
+     */
+    if (cidx < 8) {
+        MCU_DMA_SET_MUX(cidx, MCU_DMA_PERIPH_NONE);
+    }
 
     chan->DMA_CTRL_REG &= ~DMA_DMA0_CTRL_REG_DREQ_MODE_Msk;
 
+end_single:
+    OS_EXIT_CRITICAL(sr);
     return chan;
 }
 
@@ -144,7 +164,7 @@ int
 da1469x_dma_acquire_periph(int cidx, uint8_t periph,
                            struct da1469x_dma_regs *chans[2])
 {
-    assert(cidx < MCU_DMA_CHAN_MAX);
+    assert(cidx < MCU_DMA_CHAN_MAX && periph < MCU_DMA_PERIPH_NONE);
 
     if (cidx < 0) {
         cidx = find_free_pair();
@@ -156,6 +176,10 @@ da1469x_dma_acquire_periph(int cidx, uint8_t periph,
         if (g_da1469x_dma_acquired & (3 << cidx)) {
             return SYS_EBUSY;
         }
+    }
+
+    if (!g_da1469x_dma_acquired) {
+        da1469x_pd_acquire(MCU_PD_DOMAIN_SYS);
     }
 
     g_da1469x_dma_acquired |= 3 << cidx;
@@ -175,14 +199,18 @@ int
 da1469x_dma_release_channel(struct da1469x_dma_regs *chan)
 {
     int cidx = MCU_DMA_CHAN2CIDX(chan);
+    int sr;
 
     assert(cidx >= 0 && cidx < MCU_DMA_CHAN_MAX);
 
+    OS_ENTER_CRITICAL(sr);
     /*
      * If corresponding pair for this channel is configured for triggering from
      * peripheral, we'll use lower of channel index.
+     *
+     * Only channels 0-7 can use pairs for peripherals.
      */
-    if (MCU_DMA_GET_MUX(cidx) != MCU_DMA_PERIPH_NONE) {
+    if (cidx < 8 && MCU_DMA_GET_MUX(cidx) < MCU_DMA_PERIPH_NONE) {
         cidx &= 0xfe;
         chan = MCU_DMA_CIDX2CHAN(cidx);
 
@@ -201,7 +229,6 @@ da1469x_dma_release_channel(struct da1469x_dma_regs *chan)
     } else {
         chan->DMA_CTRL_REG &= ~DMA_DMA0_CTRL_REG_DMA_ON_Msk;
         g_da1469x_dma_acquired &= ~(1 << cidx);
-
         g_da1469x_dma_isr_set &= ~(1 << cidx);
         DMA->DMA_CLEAR_INT_REG = 1 << cidx;
         memset(&g_da1469x_dma_isr_cfg[cidx], 0,
@@ -213,6 +240,11 @@ da1469x_dma_release_channel(struct da1469x_dma_regs *chan)
         NVIC_DisableIRQ(DMA_IRQn);
     }
 
+    if (!g_da1469x_dma_acquired) {
+        da1469x_pd_release(MCU_PD_DOMAIN_SYS);
+    }
+
+    OS_EXIT_CRITICAL(sr);
     return 0;
 }
 
@@ -254,4 +286,32 @@ da1469x_dma_configure(struct da1469x_dma_regs *chan,
     }
 
     return 0;
+}
+
+int
+da1469x_dma_write_peripheral(struct da1469x_dma_regs *chan, const void *mem, uint16_t size)
+{
+    if (chan == NULL || mem == NULL || size == 0 || chan->DMA_B_START_REG == 0) {
+        return SYS_EINVAL;
+    }
+    chan->DMA_A_START_REG = (uint32_t)mem;
+    chan->DMA_INT_REG = size - 1;
+    chan->DMA_LEN_REG = size - 1;
+    chan->DMA_CTRL_REG |= DMA_DMA0_CTRL_REG_DMA_ON_Msk;
+
+    return SYS_EOK;
+}
+
+int
+da1469x_dma_read_peripheral(struct da1469x_dma_regs *chan, void *mem, uint16_t size)
+{
+    if (chan == NULL || mem == NULL || size == 0 || chan->DMA_A_START_REG == 0) {
+        return SYS_EINVAL;
+    }
+    chan->DMA_B_START_REG = (uint32_t)mem;
+    chan->DMA_INT_REG = size - 1;
+    chan->DMA_LEN_REG = size - 1;
+    chan->DMA_CTRL_REG |= DMA_DMA0_CTRL_REG_DMA_ON_Msk;
+
+    return SYS_EOK;
 }

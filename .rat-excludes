@@ -133,6 +133,7 @@ boot-nrf91xxaa.ld
 nordic_pca10090_no_boot.ld
 nrf91xxaa.ld
 nrf91_ram_resident.ld
+boot-pinetime.ld
 
 # STM32 HAL - BSD License
 stm32_driver_mod_i2c_v1.c
@@ -286,10 +287,20 @@ STM32F4xx_HAL_Driver
 stm32f4xx
 
 # NXP SDK - BSD License.
-sdk-2.0-frdm-k64f_b160321
+nxp-kinetis-sdk
+fsl_clock.c
 MK64FN1M0xxx12_flash.ld
 boot-MK64FN1M0xxx12_flash.ld
 startup_MK64F12.S
+MK82FN256xxx15_flash.ld
+boot-MK82FN256xxx15_flash.ld
+startup_MK82F25615.S
+MK82F25615.h
+MK82F25615_features.h
+system_MK82F25615.h
+system_MK82F25615.c
+fsl_clock.h
+fsl_ftfx_controller.c
 
 # LWIP - BSD License.
 lwip_base
@@ -509,6 +520,9 @@ reel_board
 dialog_da1469x-dk-pro
 da1469x
 DA1469xAB.h
+cmac.ld
+CMAC.h
+system_CMAC.h
 
 # Bosch BMP388 driver - BSD License
 bmp388
@@ -518,3 +532,21 @@ system_nrf5340.c
 gcc_startup_nrf5340.s
 system_nrf5340_net.c
 gcc_startup_nrf5340_net.s
+
+# LittleFS - BSD License
+lfs.c
+lfs_util.c
+lfs.h
+lfs_util.h
+DESIGN.md
+SPEC.md
+
+# OSDP library - APL2 license
+osdp
+
+# nucleo-l073rz BSP - BSD License
+stm32l0xx_hal_conf.h
+startup_stm32l073xx.s
+
+# MK64F12 SDK - BSD License
+MK64F12

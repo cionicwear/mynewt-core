@@ -25,6 +25,19 @@ syscfg.defs:
         description: 'Number of flash sectors for a non-linear STM32 MCU.'
         value: 8
 
+    STM32_ETH_PHY_TYPE:
+        description: >
+            PHY type that can be found in enum in file stm32_eth_cfg.h.
+        value: SMSC_8710_RMII
+    STM32_ETH_PHY_ADDR:
+        description: >
+            PHY address.
+        value: 0
+    STM32_ETH_PHY_IRQ:
+        description: >
+            RMII interrupt pin.
+        value: -1
+
 syscfg.vals:
     REBOOT_LOG_FLASH_AREA: FLASH_AREA_REBOOT_LOG
     CONFIG_FCB_FLASH_AREA: FLASH_AREA_NFFS
@@ -57,7 +70,7 @@ syscfg.vals:
     SPIFLASH_MEMORY_TYPE: 0x40
     SPIFLASH_MEMORY_CAPACITY: 0x15
     SPIFLASH_SECTOR_COUNT: 512
-    SPIFLASH_SECTOR_SIZE: 4094
+    SPIFLASH_SECTOR_SIZE: 4096
     SPIFLASH_PAGE_SIZE: 256
 
     SPIFLASH_TBP1_TYPICAL: 20

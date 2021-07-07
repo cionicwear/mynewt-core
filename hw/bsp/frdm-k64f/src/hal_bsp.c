@@ -30,18 +30,18 @@
 #include "hal/hal_flash.h"
 #if MYNEWT_VAL(TRNG)
 #include "trng/trng.h"
-#include "trng_k64f/trng_k64f.h"
+#include "trng_kinetis/trng_kinetis.h"
 #endif
 #if MYNEWT_VAL(CRYPTO)
 #include "crypto/crypto.h"
-#include "crypto_k64f/crypto_k64f.h"
+#include "crypto_kinetis/crypto_kinetis.h"
 #endif
 #if MYNEWT_VAL(ENC_FLASH_DEV)
 #include <ef_crypto/ef_crypto.h>
 #endif
 #if MYNEWT_VAL(HASH)
 #include "hash/hash.h"
-#include "hash_k64f/hash_k64f.h"
+#include "hash_kinetis/hash_kinetis.h"
 #endif
 #if MYNEWT_VAL(UART_0) || MYNEWT_VAL(UART_1) || MYNEWT_VAL(UART_2) || \
     MYNEWT_VAL(UART_3) || MYNEWT_VAL(UART_4) || MYNEWT_VAL(UART_5)
@@ -98,10 +98,11 @@ static const struct hal_bsp_mem_dump dump_cfg[] = {
     }
 };
 
-static void init_hardware(void)
+static void
+init_hardware(void)
 {
     /* Disable the MPU otherwise USB cannot access the bus */
-    MPU->CESR = 0;
+    SYSMPU->CESR = 0;
 
     /* Enable all the ports */
     SIM->SCGC5 |= (SIM_SCGC5_PORTA_MASK | SIM_SCGC5_PORTB_MASK | SIM_SCGC5_PORTC_MASK | SIM_SCGC5_PORTD_MASK |
@@ -116,7 +117,7 @@ static struct eflash_crypto_dev enc_flash_dev0 = {
         .efd_hal = {
             .hf_itf = &enc_flash_funcs,
         },
-        .efd_hwdev = &mk64f12_flash_dev,
+        .efd_hwdev = &kinetis_flash_dev,
     }
 };
 #endif
@@ -125,7 +126,7 @@ const struct hal_flash *
 hal_bsp_flash_dev(uint8_t id)
 {
     if (id == 0) {
-        return &mk64f12_flash_dev;
+        return &kinetis_flash_dev;
     }
 #if MYNEWT_VAL(ENC_FLASH_DEV)
     if (id == 1) {
@@ -209,20 +210,20 @@ hal_bsp_init(void)
 #if MYNEWT_VAL(TRNG)
     rc = os_dev_create(&os_bsp_trng.dev, "trng",
                        OS_DEV_INIT_KERNEL, OS_DEV_INIT_PRIO_DEFAULT,
-                       k64f_trng_dev_init, NULL);
+                       kinetis_trng_dev_init, NULL);
     assert(rc == 0);
 #endif
 
 #if MYNEWT_VAL(CRYPTO)
     rc = os_dev_create(&os_bsp_crypto.dev, "crypto",
                        OS_DEV_INIT_KERNEL, OS_DEV_INIT_PRIO_DEFAULT,
-                       k64f_crypto_dev_init, NULL);
+                       kinetis_crypto_dev_init, NULL);
     assert(rc == 0);
 #endif
 
 #if MYNEWT_VAL(HASH)
     rc = os_dev_create(&os_bsp_hash.dev, "hash", OS_DEV_INIT_KERNEL,
-                       OS_DEV_INIT_PRIO_DEFAULT, k64f_hash_dev_init, NULL);
+                       OS_DEV_INIT_PRIO_DEFAULT, kinetis_hash_dev_init, NULL);
     assert(rc == 0);
 #endif
 
@@ -256,4 +257,9 @@ hal_bsp_init(void)
       OS_DEV_INIT_PRIMARY, 0, uart_hal_init, NULL);
     assert(rc == 0);
 #endif
+}
+
+void
+hal_bsp_deinit(void)
+{
 }

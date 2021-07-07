@@ -26,7 +26,7 @@ pkg.keywords:
 
 pkg.cflags:
     - -DDEBUG
-    - -fno-builtin -fno-common -ffreestanding
+    - -fno-builtin -fno-common
     - -DCPU_MK64FN1M0VMD12
     - -DPRINTF_FLOAT_ENABLE=0
     - -DSCANF_FLOAT_ENABLE=0
@@ -42,7 +42,7 @@ pkg.cflags.HARDFLOAT:
     - -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 pkg.deps:
-    - "@apache-mynewt-core/hw/mcu/nxp/MK64F12"
+    - "@apache-mynewt-core/hw/mcu/nxp/kinetis/MK64F12"
     - "@apache-mynewt-core/libc/baselibc"
 
 pkg.deps.UART_0:
@@ -64,13 +64,13 @@ pkg.deps.UART_5:
     - "@apache-mynewt-core/hw/drivers/uart/uart_hal"
 
 pkg.deps.TRNG:
-    - "@apache-mynewt-core/hw/drivers/trng/trng_k64f"
+    - "@apache-mynewt-core/hw/drivers/trng/trng_kinetis"
 
 pkg.deps.CRYPTO:
-    - "@apache-mynewt-core/hw/drivers/crypto/crypto_k64f"
+    - "@apache-mynewt-core/hw/drivers/crypto/crypto_kinetis"
 
 pkg.deps.ENC_FLASH_DEV:
     - "@apache-mynewt-core/hw/drivers/flash/enc_flash/ef_crypto"
 
 pkg.deps.HASH:
-    - "@apache-mynewt-core/hw/drivers/hash/hash_k64f"
+    - "@apache-mynewt-core/hw/drivers/hash/hash_kinetis"

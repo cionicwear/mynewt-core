@@ -22,12 +22,14 @@ syscfg.defs:
         value: 0
         restrictions:
             - '!CONFIG_NFFS'
+            - '!CONFIG_LITTLEFS'
             - '!CONFIG_FCB2'
             - 'CONFIG_FCB_FLASH_AREA'
     CONFIG_NFFS:
         description: 'Config default storage is in NFFS'
         value: 0
         restrictions:
+            - '!CONFIG_LITTLEFS'
             - '!CONFIG_FCB'
             - '!CONFIG_FCB2'
     CONFIG_FCB2:
@@ -36,7 +38,16 @@ syscfg.defs:
         restrictions:
             - '!CONFIG_FCB'
             - '!CONFIG_NFFS'
+            - '!CONFIG_LITTLEFS'
             - 'CONFIG_FCB_FLASH_AREA'
+    CONFIG_LITTLEFS:
+        description: 'Config default storage is in littefs'
+        value: 0
+        restrictions:
+            - '!CONFIG_NFFS'
+            - '!CONFIG_FCB'
+            - '!CONFIG_FCB2'
+
     CONFIG_MGMT:
         description: 'SMP access to config'
         value: 0
@@ -93,14 +104,14 @@ syscfg.defs.(CONFIG_FCB || CONFIG_FCB2):
             used if the flash hardware cannot support this value.
         value: 8
 
-syscfg.defs.CONFIG_NFFS:
-    CONFIG_NFFS_DIR:
+syscfg.defs.(CONFIG_NFFS || CONFIG_LITTLEFS):
+    CONFIG_DIR:
         description: 'Directory where config is stored'
         value: '"/cfg"'
-    CONFIG_NFFS_FILE:
+    CONFIG_FILE:
         description: 'Name for the default config file'
         value: '"/cfg/run"'
-    CONFIG_NFFS_MAX_LINES:
+    CONFIG_MAX_LINES:
         description: 'Limit how many items stored in file before compressing'
         value: 32
 

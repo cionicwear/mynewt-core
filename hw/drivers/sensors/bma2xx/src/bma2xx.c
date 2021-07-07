@@ -4227,6 +4227,7 @@ bma2xx_wait_for_tap(struct bma2xx *bma2xx,
 {
 #if MYNEWT_VAL(BMA2XX_INT_ENABLE)
     int rc = 0;
+    int rc2 = 0;
     enum bma2xx_power_mode request_power[3];
     struct int_enable int_enable_org;
     struct int_enable int_enable = { 0 };
@@ -4313,7 +4314,10 @@ done:
     pdd->interrupt = NULL;
     disable_intpin(bma2xx);
     /* Restore previous routing */
-    rc = bma2xx_set_int_routes(bma2xx, &int_routes_org);
+    rc2 = bma2xx_set_int_routes(bma2xx, &int_routes_org);
+    if (rc == 0) {
+        rc = rc2;
+    }
 
     return rc;
 #else
@@ -4602,7 +4606,7 @@ sensor_driver_unset_notification(struct sensor * sensor,
 {
 #if MYNEWT_VAL(BMA2XX_INT_ENABLE)
     struct bma2xx *bma2xx;
-    enum bma2xx_power_mode request_power[3];
+    enum bma2xx_power_mode request_power[5];
     struct int_enable int_enable;
     struct int_routes int_routes;
     struct bma2xx_private_driver_data *pdd;
@@ -4625,6 +4629,12 @@ sensor_driver_unset_notification(struct sensor * sensor,
     pdd->notify_ctx.snec_evtype &= ~sensor_event_type;
     pdd->registered_mask &= ~BMA2XX_NOTIFY_MASK;
     disable_intpin(bma2xx);
+
+    request_power[0] = BMA2XX_POWER_MODE_SUSPEND;
+    request_power[1] = BMA2XX_POWER_MODE_STANDBY;
+    request_power[2] = BMA2XX_POWER_MODE_LPM_1;
+    request_power[3] = BMA2XX_POWER_MODE_LPM_2;
+    request_power[4] = BMA2XX_POWER_MODE_NORMAL;
 
     rc = interim_power(bma2xx,
                        request_power,

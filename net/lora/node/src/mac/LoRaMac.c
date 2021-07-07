@@ -296,8 +296,6 @@ OnRadioTxDone(void)
 static void
 OnRadioRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
-    os_eventq_put(lora_node_mac_evq_get(), &g_lora_mac_radio_rx_event);
-
     /*
       * TODO: for class C devices we may need to handle this differently as
       * the device is continuously listening I believe and it may be possible
@@ -308,6 +306,8 @@ OnRadioRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     g_lora_mac_data.rxpkt.rxdinfo.snr = snr;
     g_lora_mac_data.rxbuf = payload;
     g_lora_mac_data.rxbufsize = size;
+
+    os_eventq_put(lora_node_mac_evq_get(), &g_lora_mac_radio_rx_event);
 }
 
 /**
@@ -1511,6 +1511,10 @@ lora_mac_process_rx_win2_timeout(struct os_event *ev)
     /* Turn off the high resolution timer */
     lora_enter_low_power();
     lora_node_log(LORA_NODE_LOG_RX_WIN2_TIMEOUT, 0, 0, 0);
+
+    /* Force timeout from rx_win 1 */
+    lora_mac_process_radio_rx_timeout(0);
+
     /*
      * There are two cases here. Either the radio is still receiving in which
      * case the radio status is not idle, or the radio finished receiving

@@ -66,6 +66,17 @@ syscfg.defs:
         description: >
             Specifies settling time [ms] of 32K crystal oscillator.
         value: 8000
+
+    MCU_CLOCK_RCX_CAL_REF_CNT:
+        description: >
+            Reference count value for calibration of RCX clock. The higher
+            the value the more accurate the calibration but also increases
+            calibration time. The calibration time is approximately this
+            value multiplied by one 15kHz clock cycle, thus total calibration
+            time will be approx 66.67 usecs * MCU_CLOCK_RCX_CAL_REF_CNT.
+        value: 100
+        restrictions: '!0'
+
     MCU_SYSCLK_SOURCE:
         description: >
             Specifies system clock source
@@ -86,15 +97,35 @@ syscfg.defs:
             general usage.
         value: 0
 
+    MCU_MTB_ENABLE:
+        description: >
+            Enable support for Micro Trace Buffer (MTB).
+            This will reserve RAM space for MTB buffer, configure
+            MTB on boot and properly store/restore MTB registers
+            state during deep sleep to allow continuous trace.
+        value: 0
+    MCU_MTB_AUTO_START:
+        description: >
+            Auto start MTB trace on boot. If disabled, MTB can be
+            still enabled manually either via code or debugger.
+        value: 0
+
     MCU_FLASH_MIN_WRITE_SIZE:
         description: >
             Specifies the required alignment for internal flash writes.
             Used internally by the newt tool.
         value: 1
 
+    MCU_UART_DICONNECT_RX_ON_BUSY:
+        description: >
+            If set to 1, UART RX pin will be configured to GPIO once busy state is
+            detected.  UART block can stuck in busy state when RX line is set to 0.
+            This will result in continuous BUSY interrupt.
+            To prevent such case RX pin can be configured to GPIO.
+        value: 0
     MCU_DMA_IRQ_PRIO:
         description: >
-            Specifies the NVIC interrupt priority to assign for the DMA_IRQn 
+            Specifies the NVIC interrupt priority to assign for the DMA_IRQn
             interrupt.
         value: 15
 
@@ -305,6 +336,10 @@ syscfg.defs:
         description: 'SS pin for SPI_1_SLAVE'
         value: ''
 
+    UART_HAL:
+        description: 'Use uart_hal driver instead of uart_da1469x.'
+        value: 0
+
     UART_0:
         description: Enable DA1469x UART 0 (UART peripheral)
         value: 1
@@ -442,6 +477,9 @@ syscfg.defs:
         value: 0
         restrictions:
             - '!GPADC_BATTERY'
+
+syscfg.vals:
+    OS_TICKS_PER_SEC: 128
 
 syscfg.vals.'MCU_SYSCLK_SOURCE == "PLL96"':
     MCU_PLL_ENABLE: 1

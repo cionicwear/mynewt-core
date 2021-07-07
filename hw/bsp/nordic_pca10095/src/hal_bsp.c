@@ -49,7 +49,11 @@ hal_bsp_flash_dev(uint8_t id)
     if (id == 0) {
         return &nrf5340_flash_dev;
     }
-
+#if MYNEWT_VAL(QSPI_ENABLE)
+    if (id == 1) {
+        return &nrf5340_qspi_dev;
+    }
+#endif
     return NULL;
 }
 
@@ -74,4 +78,9 @@ hal_bsp_init(void)
 
     /* Create all available nRF5340 peripherals */
     nrf5340_periph_create();
+}
+
+void
+hal_bsp_deinit(void)
+{
 }
