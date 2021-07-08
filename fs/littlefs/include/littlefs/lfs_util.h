@@ -19,6 +19,7 @@
 #include LFS_STRINGIZE(LFS_CONFIG)
 #else
 
+#define LFS_YES_TRACE
 // System includes
 #include <stdint.h>
 #include <stdbool.h>

@@ -221,7 +221,7 @@ flash_sync(const struct lfs_config *c)
     return 0;
 }
 
-static lfs_t *g_lfs = NULL;
+lfs_t *g_lfs = NULL;
 static bool g_lfs_alloc_done = false;
 
 #define READ_SIZE (MYNEWT_VAL(LITTLEFS_READ_SIZE))
