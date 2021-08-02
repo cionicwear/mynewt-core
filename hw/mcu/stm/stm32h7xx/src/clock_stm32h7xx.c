@@ -276,6 +276,9 @@ SystemClock_Config(void)
     PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_USB;
     PeriphClkInitStruct.UsbClockSelection = MYNEWT_VAL(STM32_USB_CLOCK_SEL);
 #endif
+ // Enable RNG
+PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_RNG;
+PeriphClkInitStruct.RngClockSelection = RCC_RNGCLKSOURCE_PLL;
 
 #if MYNEWT_VAL(STM32_CLOCK_PLL3) || MYNEWT_VAL(STM32_CLOCK_PLL2)
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)

@@ -26,10 +26,7 @@
 #include "bus/bus_driver.h"
 #include "bus/drivers/i2c_common.h"
 #include "mcu/mcu.h"
-
-#if MYNEWT_VAL(I2C_DA1469X_BUS_DRIVER)
 #include "mcu/da1469x_dma.h"
-#endif
 
 #if MYNEWT_VAL(I2C_DA1469X_STAT)
 #include "stats/stats.h"
@@ -180,7 +177,7 @@ i2c_da1469x_fill_tx_dma_buffer(struct i2c_da1469x_dev_data *dd)
             dd->tx_dma_buf[0] = I2C_I2C_DATA_CMD_REG_I2C_CMD_Msk |
                                 I2C_I2C_DATA_CMD_REG_I2C_STOP_Msk;
         } else {
-            /* Stop requested more send lentght - 1 without stop */
+            /* Stop requested more send length - 1 without stop */
             dd->tx_dma_buf[0] = I2C_I2C_DATA_CMD_REG_I2C_CMD_Msk;
             --length;
         }
@@ -256,8 +253,6 @@ i2c_da1469x_fill_fifo_for_rx(I2C_Type *i2c_regs, struct i2c_da1469x_dev_data *dd
         return;
     }
 
-    i2c_da1469x_clear_int(i2c_regs);
-
     while ((transfer->wlen > 0) &&
            i2c_regs->I2C_STATUS_REG & I2C_I2C_STATUS_REG_TFNF_Msk) {
         transfer->wlen--;
@@ -266,6 +261,8 @@ i2c_da1469x_fill_fifo_for_rx(I2C_Type *i2c_regs, struct i2c_da1469x_dev_data *dd
         } else {
             i2c_regs->I2C_DATA_CMD_REG = (1U << I2C_I2C_DATA_CMD_REG_I2C_CMD_Pos) |
                                          (1U << I2C_I2C_DATA_CMD_REG_I2C_STOP_Pos);
+            /* All data in tx buffer, no need for TX interrupt any more */
+            i2c_regs->I2C_INTR_MASK_REG &= ~I2C_I2C_INTR_MASK_REG_M_TX_EMPTY_Msk;
         }
     }
 
@@ -275,29 +272,28 @@ i2c_da1469x_fill_fifo_for_rx(I2C_Type *i2c_regs, struct i2c_da1469x_dev_data *dd
             *transfer->data++ = (uint8_t)i2c_regs->I2C_DATA_CMD_REG;
             transfer->rlen--;
             if (transfer->rlen == 0) {
-                i2c_regs->I2C_INTR_MASK_REG = 0;
-                i2c_da1469x_clear_int(i2c_regs);
-                transfer->started = 0;
-                os_sem_release(&dd->sem);
+                i2c_regs->I2C_INTR_MASK_REG &= ~I2C_I2C_INTR_MASK_REG_M_RX_FULL_Msk;
+                if (transfer->nostop) {
+                    transfer->started = 0;
+                    dd->errorsrc = 0;
+                    os_sem_release(&dd->sem);
+                }
             }
         }
     }
 
     if (intr_stat & I2C_I2C_INTR_MASK_REG_M_STOP_DET_Msk) {
+        /* Clear STOP condition interrupt */
+        (void)i2c_regs->I2C_CLR_STOP_DET_REG;
         i2c_regs->I2C_INTR_MASK_REG = 0;
-        assert(transfer->started == 0 && transfer->rlen == 0);
-        if (transfer->started || transfer->rlen) {
+        if (transfer->started) {
             transfer->started = 0;
+            if (transfer->rlen > 0) {
+                dd->errorsrc = I2C_I2C_TX_ABRT_SOURCE_REG_ABRT_USER_ABRT_Msk;
+            }
             transfer->rlen = 0;
-            dd->errorsrc = I2C_I2C_TX_ABRT_SOURCE_REG_ABRT_USER_ABRT_Msk;
             os_sem_release(&dd->sem);
         }
-        return;
-    }
-
-    /* All data in tx buffer, no need for TX interrupt any more */
-    if (transfer->wlen == 0) {
-        i2c_regs->I2C_INTR_MASK_REG &= ~I2C_I2C_INTR_MASK_REG_M_TX_EMPTY_Msk;
     }
 }
 
@@ -332,8 +328,6 @@ i2c_da1469x_fill_fifo_for_tx(I2C_Type *i2c_regs, struct i2c_da1469x_dev_data *dd
         return;
     }
 
-    i2c_da1469x_clear_int(i2c_regs);
-
     while ((transfer->wlen > 0) &&
            i2c_regs->I2C_STATUS_REG & I2C_I2C_STATUS_REG_TFNF_Msk) {
         transfer->wlen--;
@@ -346,7 +340,6 @@ i2c_da1469x_fill_fifo_for_tx(I2C_Type *i2c_regs, struct i2c_da1469x_dev_data *dd
         if (transfer->wlen == 0) {
             if (transfer->nostop) {
                 i2c_regs->I2C_INTR_MASK_REG = 0;
-                i2c_da1469x_clear_int(i2c_regs);
                 transfer->started = 0;
                 os_sem_release(&dd->sem);
             }
@@ -357,6 +350,8 @@ i2c_da1469x_fill_fifo_for_tx(I2C_Type *i2c_regs, struct i2c_da1469x_dev_data *dd
     }
 
     if (intr_stat & I2C_I2C_INTR_MASK_REG_M_STOP_DET_Msk) {
+        /* Clear STOP condition interrupt */
+        (void)i2c_regs->I2C_CLR_STOP_DET_REG;
         i2c_regs->I2C_INTR_MASK_REG = 0;
         if (transfer->started) {
             transfer->started = 0;
@@ -390,6 +385,7 @@ i2c_da1469x_init_node(struct bus_dev *bdev, struct bus_node *bnode, void *arg)
 {
     struct bus_i2c_node *node = (struct bus_i2c_node *)bnode;
     struct bus_i2c_node_cfg *cfg = arg;
+    (void)bdev;
 
     BUS_DEBUG_POISON_NODE(node);
 
@@ -562,7 +558,6 @@ i2c_da1469x_write(struct bus_dev *bdev, struct bus_node *bnode,
 
     BUS_DEBUG_VERIFY_DEV(dev);
     BUS_DEBUG_VERIFY_NODE(node);
-
 
     i2c_regs = da1469x_i2c[dev->cfg.i2c_num].regs;
     dd = &i2c_dev_data[dev->cfg.i2c_num];

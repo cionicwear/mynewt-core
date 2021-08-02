@@ -27,12 +27,12 @@
 
 #if MYNEWT_VAL(CONFIG_AUTO_INIT)
 
-#if MYNEWT_VAL(CONFIG_NFFS)
+#if MYNEWT_VAL(CONFIG_NFFS) || MYNEWT_VAL(CONFIG_LITTLEFS)
 #include "fs/fs.h"
 
 static struct conf_file config_init_conf_file = {
-    .cf_name = MYNEWT_VAL(CONFIG_NFFS_FILE),
-    .cf_maxlines = MYNEWT_VAL(CONFIG_NFFS_MAX_LINES)
+    .cf_name = MYNEWT_VAL(CONFIG_FILE),
+    .cf_maxlines = MYNEWT_VAL(CONFIG_MAX_LINES)
 };
 
 static void
@@ -137,7 +137,7 @@ config_pkg_init(void)
     conf_init();
 
 #if MYNEWT_VAL(CONFIG_AUTO_INIT)
-#if MYNEWT_VAL(CONFIG_NFFS)
+#if MYNEWT_VAL(CONFIG_NFFS) || MYNEWT_VAL(CONFIG_LITTLEFS)
     config_init_fs();
 #elif MYNEWT_VAL(CONFIG_FCB)
     config_init_fcb();
@@ -154,8 +154,8 @@ config_pkg_init_stage2(void)
     /*
      * Must be called after root FS has been initialized.
      */
-#if MYNEWT_VAL(CONFIG_NFFS)
-    fs_mkdir(MYNEWT_VAL(CONFIG_NFFS_DIR));
+#if MYNEWT_VAL(CONFIG_NFFS) || MYNEWT_VAL(CONFIG_LITTLEFS)
+    fs_mkdir(MYNEWT_VAL(CONFIG_DIR));
 #endif
 #endif
 }

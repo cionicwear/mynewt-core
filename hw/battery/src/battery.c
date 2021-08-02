@@ -25,15 +25,14 @@
 #include <battery/battery_prop.h>
 #include <battery/battery_drv.h>
 
-#define BATTERY_MAX_COUNT 1
+#define BATTERY_MAX_COUNT MYNEWT_VAL(BATTERY_MAX_COUNT)
 
 #define GET_BIT(arr, bit)   ((arr)[(bit) / 32] & (1 << ((bit) % 32)))
 
 /*
  * Structure holds information about listener and what is it listening for.
  */
-struct listener_data
-{
+struct listener_data {
     /* The properties to monitor for change */
     uint32_t ld_prop_change_mask[BATTERY_PROPERTY_MASK_SIZE];
     /* The properties to monitor for periodic read */
@@ -42,8 +41,7 @@ struct listener_data
     struct battery_prop_listener *ld_listener;
 };
 
-struct battery_manager
-{
+struct battery_manager {
     /* The lock for battery object */
     struct os_mutex bm_lock;
 
@@ -193,7 +191,7 @@ battery_get_num(struct battery *battery)
 
 struct battery_driver *
 battery_get_driver(struct os_dev *battery,
-        const char *dev_name)
+                   const char *dev_name)
 {
     int i;
     assert(battery);
@@ -224,22 +222,23 @@ clear_bit(uint32_t *mask, int bit)
 
 static struct battery_property *
 find_driver_property(struct battery *bat, struct battery_driver *driver,
-        battery_property_type_t type, battery_property_flags_t flags)
+                     battery_property_type_t type, battery_property_flags_t flags)
 {
     struct battery_property *prop = bat->b_properties + driver->bd_first_property;
     int i;
     assert(driver);
 
-    for (i = 0; driver->bd_property_count; ++i, ++prop) {
-        if (prop->bp_type == type && prop->bp_flags == flags)
+    for (i = 0; i < driver->bd_property_count; ++i, ++prop) {
+        if (prop->bp_type == type && prop->bp_flags == flags) {
             return prop;
+        }
     }
     return NULL;
 }
 
 static struct battery_property *
 find_hardware_property(struct battery *battery, struct battery_driver *driver,
-        battery_property_type_t type, battery_property_flags_t flags)
+                       battery_property_type_t type, battery_property_flags_t flags)
 {
     struct battery_property *res = NULL;
     int i;
@@ -249,8 +248,10 @@ find_hardware_property(struct battery *battery, struct battery_driver *driver,
         res = find_driver_property(battery, driver, type, flags);
     } else {
         for (i = 0; res == NULL && i < BATTERY_DRIVERS_MAX; ++i) {
-            res = find_driver_property(battery, battery->b_drivers[i],
-                                       type, flags);
+            if (battery->b_drivers[i]) {
+                res = find_driver_property(battery, battery->b_drivers[i],
+                                           type, flags);
+            }
         }
     }
     return res;
@@ -258,8 +259,8 @@ find_hardware_property(struct battery *battery, struct battery_driver *driver,
 
 struct battery_property *
 battery_find_property(struct os_dev *battery,
-        battery_property_type_t type, battery_property_flags_t flags,
-        const char *dev_name)
+                      battery_property_type_t type, battery_property_flags_t flags,
+                      const char *dev_name)
 {
     struct battery_property *res = NULL;
     struct battery_property *prop;
@@ -276,7 +277,7 @@ battery_find_property(struct os_dev *battery,
     if (!res) {
         /* Search battery manager created properties */
         for (i = 0; i < bat->b_all_property_count; ++i) {
-            prop =  &bat->b_properties[i];
+            prop = &bat->b_properties[i];
             if (prop->bp_type == type &&
                 prop->bp_flags == flags &&
                 (driver == NULL ||
@@ -324,7 +325,7 @@ battery_find_property(struct os_dev *battery,
 
 int
 battery_get_property_count(struct os_dev *battery,
-        struct battery_driver *driver)
+                           struct battery_driver *driver)
 {
     struct battery *bat = (struct battery *)battery;
     int i;
@@ -344,7 +345,7 @@ battery_get_property_count(struct os_dev *battery,
 
 struct battery_property *
 battery_enum_property(struct os_dev *battery, struct battery_driver *driver,
-        uint8_t prop_num)
+                      uint8_t prop_num)
 {
     struct battery *bat = (struct battery *)battery;
     struct battery_property *prop = NULL;
@@ -369,14 +370,15 @@ battery_enum_property(struct os_dev *battery, struct battery_driver *driver,
 
 char *
 battery_prop_get_name(const struct battery_property *prop, char *buf,
-        size_t buf_size)
+                      size_t buf_size)
 {
     struct battery *bat = battery_manager.bm_batteries[prop->bp_bat_num];
     struct battery_driver *driver = bat->b_drivers[prop->bp_drv_num];
     const struct battery_driver_property *driver_prop =
-            &driver->bd_driver_properties[prop->bp_prop_num - driver->bd_first_property];
+        &driver->bd_driver_properties[prop->bp_prop_num - driver->bd_first_property];
 
-    strncpy(buf, driver_prop->bdp_name, buf_size);
+    strncpy(buf, driver_prop->bdp_name, buf_size - 1);
+    buf[buf_size - 1] = '\0';
 
     return buf;
 }
@@ -389,7 +391,7 @@ battery_find_property_by_name(struct os_dev *battery, const char *name)
     int i;
 
     for (i = 0; i < bat->b_all_property_count; ++i) {
-        battery_prop_get_name(&bat->b_properties[i], buf, 20);
+        battery_prop_get_name(&bat->b_properties[i], buf, sizeof(buf));
         if (strcmp(buf, name) == 0) {
             return &bat->b_properties[i];
         }
@@ -399,7 +401,7 @@ battery_find_property_by_name(struct os_dev *battery, const char *name)
 
 static void
 battery_mgr_poll_battery_driver(struct battery *bat,
-        struct battery_driver *drv, uint32_t changed[], uint32_t queried[])
+                                struct battery_driver *drv, uint32_t changed[], uint32_t queried[])
 {
     int i;
     battery_property_value_t old_val;
@@ -441,7 +443,7 @@ battery_mgr_poll_battery(struct battery *battery)
     int j;
 
     /* Poll battery drivers */
-    for(i = 0; i < BATTERY_DRIVERS_MAX; ++i) {
+    for (i = 0; i < BATTERY_DRIVERS_MAX; ++i) {
         driver = battery->b_drivers[i];
         if (driver) {
             battery_mgr_poll_battery_driver(battery, driver, changed, queried);
@@ -495,7 +497,7 @@ battery_set_poll_rate_ms(struct os_dev *battery, uint32_t poll_rate)
 
 int
 battery_set_poll_rate_ms_delay(struct os_dev *battery, uint32_t poll_rate,
-    uint32_t start_delay)
+                               uint32_t start_delay)
 {
     struct battery *bat = (struct battery *)battery;
 
@@ -574,7 +576,7 @@ battery_add_driver(struct os_dev *battery, struct battery_driver *driver)
 
 static int
 get_listener_index(struct battery *battery,
-        struct battery_prop_listener *listener)
+                   struct battery_prop_listener *listener)
 {
     int i;
 
@@ -629,7 +631,7 @@ battery_update_polled_properties(struct battery *battery)
 
 int
 battery_prop_change_subscribe(struct battery_prop_listener *listener,
-        struct battery_property *prop)
+                              struct battery_property *prop)
 {
     struct battery *battery;
     int listener_index;
@@ -650,7 +652,7 @@ battery_prop_change_subscribe(struct battery_prop_listener *listener,
 
 int
 battery_prop_change_unsubscribe(struct battery_prop_listener *listener,
-        struct battery_property *prop)
+                                struct battery_property *prop)
 {
     struct battery *battery;
     int i;
@@ -673,7 +675,7 @@ battery_prop_change_unsubscribe(struct battery_prop_listener *listener,
     } else {
         /* No property supplied, remove listener from all subscriptions */
         for (i = 0; i < BATTERY_MAX_COUNT; ++i) {
-            battery =  battery_manager.bm_batteries[i];
+            battery = battery_manager.bm_batteries[i];
             for (j = 0; j < battery->b_listener_count; ++i) {
                 if (battery->b_listeners[j].ld_listener == listener) {
                     /* Reduce number of listeners */
@@ -682,7 +684,7 @@ battery_prop_change_unsubscribe(struct battery_prop_listener *listener,
                         /* It was not last listener,
                          * move last to emptied space */
                         battery->b_listeners[j] =
-                                battery->b_listeners[battery->b_listener_count];
+                            battery->b_listeners[battery->b_listener_count];
                     }
                     battery->b_listeners =
                         realloc(battery->b_listeners,
@@ -701,7 +703,7 @@ battery_prop_change_unsubscribe(struct battery_prop_listener *listener,
 
 int
 battery_prop_poll_subscribe(struct battery_prop_listener *listener,
-        struct battery_property *prop)
+                            struct battery_property *prop)
 {
     struct battery *battery;
     int listener_index;
@@ -722,7 +724,7 @@ battery_prop_poll_subscribe(struct battery_prop_listener *listener,
 
 int
 battery_prop_poll_unsubscribe(struct battery_prop_listener *listener,
-        struct battery_property *prop)
+                              struct battery_property *prop)
 {
     struct battery *battery;
     int i;
@@ -743,13 +745,13 @@ battery_prop_poll_unsubscribe(struct battery_prop_listener *listener,
                   prop->bp_prop_num);
     } else {
         for (i = 0; i < BATTERY_MAX_COUNT; ++i) {
-            battery =  battery_manager.bm_batteries[i];
+            battery = battery_manager.bm_batteries[i];
             for (j = 0; j < battery->b_listener_count; ++i) {
                 if (battery->b_listeners[j].ld_listener == listener) {
                     battery->b_listener_count--;
                     if (j < battery->b_listener_count) {
                         battery->b_listeners[j] =
-                                battery->b_listeners[battery->b_listener_count];
+                            battery->b_listeners[battery->b_listener_count];
                     }
                     battery->b_listeners =
                         realloc(battery->b_listeners,

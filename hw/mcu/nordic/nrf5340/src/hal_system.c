@@ -81,6 +81,8 @@ hal_system_clock_start(void)
     regval = CLOCK_LFCLKSTAT_STATE_Running << CLOCK_LFCLKSTAT_STATE_Pos;
 
 #if MYNEWT_VAL_CHOICE(MCU_LFCLK_SOURCE, LFXO)
+    NRF_P0_S->PIN_CNF[0] |= GPIO_PIN_CNF_MCUSEL_Peripheral << GPIO_PIN_CNF_MCUSEL_Pos;
+    NRF_P0_S->PIN_CNF[1] |= GPIO_PIN_CNF_MCUSEL_Peripheral << GPIO_PIN_CNF_MCUSEL_Pos;
     regval |= CLOCK_LFCLKSTAT_SRC_LFXO << CLOCK_LFCLKSTAT_SRC_Pos;
     clksrc = CLOCK_LFCLKSTAT_SRC_LFXO;
 #elif MYNEWT_VAL_CHOICE(MCU_LFCLK_SOURCE, LFSYNTH)
@@ -124,4 +126,11 @@ hal_system_clock_start(void)
         }
     }
 #endif
+    if (MYNEWT_VAL(MCU_HFCLCK192_DIV) == 1) {
+        NRF_CLOCK_S->HFCLK192MCTRL = 0;
+    } else if (MYNEWT_VAL(MCU_HFCLCK192_DIV) == 2) {
+        NRF_CLOCK_S->HFCLK192MCTRL = 1;
+    } else if (MYNEWT_VAL(MCU_HFCLCK192_DIV) == 4) {
+        NRF_CLOCK_S->HFCLK192MCTRL = 2;
+    }
 }
