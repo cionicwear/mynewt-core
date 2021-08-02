@@ -47,6 +47,9 @@ int fs_unlink(const char *filename);
 int fs_rename(const char *from, const char *to);
 int fs_mkdir(const char *path);
 
+void fs_lock(const char *disk);
+void fs_unlock(const char *disk);
+
 int fs_opendir(const char *path, struct fs_dir **);
 int fs_readdir(struct fs_dir *, struct fs_dirent **);
 int fs_closedir(struct fs_dir *);

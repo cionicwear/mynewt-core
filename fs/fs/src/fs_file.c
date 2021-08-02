@@ -186,6 +186,20 @@ fops_from_file(const struct fs_file *file)
     return fs_ops_from_container((struct fops_container *) file);
 }
 
+void
+fs_lock(const char *disk)
+{
+    struct fs_ops *fops = fops_from_filename(disk);
+    fops->f_lock(disk);
+}
+
+void
+fs_unlock(const char *disk)
+{
+    struct fs_ops *fops = fops_from_filename(disk);
+    fops->f_unlock(disk);
+}
+
 int
 fs_open(const char *filename, uint8_t access_flags, struct fs_file **out_file)
 {
