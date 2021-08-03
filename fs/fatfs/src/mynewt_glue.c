@@ -54,6 +54,10 @@ static int fatfs_dirent_is_dir(const struct fs_dirent *fs_dirent);
 static int fatfs_mkfs(const char *path, uint8_t format);
 static int fatfs_mount(const char *disk_name);
 static int fatfs_unmount(const char *disk_name);
+static bool fatfs_is_mounted(const char *disk_name);
+
+#define NB_CONCUR_OPS       16
+#define MAX_UNMOUNT_REQ     2
 #define DRIVE_LEN 4
 
 struct fatfs_file {
@@ -104,6 +108,7 @@ static struct fs_ops fatfs_ops = {
 
     .f_unmount = fatfs_unmount,
     .f_mount = fatfs_mount,
+    .f_is_mounted = fatfs_is_mounted,
 
     .f_name = "fatfs"
 };
@@ -183,6 +188,8 @@ struct mounted_disk {
     FATFS *fs_instance;
     struct disk_ops *dops;
     bool mounted;
+    int unmount_req;
+    struct os_sem cnt_sem;
     SLIST_ENTRY(mounted_disk) sc_next;
 };
 
@@ -223,11 +230,30 @@ fatfs_get_disk_by_number(int nb)
     return NULL;
 }
 
+static void
+fatfs_request(struct mounted_disk *sc)
+{
+    os_sem_pend(&sc->cnt_sem, OS_TIMEOUT_NEVER);
+}
+
+static void
+fatfs_release(struct mounted_disk *sc)
+{
+    os_sem_release(&sc->cnt_sem);
+
+    if(os_sem_get_count(&sc->cnt_sem) == NB_CONCUR_OPS && sc->unmount_req > MAX_UNMOUNT_REQ){
+        // Unmount has been requested while disk was being used
+        // For unmount after MAX_UNMOUNT_REQ request
+        fatfs_unmount(sc->disk_name);
+    }
+}
+
 static int 
 fatfs_unmount(const char *disk_name)
 {
     struct mounted_disk *sc;
     char path[6];
+    int rc;
     
     sc = fatfs_get_disk_by_name(disk_name, NULL);
 
@@ -235,11 +261,17 @@ fatfs_unmount(const char *disk_name)
         return FS_EOK;
     }
 
-    sprintf(path, "%d:", (uint8_t)sc->disk_number);
-    f_mount(NULL, path, 0); // set FAT context to NULL unmount the disk
-    sc->mounted = false;
+    if(os_sem_get_count(&sc->cnt_sem) != NB_CONCUR_OPS){
+        sc->unmount_req++;
+        return FR_NOT_READY;
+    }
 
-    return FS_EOK;
+    sprintf(path, "%d:", (uint8_t)sc->disk_number);
+    rc = f_mount(NULL, path, 0); // set FAT context to NULL unmount the disk
+    sc->mounted = false;
+    sc->unmount_req = 0;
+
+    return rc;
 }
 
 static int 
@@ -248,7 +280,8 @@ fatfs_mount(const char *disk_name)
     struct mounted_disk *sc;
     int disk_number;
     char path[6];
-    
+    int rc;
+
     sc = fatfs_get_disk_by_name(disk_name, &disk_number);
 
     if(sc && sc->mounted){
@@ -260,21 +293,22 @@ fatfs_mount(const char *disk_name)
         sc->disk_name = strdup(disk_name);
         sc->disk_number = disk_number;
         sc->dops = disk_ops_for(disk_name);
-
+        sc->unmount_req = 0;
+        os_sem_init(&sc->cnt_sem, NB_CONCUR_OPS);
         /* XXX: check for errors? */
         sc->fs_instance = malloc(sizeof(FATFS));
         SLIST_INSERT_HEAD(&mounted_disks, sc, sc_next);
     }
 
     sprintf(path, "%d:", (uint8_t)sc->disk_number);
-    f_mount(sc->fs_instance, path, 1);
+    rc = f_mount(sc->fs_instance, path, 1);
     sc->mounted = true;
 
-    return FS_EOK;
+    return rc;
 }
 
 static bool 
-fatfs_is_mounted(struct mounted_disk *sc)
+_fatfs_is_mounted(struct mounted_disk *sc)
 {
     if(sc && sc->mounted){
         return true;
@@ -282,6 +316,16 @@ fatfs_is_mounted(struct mounted_disk *sc)
 
     return false;
 } 
+
+static bool 
+fatfs_is_mounted(const char *disk_name)
+{
+    struct mounted_disk *sc;
+    
+    sc = fatfs_get_disk_by_name(disk_name, NULL);
+
+    return _fatfs_is_mounted(sc);
+}
 
 /**
  * Converts fs path to fatfs path
@@ -342,9 +386,12 @@ fatfs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_file)
 
     sc = fatfs_get_disk_by_name(path, NULL);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
+
+    printf("\nopen %s\n", path);
+    fatfs_request(sc);
 
     file = malloc(sizeof(struct fatfs_file));
     if (!file) {
@@ -388,6 +435,7 @@ fatfs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_file)
 out:
     if(fatfs_path) free(fatfs_path);
     if (rc != FS_EOK) {
+        fatfs_release(sc);
         if (file) free(file);
         if (out_file) free(out_file);
     }
@@ -403,9 +451,10 @@ fatfs_close(struct fs_file *fs_file)
 
     sc = fatfs_get_disk_by_number(((struct fatfs_file *) fs_file)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
+
 
     if (file != NULL) {
         res = f_close(file);
@@ -413,6 +462,8 @@ fatfs_close(struct fs_file *fs_file)
     }
 
     free(fs_file);
+    fatfs_release(sc);
+    printf("\nclose file\n");
     return fatfs_to_vfs_error(res);
 }
 
@@ -425,7 +476,7 @@ fatfs_seek(struct fs_file *fs_file, uint32_t offset)
 
     sc = fatfs_get_disk_by_number(((struct fatfs_file *) fs_file)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -442,7 +493,7 @@ fatfs_getpos(const struct fs_file *fs_file)
 
     sc = fatfs_get_disk_by_number(((struct fatfs_file *) fs_file)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -458,7 +509,7 @@ fatfs_file_len(const struct fs_file *fs_file, uint32_t *out_len)
 
     sc = fatfs_get_disk_by_number(((struct fatfs_file *) fs_file)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -478,7 +529,7 @@ fatfs_read(struct fs_file *fs_file, uint32_t len, void *out_data,
 
     sc = fatfs_get_disk_by_number(((struct fatfs_file *) fs_file)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -497,7 +548,7 @@ fatfs_write(struct fs_file *fs_file, const void *data, int len)
 
     sc = fatfs_get_disk_by_number(((struct fatfs_file *) fs_file)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -517,7 +568,7 @@ fatfs_flush(struct fs_file *fs_file)
 
     sc = fatfs_get_disk_by_number(((struct fatfs_file *) fs_file)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -541,14 +592,17 @@ fatfs_unlink(const char *path)
 
     sc = fatfs_get_disk_by_name(path, NULL);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         free(fatfs_path);
         return FS_EUNINIT;
     }
 
+    fatfs_request(sc);
     
     res = f_unlink(fatfs_path);
     free(fatfs_path);
+
+    fatfs_release(sc);
 
     return fatfs_to_vfs_error(res);
 }
@@ -563,7 +617,7 @@ fatfs_rename(const char *from, const char *to)
     
     sc = fatfs_get_disk_by_name(from, NULL);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -576,9 +630,13 @@ fatfs_rename(const char *from, const char *to)
         return FS_ENOMEM;
     }
 
+    fatfs_request(sc);
+
     res = f_rename(fatfs_src_path, fatfs_dst_path);
     free(fatfs_src_path);
     free(fatfs_dst_path);
+
+    fatfs_release(sc);
 
     return fatfs_to_vfs_error(res);
 }
@@ -598,13 +656,17 @@ fatfs_mkdir(const char *path)
 
     sc = fatfs_get_disk_by_name(path, NULL);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         free(fatfs_path);
         return FS_EUNINIT;
     }
 
+    fatfs_request(sc);
+
     res = f_mkdir(fatfs_path);
     free(fatfs_path);
+
+    fatfs_release(sc);
     return fatfs_to_vfs_error(res);
 }
 
@@ -619,7 +681,7 @@ fatfs_mkfs(const char *disk, uint8_t format)
     
     sc = fatfs_get_disk_by_name(disk, NULL);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -641,10 +703,12 @@ fatfs_opendir(const char *path, struct fs_dir **out_fs_dir)
 
     sc = fatfs_get_disk_by_name(path, NULL);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         free(fatfs_path);
         return FS_EUNINIT;
     }
+
+    fatfs_request(sc);
 
     dir = malloc(sizeof(struct fatfs_dir));
     if (!dir) {
@@ -673,6 +737,7 @@ fatfs_opendir(const char *path, struct fs_dir **out_fs_dir)
 out:
     free(fatfs_path);
     if (rc != FS_EOK) {
+        fatfs_release(sc);
         if (dir) free(dir);
         if (out_dir) free(out_dir);
     }
@@ -688,7 +753,7 @@ fatfs_readdir(struct fs_dir *fs_dir, struct fs_dirent **out_fs_dirent)
     
     sc = fatfs_get_disk_by_number(((struct fatfs_dir *) fs_dir)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
@@ -714,13 +779,15 @@ fatfs_closedir(struct fs_dir *fs_dir)
     
     sc = fatfs_get_disk_by_number(((struct fatfs_dir *) fs_dir)->disk_number);
 
-    if(!sc || !fatfs_is_mounted(sc)){
+    if(!sc || !_fatfs_is_mounted(sc)){
         return FS_EUNINIT;
     }
 
     res = f_closedir(dir);
     free(dir);
     free(fs_dir);
+
+    fatfs_release(sc);
     return fatfs_to_vfs_error(res);
 }
 
