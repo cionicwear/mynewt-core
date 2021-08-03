@@ -52,8 +52,8 @@ static int fatfs_dirent_name(const struct fs_dirent *fs_dirent, size_t max_len,
   char *out_name, uint8_t *out_name_len);
 static int fatfs_dirent_is_dir(const struct fs_dirent *fs_dirent);
 static int fatfs_mkfs(const char *path, uint8_t format);
-static void fatfs_lock(const char *disk_name);
-static void fatfs_unlock(const char *disk_name);
+static int fatfs_mount(const char *disk_name);
+static int fatfs_unmount(const char *disk_name);
 #define DRIVE_LEN 4
 
 struct fatfs_file {
@@ -102,8 +102,8 @@ static struct fs_ops fatfs_ops = {
     .f_dirent_name = fatfs_dirent_name,
     .f_dirent_is_dir = fatfs_dirent_is_dir,
 
-    .f_lock = fatfs_lock,
-    .f_unlock = fatfs_unlock,
+    .f_unmount = fatfs_unmount,
+    .f_mount = fatfs_mount,
 
     .f_name = "fatfs"
 };
@@ -223,36 +223,36 @@ fatfs_get_disk_by_number(int nb)
     return NULL;
 }
 
-static void 
-fatfs_unmount(struct mounted_disk *sc)
+static int 
+fatfs_unmount(const char *disk_name)
 {
+    struct mounted_disk *sc;
     char path[6];
+    
+    sc = fatfs_get_disk_by_name(disk_name, NULL);
+
+    if(!sc->mounted){
+        return FS_EOK;
+    }
 
     sprintf(path, "%d:", (uint8_t)sc->disk_number);
     f_mount(NULL, path, 0); // set FAT context to NULL unmount the disk
     sc->mounted = false;
+
+    return FS_EOK;
 }
 
-static void 
-fatfs_mount(struct mounted_disk *sc)
-{
-    char path[6];
-
-    sprintf(path, "%d:", (uint8_t)sc->disk_number);
-    f_mount(sc->fs_instance, path, 1);
-    sc->mounted = true;
-}
-
-static int
-drivenumber_from_disk(char *disk_name)
+static int 
+fatfs_mount(const char *disk_name)
 {
     struct mounted_disk *sc;
     int disk_number;
+    char path[6];
+    
+    sc = fatfs_get_disk_by_name(disk_name, &disk_number);
 
-    sc = fatfs_get_disk_by_name((const char *)disk_name, &disk_number);
-
-    if(sc && !sc->mounted){
-        fatfs_mount(sc);
+    if(sc && sc->mounted){
+        return FS_EOK;
     }
 
     if(sc == NULL){
@@ -263,42 +263,14 @@ drivenumber_from_disk(char *disk_name)
 
         /* XXX: check for errors? */
         sc->fs_instance = malloc(sizeof(FATFS));
-        fatfs_mount(sc);
-
         SLIST_INSERT_HEAD(&mounted_disks, sc, sc_next);
     }
 
-    return disk_number;
-}
+    sprintf(path, "%d:", (uint8_t)sc->disk_number);
+    f_mount(sc->fs_instance, path, 1);
+    sc->mounted = true;
 
-static void 
-fatfs_lock(const char *disk)
-{
-    struct mounted_disk *sc;
-
-    sc = fatfs_get_disk_by_name(disk, NULL);
-
-    // Disk not mounted, no need to unmount it
-    if(!sc->mounted){
-        return;
-    }
-
-    fatfs_unmount(sc);
-}
-
-static void 
-fatfs_unlock(const char *disk)
-{
-    struct mounted_disk *sc;
-
-    sc = fatfs_get_disk_by_name(disk, NULL);
-
-    // Disk mounted, no need to mount it
-    if(sc->mounted){
-        return;
-    }
-
-    fatfs_mount(sc);
+    return FS_EOK;
 }
 
 static bool 
@@ -322,17 +294,19 @@ fatfs_is_mounted(struct mounted_disk *sc)
 static char *
 fatfs_path_from_fs_path(const char *fs_path)
 {
-    char *disk;
-    int drive_number;
+    struct mounted_disk *sc;
+    int disk_number;
     char *file_path = NULL;
     char *fatfs_path = NULL;
 
-    disk = disk_name_from_path(fs_path);
-    if (disk == NULL) {
+    sc = fatfs_get_disk_by_name(fs_path, &disk_number);
+    
+    if(!sc){
         goto err;
     }
-    drive_number = drivenumber_from_disk(disk);
-    free(disk);
+
+    disk_number = sc->disk_number;
+
     file_path = disk_filepath_from_path(fs_path);
 
     if (file_path == NULL) {
@@ -343,7 +317,7 @@ fatfs_path_from_fs_path(const char *fs_path)
     if (fatfs_path == NULL) {
         goto err;
     }
-    sprintf(fatfs_path, "%d:%s", drive_number, file_path);
+    sprintf(fatfs_path, "%d:%s", disk_number, file_path);
 err:
     free(file_path);
     return fatfs_path;
@@ -692,6 +666,7 @@ fatfs_opendir(const char *path, struct fs_dir **out_fs_dir)
 
     dir->dir = out_dir;
     dir->fops = &fatfs_ops;
+    dir->disk_number = sc->disk_number;
     *out_fs_dir = (struct fs_dir *)dir;
     rc = FS_EOK;
 
