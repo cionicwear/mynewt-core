@@ -200,6 +200,13 @@ fs_unmount(const char *disk)
     return fops->f_unmount(disk);
 }
 
+bool
+fs_is_mounted(const char *disk)
+{
+    struct fs_ops *fops = fops_from_filename(disk);
+    return fops->f_is_mounted(disk);
+}
+
 int
 fs_open(const char *filename, uint8_t access_flags, struct fs_file **out_file)
 {

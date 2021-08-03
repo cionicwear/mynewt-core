@@ -52,6 +52,7 @@ struct fs_ops {
 
     int (*f_mount)(const char *disk_name);
     int (*f_unmount)(const char *disk_name);
+    bool (*f_is_mounted)(const char *disk_name);
 
     int (*f_dirent_name)(const struct fs_dirent *dirent, size_t max_len,
       char *out_name, uint8_t *out_name_len);

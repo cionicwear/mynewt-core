@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +50,7 @@ int fs_mkdir(const char *path);
 
 int fs_mount(const char *disk);
 int fs_unmount(const char *disk);
+bool fs_is_mounted(const char *disk);
 
 int fs_opendir(const char *path, struct fs_dir **);
 int fs_readdir(struct fs_dir *, struct fs_dirent **);
