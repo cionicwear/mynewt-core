@@ -56,8 +56,6 @@ static int fatfs_mount(const char *disk_name);
 static int fatfs_unmount(const char *disk_name);
 static bool fatfs_is_mounted(const char *disk_name);
 
-#define NB_CONCUR_OPS       16
-#define MAX_UNMOUNT_REQ     2
 #define DRIVE_LEN 4
 
 struct fatfs_file {
@@ -188,8 +186,6 @@ struct mounted_disk {
     FATFS *fs_instance;
     struct disk_ops *dops;
     bool mounted;
-    int unmount_req;
-    struct os_sem cnt_sem;
     SLIST_ENTRY(mounted_disk) sc_next;
 };
 
@@ -230,24 +226,6 @@ fatfs_get_disk_by_number(int nb)
     return NULL;
 }
 
-static void
-fatfs_request(struct mounted_disk *sc)
-{
-    os_sem_pend(&sc->cnt_sem, OS_TIMEOUT_NEVER);
-}
-
-static void
-fatfs_release(struct mounted_disk *sc)
-{
-    os_sem_release(&sc->cnt_sem);
-
-    if(os_sem_get_count(&sc->cnt_sem) == NB_CONCUR_OPS && sc->unmount_req > MAX_UNMOUNT_REQ){
-        // Unmount has been requested while disk was being used
-        // For unmount after MAX_UNMOUNT_REQ request
-        fatfs_unmount(sc->disk_name);
-    }
-}
-
 static int 
 fatfs_unmount(const char *disk_name)
 {
@@ -261,15 +239,9 @@ fatfs_unmount(const char *disk_name)
         return FS_EOK;
     }
 
-    if(os_sem_get_count(&sc->cnt_sem) != NB_CONCUR_OPS){
-        sc->unmount_req++;
-        return FR_NOT_READY;
-    }
-
     sprintf(path, "%d:", (uint8_t)sc->disk_number);
     rc = f_mount(NULL, path, 0); // set FAT context to NULL unmount the disk
     sc->mounted = false;
-    sc->unmount_req = 0;
 
     return rc;
 }
@@ -293,8 +265,6 @@ fatfs_mount(const char *disk_name)
         sc->disk_name = strdup(disk_name);
         sc->disk_number = disk_number;
         sc->dops = disk_ops_for(disk_name);
-        sc->unmount_req = 0;
-        os_sem_init(&sc->cnt_sem, NB_CONCUR_OPS);
         /* XXX: check for errors? */
         sc->fs_instance = malloc(sizeof(FATFS));
         SLIST_INSERT_HEAD(&mounted_disks, sc, sc_next);
@@ -390,9 +360,6 @@ fatfs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_file)
         return FS_EUNINIT;
     }
 
-    printf("\nopen %s\n", path);
-    fatfs_request(sc);
-
     file = malloc(sizeof(struct fatfs_file));
     if (!file) {
         rc = FS_ENOMEM;
@@ -435,7 +402,6 @@ fatfs_open(const char *path, uint8_t access_flags, struct fs_file **out_fs_file)
 out:
     if(fatfs_path) free(fatfs_path);
     if (rc != FS_EOK) {
-        fatfs_release(sc);
         if (file) free(file);
         if (out_file) free(out_file);
     }
@@ -462,8 +428,6 @@ fatfs_close(struct fs_file *fs_file)
     }
 
     free(fs_file);
-    fatfs_release(sc);
-    printf("\nclose file\n");
     return fatfs_to_vfs_error(res);
 }
 
@@ -596,13 +560,9 @@ fatfs_unlink(const char *path)
         free(fatfs_path);
         return FS_EUNINIT;
     }
-
-    fatfs_request(sc);
     
     res = f_unlink(fatfs_path);
     free(fatfs_path);
-
-    fatfs_release(sc);
 
     return fatfs_to_vfs_error(res);
 }
@@ -630,13 +590,9 @@ fatfs_rename(const char *from, const char *to)
         return FS_ENOMEM;
     }
 
-    fatfs_request(sc);
-
     res = f_rename(fatfs_src_path, fatfs_dst_path);
     free(fatfs_src_path);
     free(fatfs_dst_path);
-
-    fatfs_release(sc);
 
     return fatfs_to_vfs_error(res);
 }
@@ -661,12 +617,9 @@ fatfs_mkdir(const char *path)
         return FS_EUNINIT;
     }
 
-    fatfs_request(sc);
-
     res = f_mkdir(fatfs_path);
     free(fatfs_path);
 
-    fatfs_release(sc);
     return fatfs_to_vfs_error(res);
 }
 
@@ -708,8 +661,6 @@ fatfs_opendir(const char *path, struct fs_dir **out_fs_dir)
         return FS_EUNINIT;
     }
 
-    fatfs_request(sc);
-
     dir = malloc(sizeof(struct fatfs_dir));
     if (!dir) {
         rc = FS_ENOMEM;
@@ -737,7 +688,6 @@ fatfs_opendir(const char *path, struct fs_dir **out_fs_dir)
 out:
     free(fatfs_path);
     if (rc != FS_EOK) {
-        fatfs_release(sc);
         if (dir) free(dir);
         if (out_dir) free(out_dir);
     }
@@ -787,7 +737,6 @@ fatfs_closedir(struct fs_dir *fs_dir)
     free(dir);
     free(fs_dir);
 
-    fatfs_release(sc);
     return fatfs_to_vfs_error(res);
 }
 
