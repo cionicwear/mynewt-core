@@ -56,7 +56,7 @@ os_time_get(void)
     return (g_os_time);
 }
 
-#if MYNEWT_VAL(OS_SCHEDULING)
+#if MYNEWT_VAL(OS_SCHEDULING) && !MYNEWT_VAL(BSP_SIMULATED)
 static void
 os_time_tick(int ticks)
 {
