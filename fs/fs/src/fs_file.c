@@ -186,18 +186,25 @@ fops_from_file(const struct fs_file *file)
     return fs_ops_from_container((struct fops_container *) file);
 }
 
-void
-fs_lock(const char *disk)
+int
+fs_mount(const char *disk)
 {
     struct fs_ops *fops = fops_from_filename(disk);
-    fops->f_lock(disk);
+    return fops->f_mount(disk);
 }
 
-void
-fs_unlock(const char *disk)
+int
+fs_unmount(const char *disk)
 {
     struct fs_ops *fops = fops_from_filename(disk);
-    fops->f_unlock(disk);
+    return fops->f_unmount(disk);
+}
+
+bool
+fs_is_mounted(const char *disk)
+{
+    struct fs_ops *fops = fops_from_filename(disk);
+    return fops->f_is_mounted(disk);
 }
 
 int
