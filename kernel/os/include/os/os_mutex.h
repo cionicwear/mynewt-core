@@ -48,6 +48,8 @@ struct os_mutex {
     struct os_task *mu_owner;
 };
 
+typedef struct os_mutex os_mutex_t;
+
 /*
   XXX: NOTES
     -> Should we add a magic number or flag to the mutex structure so
