@@ -252,6 +252,7 @@ SystemClock_Config(void)
 
 #if MYNEWT_VAL(STM32_CLOCK_PLL3)
     /* PLL2 for USART interface */
+    PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_SPI123;
     PeriphClkInitStruct.PLL3.PLL3M = MYNEWT_VAL(STM32_CLOCK_PLL3_PLLM);
     PeriphClkInitStruct.PLL3.PLL3N = MYNEWT_VAL(STM32_CLOCK_PLL3_PLLN);
     PeriphClkInitStruct.PLL3.PLL3P = MYNEWT_VAL(STM32_CLOCK_PLL3_PLLP);
@@ -260,12 +261,11 @@ SystemClock_Config(void)
     PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
     PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
     PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
+    PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL3;
 #endif
 
-#if MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL)
     PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_SDMMC;
     PeriphClkInitStruct.SdmmcClockSelection = MYNEWT_VAL(STM32_SDMMC_CLOCK_SEL);
-#endif
 
 #if MYNEWT_VAL(STM32_FMC_CLOCK_SEL)
     PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_FMC;
