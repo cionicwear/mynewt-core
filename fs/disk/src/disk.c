@@ -41,7 +41,7 @@ int disk_register(const char *disk_name, const char *fs_name, struct disk_ops *d
     struct disk_info *sc;
 
     SLIST_FOREACH(sc, &disks, sc_next) {
-        if (strcmp(sc->disk_name, disk_name) == 0) {
+        if (strncmp(sc->disk_name, disk_name, strlen(sc->disk_name)) == 0) {
             return DISK_ENOENT;
         }
     }
@@ -67,7 +67,7 @@ disk_ops_for(const char *disk_name)
 
     if (disk_name) {
         SLIST_FOREACH(sc, &disks, sc_next) {
-            if (strcmp(sc->disk_name, disk_name) == 0) {
+            if (strncmp(sc->disk_name, disk_name, strlen(sc->disk_name)) == 0) {
                 return sc->dops;
             }
         }
@@ -83,7 +83,7 @@ disk_fs_for(const char *disk_name)
 
     if (disk_name) {
         SLIST_FOREACH(sc, &disks, sc_next) {
-            if (strcmp(sc->disk_name, disk_name) == 0) {
+            if (strncmp(sc->disk_name, disk_name, strlen(sc->disk_name)) == 0) {
                 return ((char *) sc->fs_name);
             }
         }

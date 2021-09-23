@@ -31,6 +31,7 @@ static struct {
     } dir;
 } hal_gpio[HAL_GPIO_NUM_PINS];
 
+
 int
 hal_gpio_init_in(int pin, hal_gpio_pull_t pull)
 {
@@ -69,7 +70,7 @@ void hal_gpio_write(int pin, int val)
         return;
     }
     hal_gpio[pin].val = (val != 0);
-    printf("hal_gpio set pin %2d to %1d\r", pin, hal_gpio[pin].val);
+    // printf("hal_gpio set pin %2d to %1d\r", pin, hal_gpio[pin].val);
     fflush(stdout);
 }
 
@@ -88,4 +89,35 @@ hal_gpio_toggle(int pin)
     int pin_state = (hal_gpio_read(pin) != 1);
     hal_gpio_write(pin, pin_state);
     return pin_state;
+}
+
+int
+hal_gpio_irq_init(int pin, hal_gpio_irq_handler_t handler, void *arg,
+                      hal_gpio_irq_trig_t trig, hal_gpio_pull_t pull)
+{
+    return hal_gpio_init_in(pin,pull);
+}
+
+void
+hal_gpio_irq_enable(int pin)
+{
+    (void)pin;
+}
+
+void
+hal_gpio_irq_release(int pin)
+{
+    (void)pin;
+}
+
+void
+hal_gpio_irq_disable(int pin)
+{
+    (void)pin;
+}
+
+int hal_gpio_deinit(int pin)
+{
+    (void)pin;
+    return 0;
 }
