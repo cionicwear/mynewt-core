@@ -21,3 +21,6 @@ syscfg.defs:
    HARDFLOAT:
        description: 'Use hardware FPU'
        value: 0
+   CPP_SUPPORT:
+       description: 'Use C++'
+       value: 0
