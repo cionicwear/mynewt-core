@@ -89,6 +89,7 @@ stm32_flash_write_linear(const struct hal_flash *dev, uint32_t address,
     int rc;
     uint8_t align;
     uint32_t num_words;
+    os_sr_t sr;
 
     align = dev->hf_align;
 
@@ -119,7 +120,9 @@ stm32_flash_write_linear(const struct hal_flash *dev, uint32_t address,
         /* FIXME: L1 was previously unlocking flash before erasing/programming,
          * and locking again afterwards. Maybe all MCUs should do the same?
          */
+        OS_ENTER_CRITICAL(sr);
         rc = HAL_FLASH_Program(FLASH_PROGRAM_TYPE, address, val);
+        OS_EXIT_CRITICAL(sr);
         if (rc != HAL_OK) {
             return rc;
         }
@@ -151,6 +154,7 @@ stm32_flash_write_256_aligned(const struct hal_flash *dev, uint32_t address,
     uint32_t n_bytes = 0;
 	int32_t left = 0, to_write = 0, rc;
 	uint8_t tmp[32];
+    os_sr_t sr;
 
     HAL_FLASH_Unlock();
 
@@ -189,7 +193,9 @@ stm32_flash_write_256_aligned(const struct hal_flash *dev, uint32_t address,
 		left -= to_write;
 		sptr += to_write;
 
+        OS_ENTER_CRITICAL(sr);
 		rc = HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, address, (uint64_t)((uint32_t) tmp));
+        OS_EXIT_CRITICAL(sr);
 
 		if(rc)
 			break;
@@ -211,7 +217,7 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
     const uint8_t *sptr;
     uint32_t i;
     int rc = 0;
-
+    os_sr_t sr;
     
     /*
      * Clear status of previous operation.
@@ -226,7 +232,9 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
     sptr = src;
     HAL_FLASH_Unlock();
     for (i = 0; i < num_bytes; i++) {
+        OS_ENTER_CRITICAL(sr);
         rc = HAL_FLASH_Program(FLASH_PROGRAM_TYPE, address, sptr[i]);
+        OS_EXIT_CRITICAL(sr);
         if (rc != 0) {
             HAL_FLASH_Lock();
             return rc;
@@ -264,6 +272,7 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
     HAL_StatusTypeDef err;
     uint32_t SectorError;
     int i, rc = 0;
+    os_sr_t sr;
     /*
      * Clear status of previous operation.
      */
@@ -290,8 +299,9 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
             eraseinit.Sector = i;
             eraseinit.NbSectors = 1;
             eraseinit.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-
+            OS_ENTER_CRITICAL(sr);
             err = HAL_FLASHEx_Erase(&eraseinit, &SectorError);
+            OS_EXIT_CRITICAL(sr);
             if (err) {
                 rc = -1;
             }
