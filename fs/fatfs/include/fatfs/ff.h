@@ -292,6 +292,11 @@ TCHAR* f_gets (TCHAR* buff, int len, FIL* fp);						/* Get a string from the fil
 
 
 
+struct fatfs_file {
+    struct fs_ops *fops;
+    int disk_number;
+    FIL *file;
+};
 
 /*--------------------------------------------------------------*/
 /* Additional user defined functions                            */
