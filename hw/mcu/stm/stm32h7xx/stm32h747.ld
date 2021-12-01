@@ -93,6 +93,15 @@ SECTIONS
         KEEP(*(.eh_frame*))
     } > FLASH
 
+    .stream_new_cbs :
+    {
+        _streamcb_start = .;
+        . = ALIGN(4);
+        KEEP(*(.stream_new_cbs)) /* Store stream new cbs here */
+        . = ALIGN(4);
+        _streamcb_end = .;
+    } >FLASH
+
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
