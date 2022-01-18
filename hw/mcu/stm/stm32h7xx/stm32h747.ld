@@ -164,6 +164,13 @@ SECTIONS
 
     } > RAM AT > FLASH
 
+    .recovery  :
+    { 
+        . = ALIGN(4);
+        *(.recovery*);
+        . = ALIGN(4);
+    } >RAM AT> FLASH
+
     .sdram (NOLOAD):
     {
         . = ALIGN(4);
