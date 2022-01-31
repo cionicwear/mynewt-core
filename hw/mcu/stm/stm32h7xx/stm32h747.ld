@@ -116,6 +116,13 @@ SECTIONS
         . = ALIGN(4);
     } > RAM
 
+    .recovery  :
+    { 
+        . = ALIGN(4);
+        *(.recovery*);
+        . = ALIGN(4);
+    } >DTCM AT > FLASH
+
     .coredata :
     {
         __coredata_start__ = .;
@@ -163,13 +170,6 @@ SECTIONS
         __data_end__ = _edata;
 
     } > RAM AT > FLASH
-
-    .recovery  :
-    { 
-        . = ALIGN(4);
-        *(.recovery*);
-        . = ALIGN(4);
-    } >RAM AT> FLASH
 
     .sdram (NOLOAD):
     {
