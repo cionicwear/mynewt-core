@@ -58,12 +58,6 @@ static bool fatfs_is_mounted(const char *disk_name);
 
 #define DRIVE_LEN 4
 
-struct fatfs_file {
-    struct fs_ops *fops;
-    int disk_number;
-    FIL *file;
-};
-
 struct fatfs_dir {
     struct fs_ops *fops;
     int disk_number;

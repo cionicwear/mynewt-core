@@ -211,7 +211,6 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
     const uint8_t *sptr;
     uint32_t i;
     int rc = 0;
-
     
     /*
      * Clear status of previous operation.
@@ -290,7 +289,6 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
             eraseinit.Sector = i;
             eraseinit.NbSectors = 1;
             eraseinit.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-
             err = HAL_FLASHEx_Erase(&eraseinit, &SectorError);
             if (err) {
                 rc = -1;

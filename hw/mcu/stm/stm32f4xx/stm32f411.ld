@@ -170,6 +170,15 @@ SECTIONS
         __ecorebss = .;
     } > RAM
 
+    .cilog (NOLOAD):
+    {
+        . = ALIGN(4);
+        _scilog = .;
+        *(.cilog*)
+        . = ALIGN(4);
+        _ecilog = .;
+    } > RAM_LOG
+
     .bss :
     {
         . = ALIGN(4);

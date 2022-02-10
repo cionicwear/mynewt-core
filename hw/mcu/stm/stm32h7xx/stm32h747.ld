@@ -181,7 +181,16 @@ SECTIONS
         . = ALIGN(4);
         _esdram = .;
     } > SDRAM
-    
+
+    .sram3 (NOLOAD):
+    {
+        . = ALIGN(4);
+        _ssram3 = .;
+        *(.sram3*)
+        . = ALIGN(4);
+        _esram3 = .;
+    } > SRAM3
+
     .corebss (NOLOAD):
     {
         . = ALIGN(4);
