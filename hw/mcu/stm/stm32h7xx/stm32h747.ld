@@ -116,12 +116,19 @@ SECTIONS
         . = ALIGN(4);
     } > RAM
 
+    .bootstate  :
+    { 
+        . = ALIGN(4);
+        *(.bootstate*);
+        . = ALIGN(4);
+    } > DTCM AT > FLASH
+
     .recovery  :
     { 
         . = ALIGN(4);
         *(.recovery*);
         . = ALIGN(4);
-    } >DTCM AT > FLASH
+    } > DTCM AT > FLASH
 
     .coredata :
     {
