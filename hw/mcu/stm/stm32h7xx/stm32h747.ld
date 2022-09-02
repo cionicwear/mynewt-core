@@ -116,19 +116,19 @@ SECTIONS
         . = ALIGN(4);
     } > RAM
 
-    .bootstate  :
-    { 
-        . = ALIGN(4);
-        *(.bootstate*);
-        . = ALIGN(4);
-    } > DTCM AT > FLASH
-
-    .recovery  :
+    .recovery (NOLOAD):
     { 
         . = ALIGN(4);
         *(.recovery*);
         . = ALIGN(4);
-    } > DTCM AT > FLASH
+    } > DTCM
+
+    .bootstate (NOLOAD):
+    { 
+        . = ALIGN(4);
+        *(.bootstate*);
+        . = ALIGN(4);
+    } > DTCM
 
     .coredata :
     {
@@ -236,7 +236,7 @@ SECTIONS
         *(.stack*)
     } > DTCM
 
-    .ipc_shmem  :
+    .ipc_shmem (NOLOAD):
     { 
         . = ALIGN(4);
         _sipc_shmem = .; 
@@ -244,16 +244,16 @@ SECTIONS
             
         . = ALIGN(4);
         _eipc_shmem = .;
-    } >SRAM4 AT> FLASH
+    } >SRAM4
 
-    .ipc_async_shmem  :
+    .ipc_async_shmem (NOLOAD):
     { 
         . = ALIGN(4);
         _sipc_ashmem = .; 
         *(.ipc_async_shmem*);
         . = ALIGN(4);
         _eipc_ashmem = .;
-    } >SRAM4 AT> FLASH
+    } >SRAM4
 
     /* Set stack top to end of DTCM; stack limit is bottom of stack */
     __StackTop = ORIGIN(DTCM) + LENGTH(DTCM);
