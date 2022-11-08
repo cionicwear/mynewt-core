@@ -93,6 +93,15 @@ SECTIONS
         KEEP(*(.eh_frame*))
     } > FLASH
 
+    .cionic_ctrl :
+    {
+        _scctrl = .;
+        . = ALIGN(4);
+        KEEP(*(.cionic_ctrl*))
+        . = ALIGN(4);
+        _ecctrl = .;
+    } > FLASH
+
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
