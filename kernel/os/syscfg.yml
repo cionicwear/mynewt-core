@@ -24,6 +24,9 @@ syscfg.defs:
     OS_MAIN_STACK_SIZE:
         description: 'Stack size of initialization and main task'
         value: 1024
+    OS_IDLE_STACK_SZ:
+        description: 'Stack size of idle task'
+        value: 64
     OS_CLI:
         description: 'CLI commands to inspect OS'
         value: 0
