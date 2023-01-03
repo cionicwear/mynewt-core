@@ -118,6 +118,14 @@ void os_reboot(int reason);
  */
 void os_system_reset(void);
 
+/**
+ * Called before the watchod kick in. Must be defined in application code
+ * 
+ */
+#if MYNEWT_VAL(OS_WATCHDOG_MONITOR)
+void os_wdog_monitor_tmo(void *arg); 
+#endif
+
 #include "os/endian.h"
 #include "os/os_callout.h"
 #include "os/os_cfg.h"

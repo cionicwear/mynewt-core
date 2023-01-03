@@ -21,7 +21,7 @@
 
 #include "os/mynewt.h"
 #include "os_priv.h"
-
+#include "os/os.h"
 #include "hal/hal_os_tick.h"
 #include "hal/hal_bsp.h"
 #include "hal/hal_system.h"
@@ -188,19 +188,6 @@ os_main(void *arg)
 #endif
     assert(0);
 }
-
-#if MYNEWT_VAL(OS_WATCHDOG_MONITOR)
-static void
-os_wdog_monitor_tmo(void *arg)
-{
-    /*
-     * Hardware watchdog about to fire.
-     * Stop in debugger/coredump/fault printout.
-     */
-    assert(0);
-    while(1);
-}
-#endif
 
 void
 os_init_idle_task(void)

@@ -93,6 +93,15 @@ SECTIONS
         KEEP(*(.eh_frame*))
     } > FLASH
 
+    .cionic_ctrl :
+    {
+        _scctrl = .;
+        . = ALIGN(4);
+        KEEP(*(.cionic_ctrl*))
+        . = ALIGN(4);
+        _ecctrl = .;
+    } > FLASH
+
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
@@ -115,6 +124,20 @@ SECTIONS
         . = . + (__isr_vector_end - __isr_vector_start);
         . = ALIGN(4);
     } > RAM
+
+    .recovery (NOLOAD):
+    { 
+        . = ALIGN(4);
+        *(.recovery*);
+        . = ALIGN(4);
+    } > DTCM
+
+    .bootstate (NOLOAD):
+    { 
+        . = ALIGN(4);
+        *(.bootstate*);
+        . = ALIGN(4);
+    } > DTCM
 
     .coredata :
     {
@@ -222,7 +245,7 @@ SECTIONS
         *(.stack*)
     } > DTCM
 
-    .ipc_shmem  :
+    .ipc_shmem (NOLOAD):
     { 
         . = ALIGN(4);
         _sipc_shmem = .; 
@@ -230,16 +253,16 @@ SECTIONS
             
         . = ALIGN(4);
         _eipc_shmem = .;
-    } >SRAM4 AT> FLASH
+    } >SRAM4
 
-    .ipc_async_shmem  :
+    .ipc_async_shmem (NOLOAD):
     { 
         . = ALIGN(4);
         _sipc_ashmem = .; 
         *(.ipc_async_shmem*);
         . = ALIGN(4);
         _eipc_ashmem = .;
-    } >SRAM4 AT> FLASH
+    } >SRAM4
 
     /* Set stack top to end of DTCM; stack limit is bottom of stack */
     __StackTop = ORIGIN(DTCM) + LENGTH(DTCM);
