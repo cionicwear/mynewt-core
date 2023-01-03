@@ -39,9 +39,9 @@ typedef uint32_t os_stack_t;
 /* Stack sizes for common OS tasks */
 #define OS_SANITY_STACK_SIZE (64)
 #if MYNEWT_VAL(OS_SYSVIEW)
-#define OS_IDLE_STACK_SIZE (80)
+#define OS_IDLE_STACK_SIZE ((MYNEWT_VAL(OS_IDLE_STACK_SZ)) + 16)
 #else
-#define OS_IDLE_STACK_SIZE (64)
+#define OS_IDLE_STACK_SIZE (MYNEWT_VAL(OS_IDLE_STACK_SZ))
 #endif
 
 static inline int

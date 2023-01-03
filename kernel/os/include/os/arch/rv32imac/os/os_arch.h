@@ -35,7 +35,7 @@ typedef uint32_t os_stack_t;
 
 /* Stack sizes for common OS tasks */
 #define OS_SANITY_STACK_SIZE (96)
-#define OS_IDLE_STACK_SIZE (64)
+#define OS_IDLE_STACK_SIZE (MYNEWT_VAL(OS_IDLE_STACK_SZ))
 
 void plic_default_isr(int num);
 
