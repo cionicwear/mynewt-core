@@ -102,6 +102,33 @@ SECTIONS
         _ecctrl = .;
     } > FLASH
 
+    .fsm_state :
+    {
+        . = ALIGN(4);
+        _fsm_start = .;
+        KEEP(*(.fsm_state*))           /* fsm state */
+        . = ALIGN(4);
+        _fsm_end = . ;
+    } >FLASH
+
+    .fsm_trans :
+    {
+        . = ALIGN(4);
+        _fsm_trans_start = .;
+        KEEP(*(.fsm_trans))           /* fsm transition*/
+        . = ALIGN(4);
+        _fsm_trans_end = . ;
+    } >FLASH
+
+    .fsm_evt :
+    {
+        . = ALIGN(4);
+        _fsm_evt_start = .;
+        KEEP(*(.fsm_evt))           /* fsm event*/
+        . = ALIGN(4);
+        _fsm_evt_end = . ;
+    } >FLASH
+
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
