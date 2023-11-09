@@ -26,3 +26,4 @@ pkg.keywords:
     - sim
     - compiler
     - gcc
+    - g++

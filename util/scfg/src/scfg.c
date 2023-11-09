@@ -154,7 +154,7 @@ scfg_handler_export(void (*func)(char *name, char *val),
 
     SCFG_FOREACH_SETTING(group, setting) {
         scfg_setting_id(group->handler.ch_name, setting->name, id_buf);
-        if (setting->private) {
+        if (setting->is_private) {
             val = "<set>";
         } else {
             val = conf_str_from_value(setting->type, setting->val,

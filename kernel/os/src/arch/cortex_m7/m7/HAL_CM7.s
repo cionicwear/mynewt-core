@@ -235,7 +235,8 @@ os_default_irq_asm:
 
         .fnend
         .size   os_default_irq_asm, .-os_default_irq_asm
-
+        
+#if !MYNEWT_VAL(CPP_SUPPORT)
         /*
          * Prevent libgcc unwind stuff from getting pulled in.
          */
@@ -243,6 +244,7 @@ os_default_irq_asm:
         .global __aeabi_unwind_cpp_pr0
 __aeabi_unwind_cpp_pr0:
         .end
+#endif
 
 /*----------------------------------------------------------------------------
  * end of file

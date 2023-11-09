@@ -22,6 +22,11 @@
 
 #include "config/config.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 struct scfg_setting {
     /** The name of the setting. */
     const char *name;
@@ -42,7 +47,7 @@ struct scfg_setting {
      * Whether this setting contains private data.  If true, the value is
      * hidden in config dump output.
      */
-    bool private;
+    bool is_private;
 };
 
 struct scfg_group {
@@ -97,5 +102,9 @@ int scfg_save_val(const struct scfg_group *group, const void *val);
  * @return                      0 on success; SYS_E[...] code on failure.
  */
 int scfg_register(struct scfg_group *group, char *name);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

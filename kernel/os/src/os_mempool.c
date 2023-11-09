@@ -305,8 +305,10 @@ os_memblock_from(const struct os_mempool *mp, const void *block_addr)
     uint32_t baddr32;
     uint32_t end;
 
+    #ifndef GTEST_OS_NEWT_SIM
     static_assert(sizeof block_addr == sizeof baddr32,
                   "Pointer to void must be 32-bits.");
+    #endif
 
     baddr32 = (uint32_t)block_addr;
     true_block_size = OS_MEMPOOL_TRUE_BLOCK_SIZE(mp);
