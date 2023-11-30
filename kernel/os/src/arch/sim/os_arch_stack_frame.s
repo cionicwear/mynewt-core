@@ -18,10 +18,13 @@
  */
 
 #if defined MN_LINUX
+#define sigsetjmp   __sigsetjmp
 #define CNAME(x)    x
 #elif defined MN_OSX
+#define sigsetjmp   sigsetjmp
 #define CNAME(x)    _ ## x
 #elif defined MN_FreeBSD
+#define sigsetjmp   sigsetjmp
 #define CNAME(x)    x
 #else
 #error "unsupported platform"
@@ -29,6 +32,7 @@
 
 .section __TEXT,__text,regular,pure_instructions
 
+.balign 8
 .globl CNAME(os_arch_frame_init)
 .globl _os_arch_frame_init
 /*
@@ -77,13 +81,13 @@ CNAME(os_arch_frame_init):
      * ----------------
      */
     mov x0, x29
-    sub x0, x0, #0x8
+    sub x0, x0, #0x10
     and x0, x0, #0xfffffffffffffff0 // Align x0 on a 16-byte boundary
-    ldr x1, [x1, #0x4]       // Load &sf->sf_jb into x1
+    ldr x1, [x1, #0x8]       // Load &sf->sf_jb into x1
     str x0, [x29]            // Save the aligned x0 (new stack pointer)
     ldr x0, [x29, #0x10]     // Load &sf->sf_jb into x0
     mov x2, #0
-   bl CNAME(sigsetjmp)      // sigsetjmp(sf->sf_jb, 0)
+    bl CNAME(sigsetjmp)      // sigsetjmp(sf->sf_jb, 0)
     cbz x0, 1f               // If x0 is 0, jump to 1
     ldr x0, [x29, #0x10]     // Load 'sf' from saved x30
     ldr x1, [x29, #0x8]      // Load saved x29

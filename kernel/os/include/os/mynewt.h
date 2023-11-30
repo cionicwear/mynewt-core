@@ -20,6 +20,10 @@
 #ifndef H_OS_MYNEWT_
 #define H_OS_MYNEWT_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "syscfg/syscfg.h"
 #include "sysdown/sysdown.h"
 #include "sysinit/sysinit.h"
@@ -31,6 +35,10 @@
 /* Only include the logcfg header if this version of newt can generate it. */
 #if MYNEWT_VAL(NEWT_FEATURE_LOGCFG)
 #include "logcfg/logcfg.h"
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

@@ -164,6 +164,10 @@ static int utf8EscapedDump(FILE *out, const char *buffer, size_t n)
             continue;
         }
 
+    print_utf16:
+         if (fprintf(out, "\\u%04" PRIX32, uc) < 0)
+                return CborErrorIO;
+
         /* multi-byte UTF-8, decode it */
         unsigned charsNeeded;
         uint32_t min_uc;
@@ -226,11 +230,6 @@ static int utf8EscapedDump(FILE *out, const char *buffer, size_t n)
             if (fprintf(out, "\\u%04" PRIX32 "\\u%04" PRIX32,
                         (uc >> 10) + 0xd7c0,    /* high surrogate */
                         (uc % 0x0400) + 0xdc00) < 0)
-                return CborErrorIO;
-        } else {
-print_utf16:
-            /* no surrogate pair needed */
-            if (fprintf(out, "\\u%04" PRIX32, uc) < 0)
                 return CborErrorIO;
         }
     }

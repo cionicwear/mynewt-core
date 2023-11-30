@@ -17,6 +17,10 @@
  * under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
@@ -1213,22 +1217,24 @@ void
 sensor_mgr_put_notify_evt(struct sensor_notify_ev_ctx *ctx,
                           sensor_event_type_t evtype)
 {
-    struct sensor_notify_os_ev *snoe = os_memblock_get(&sensor_notify_evt_pool);
+    struct sensor_notify_os_ev *snoe = (struct sensor_notify_os_ev *)os_memblock_get(&sensor_notify_evt_pool);
 
     if (!snoe) {
         /* no free events */
         return;
     }
 
+    #if !MYNEWT_VAL(UNITTEST)
     *snoe = (struct sensor_notify_os_ev) {
-        .snoe_evt = {
+        .snoe_evt = (struct os_event){
             .ev_arg = snoe,
-            .ev_cb = sensor_notify_ev_cb,
+            .ev_cb = (os_event_fn*)sensor_notify_ev_cb,
         },
 
         .snoe_evtype = evtype,
         .snoe_sensor = ctx->snec_sensor,
     };
+    #endif
 
     os_eventq_put(sensor_mgr_evq_get(), &(snoe->snoe_evt));
 }
@@ -1248,9 +1254,7 @@ sensor_mgr_put_read_evt(void *arg)
 static void
 sensor_interrupt_ev_cb(struct os_event *ev)
 {
-    struct sensor *sensor;
-
-    sensor = ev->ev_arg;
+    struct sensor *sensor = ( struct sensor *)ev->ev_arg;
 
     if (sensor && sensor->s_funcs->sd_handle_interrupt) {
         sensor->s_funcs->sd_handle_interrupt(sensor);
@@ -2239,3 +2243,7 @@ sensor_reset(struct sensor *sensor)
     sensor_unlock(sensor);
     return rc;
 }
+
+#ifdef __cplusplus
+}
+#endif

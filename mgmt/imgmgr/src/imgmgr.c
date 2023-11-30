@@ -86,6 +86,7 @@ static int
 imgr_erase_state(struct mgmt_ctxt *ctxt);
 
 static const struct mgmt_handler imgr_mgmt_handlers[] = {
+#if !MYNEWT_VAL(UNITTEST)
     [IMGMGR_NMGR_ID_CORELIST] = {
 #if MYNEWT_VAL(IMGMGR_COREDUMP)
         .mh_read = imgr_core_list,
@@ -108,6 +109,7 @@ static const struct mgmt_handler imgr_mgmt_handlers[] = {
         .mh_read = NULL,
         .mh_write = imgr_erase_state,
     },
+#endif
 };
 
 #define IMGR_HANDLER_CNT                                                \

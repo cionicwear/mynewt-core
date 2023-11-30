@@ -118,6 +118,8 @@ void os_reboot(int reason);
  */
 void os_system_reset(void);
 
+extern void os_mempool_module_init(void);
+
 /**
  * Called before the watchod kick in. Must be defined in application code
  * 

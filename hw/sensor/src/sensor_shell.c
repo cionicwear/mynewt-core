@@ -46,8 +46,8 @@
 
 static int sensor_cmd_exec(int, char **);
 static struct shell_cmd shell_sensor_cmd = {
+    .sc_cmd_func = sensor_cmd_exec,
     .sc_cmd = "sensor",
-    .sc_cmd_func = sensor_cmd_exec
 };
 
 struct sensor_poll_data {
@@ -108,7 +108,7 @@ sensor_cmd_display_type(char **argv)
     int i;
     int rc;
     struct sensor *sensor;
-    unsigned int type;
+    long int type;
 
     rc = 0;
 

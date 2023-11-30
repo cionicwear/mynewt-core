@@ -119,7 +119,12 @@ void sysinit_app(void);
     sysinit_app();                                                          \
     sysinit_end();                                                          \
 } while (0)
+#endif
 
+#if MYNEWT_VAL(UNITTEST)
+void os_pkg_init(void);
+void config_pkg_init(void);
+void config_pkg_init_stage2(void);
 #endif
 
 #ifdef __cplusplus

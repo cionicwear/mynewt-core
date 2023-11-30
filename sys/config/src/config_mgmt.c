@@ -70,6 +70,7 @@ conf_mgmt_read(struct mgmt_ctxt *cb)
     CborError g_err = CborNoError;
 
     const struct cbor_attr_t attr[2] = {
+       #if !MYNEWT_VAL(UNITTEST)
         [0] = {
             .attribute = "name",
             .type = CborAttrTextStringType,
@@ -79,6 +80,7 @@ conf_mgmt_read(struct mgmt_ctxt *cb)
         [1] = {
             .attribute = NULL
         }
+        #endif
     };
 
     rc = cbor_read_object(&cb->it, attr);
@@ -110,6 +112,7 @@ conf_mgmt_write(struct mgmt_ctxt *cb)
     char val_str[CONF_MAX_VAL_LEN];
     bool do_save = false;
     const struct cbor_attr_t val_attr[] = {
+        #if !MYNEWT_VAL(UNITTEST)
         [0] = {
             .attribute = "name",
             .type = CborAttrTextStringType,
@@ -130,6 +133,7 @@ conf_mgmt_write(struct mgmt_ctxt *cb)
         [3] = {
             .attribute = NULL
         }
+        #endif
     };
 
     name_str[0] = '\0';

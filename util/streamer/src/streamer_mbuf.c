@@ -70,12 +70,8 @@ streamer_mbuf_new(struct streamer_mbuf *sm, struct os_mbuf *om)
     if (sm == NULL || om == NULL) {
         return SYS_EINVAL;
     }
-
-    *sm = (struct streamer_mbuf) {
-        .streamer.cfg = &streamer_cfg_mbuf,
-        .om = om,
-    };
-
+    sm->streamer.cfg = &streamer_cfg_mbuf;
+    sm->om = om;
     return 0;
 }
 

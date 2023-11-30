@@ -245,11 +245,12 @@ scfg_register(struct scfg_group *group, char *name)
 
     group->handler = (struct conf_handler) {
         .ch_name = name,
+        .ch_ext = true,
         .ch_get_ext = scfg_handler_get,
         .ch_set_ext = scfg_handler_set,
         .ch_export_ext = scfg_handler_export,
         .ch_arg = group,
-        .ch_ext = true,
+        
     };
 
     rc = conf_register(&group->handler);

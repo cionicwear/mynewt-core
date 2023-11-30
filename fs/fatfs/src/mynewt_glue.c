@@ -95,12 +95,12 @@ static struct fs_ops fatfs_ops = {
     .f_readdir = fatfs_readdir,
     .f_closedir = fatfs_closedir,
 
+    .f_mount = fatfs_mount,
+    .f_unmount = fatfs_unmount,
+    .f_is_mounted = fatfs_is_mounted,
+
     .f_dirent_name = fatfs_dirent_name,
     .f_dirent_is_dir = fatfs_dirent_is_dir,
-
-    .f_unmount = fatfs_unmount,
-    .f_mount = fatfs_mount,
-    .f_is_mounted = fatfs_is_mounted,
 
     .f_name = "fatfs"
 };

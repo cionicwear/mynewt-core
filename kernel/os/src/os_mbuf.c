@@ -266,7 +266,7 @@ os_mbuf_append(struct os_mbuf *om, const void *data,  uint16_t len)
 {
     struct os_mbuf_pool *omp;
     struct os_mbuf *last;
-    struct os_mbuf *new;
+    struct os_mbuf *temp;
     int remainder;
     int space;
     int rc;
@@ -306,17 +306,17 @@ os_mbuf_append(struct os_mbuf *om, const void *data,  uint16_t len)
      * data into it, until data is exhausted.
      */
     while (remainder > 0) {
-        new = os_mbuf_get(omp, 0);
-        if (!new) {
+        temp = os_mbuf_get(omp, 0);
+        if (!temp) {
             break;
         }
 
-        new->om_len = min(omp->omp_databuf_len, remainder);
-        memcpy(OS_MBUF_DATA(new, void *), data, new->om_len);
-        data += new->om_len;
-        remainder -= new->om_len;
-        SLIST_NEXT(last, om_next) = new;
-        last = new;
+        temp->om_len = min(omp->omp_databuf_len, remainder);
+        memcpy(OS_MBUF_DATA(temp, void *), data, temp->om_len);
+        data += temp->om_len;
+        remainder -= temp->om_len;
+        SLIST_NEXT(last, om_next) = temp;
+        last = temp;
     }
 
     /* Adjust the packet header length in the buffer */

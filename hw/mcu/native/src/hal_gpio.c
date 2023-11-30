@@ -23,12 +23,15 @@
 
 #define HAL_GPIO_NUM_PINS 8
 
+// Define the enum type outside the structure
+enum gpio_dir {
+    INPUT,
+    OUTPUT
+};
+
 static struct {
     int val;
-    enum {
-        INPUT,
-        OUTPUT
-    } dir;
+    enum gpio_dir dir;
 } hal_gpio[HAL_GPIO_NUM_PINS];
 
 

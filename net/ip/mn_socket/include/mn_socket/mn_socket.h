@@ -93,7 +93,7 @@ union mn_socket_cb {
         void (*writable)(void *cb_arg, int err);
     } socket;
     struct {
-        int (*newconn)(void *cb_arg, struct mn_socket *new);
+        int (*newconn)(void *cb_arg, struct mn_socket *temp);
     } listen;
 };
 

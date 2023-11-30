@@ -34,6 +34,10 @@ extern "C" {
 /* LED pins */
 #define LED_BLINK_PIN   (0x1)
 
+#if MYNEWT_VAL(UNITTEST)
+void hal_bsp_turn_off(void *arg);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

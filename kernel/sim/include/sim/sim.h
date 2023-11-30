@@ -48,6 +48,13 @@ void sim_restore_sr(os_sr_t osr);
 int sim_in_critical(void);
 void sim_tick_idle(os_time_t ticks);
 
+
+
+#ifdef MN_OSX
+#define OS_PRINT_ASSERT_SIM(file, line, func, e) do \
+{\
+} while (0)
+#else
 /**
  * Prints information about a crash to stdout.  This functionality is defined
  * as a macro rather than a function to ensure that it gets inlined, enforcing
@@ -64,6 +71,8 @@ void sim_tick_idle(os_time_t ticks);
                 (file), (line));                                            \
     }                                                                       \
 } while (0)
+
+#endif
 
 #ifdef __cplusplus
 }

@@ -67,8 +67,8 @@ static const struct shell_cmd_help ticks_help = {
 
 static const struct shell_cmd prompt_commands[] = {
     {
-        .sc_cmd = "ticks",
         .sc_cmd_func = shell_ticks_cmd,
+        .sc_cmd = "ticks",
 #if MYNEWT_VAL(SHELL_CMD_HELP)
         .help = &ticks_help,
 #endif

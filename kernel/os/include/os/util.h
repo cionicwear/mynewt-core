@@ -20,6 +20,10 @@
 #ifndef H_OS_UTIL_
 #define H_OS_UTIL_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Helpers to pass integers as pointers and vice-versa */
 #define POINTER_TO_UINT(p) ((unsigned int) ((uintptr_t) (p)))
 #define UINT_TO_POINTER(u) ((void *) ((uintptr_t) (u)))
@@ -34,5 +38,9 @@
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(array) \
         (sizeof(array) / sizeof((array)[0]))
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 #endif

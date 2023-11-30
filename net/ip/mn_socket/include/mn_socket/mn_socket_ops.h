@@ -77,10 +77,10 @@ mn_socket_readable(struct mn_socket *s, int error)
 }
 
 static inline int
-mn_socket_newconn(struct mn_socket *s, struct mn_socket *new)
+mn_socket_newconn(struct mn_socket *s, struct mn_socket *temp)
 {
     if (s->ms_cbs && s->ms_cbs->listen.newconn) {
-        return s->ms_cbs->listen.newconn(s->ms_cb_arg, new);
+        return s->ms_cbs->listen.newconn(s->ms_cb_arg, temp);
     } else {
         return -1;
     }

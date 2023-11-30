@@ -259,10 +259,19 @@ os_mempool_clear(struct os_mempool *mp)
     mp->mp_min_free = mp->mp_num_blocks;
     os_mempool_poison(mp, (void *)mp->mp_membuf_addr);
     os_mempool_guard(mp, (void *)mp->mp_membuf_addr);
+    #ifdef MN_OSX
+    SLIST_FIRST(mp) = (struct os_memblock *)(uintptr_t)mp->mp_membuf_addr;
+    #else
     SLIST_FIRST(mp) = (void *)mp->mp_membuf_addr;
+    #endif
 
     /* Chain the memory blocks to the free list */
+    #ifdef MN_OSX
+    block_addr = (uint8_t *)(uintptr_t)mp->mp_membuf_addr;
+    #else
     block_addr = (uint8_t *)mp->mp_membuf_addr;
+    #endif
+
     block_ptr = (struct os_memblock *)block_addr;
     blocks = mp->mp_num_blocks;
 
@@ -305,12 +314,14 @@ os_memblock_from(const struct os_mempool *mp, const void *block_addr)
     uint32_t baddr32;
     uint32_t end;
 
-    #ifndef GTEST_OS_NEWT_SIM
+    #ifndef MN_OSX
     static_assert(sizeof block_addr == sizeof baddr32,
                   "Pointer to void must be 32-bits.");
-    #endif
-
     baddr32 = (uint32_t)block_addr;
+    #else
+    baddr32 = (uint32_t)(uintptr_t)block_addr;
+    #endif
+    
     true_block_size = OS_MEMPOOL_TRUE_BLOCK_SIZE(mp);
     end = mp->mp_membuf_addr + (mp->mp_num_blocks * true_block_size);
 
