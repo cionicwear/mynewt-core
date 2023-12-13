@@ -23,7 +23,7 @@
 
 #define HAL_GPIO_NUM_PINS 8
 
-// Define the enum type outside the structure
+// Define the enum type outside the structure (cpp support)
 enum gpio_dir {
     INPUT,
     OUTPUT

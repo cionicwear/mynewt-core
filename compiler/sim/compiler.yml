@@ -24,7 +24,7 @@ compiler.path.as: "gcc"
 compiler.path.archive: "ar"
 compiler.path.objdump: "objdump"
 compiler.path.objsize: "size"
-compiler.flags.base: [ -Wall, -Werror, -ggdb, -ffunction-sections, -fdata-sections, -fno-common]
+compiler.flags.base: [ -Wall, -Werror, -ggdb, -ffunction-sections, -fdata-sections, -fno-common, -fpermissive -w]
 compiler.ld.resolve_circular_deps: true
 
 compiler.flags.default: [compiler.flags.base, -O1]
@@ -43,10 +43,10 @@ compiler.path.cpp.DARWIN.OVERWRITE: "aarch64-apple-darwin23-g++-13"
 compiler.path.cc.DARWIN.OVERWRITE: "aarch64-apple-darwin23-g++-13"
 compiler.path.as.DARWIN.OVERWRITE: "aarch64-apple-darwin23-gcc-13"
 compiler.path.objdump.DARWIN.OVERWRITE: "objdump"
-compiler.flags.base.DARWIN: [-DMN_OSX, -Wno-missing-braces, -Wno-error=unused-variable, -Wno-error=sign-compare, -Wno-error=write-strings]
+compiler.path.objcopy.DARWIN.OVERWRITE: "objcopy"
+compiler.flags.base.DARWIN: [-DMN_OSX, -Wno-missing-braces, -Wno-unused-variable, -Wno-sign-compare, -Wno-write-strings, -Wno-int-to-pointer-cast]
 compiler.ld.flags.DARWIN.OVERWRITE: -lm -lSystem -dead_strip
 compiler.ld.resolve_circular_deps.DARWIN.OVERWRITE: false
-
 compiler.path.cc.FREEBSD.OVERWRITE: "cc"
 compiler.path.as.FREEBSD.OVERWRITE: "cc"
 compiler.flags.base.FREEBSD: [-DMN_FreeBSD, -D_WITH_DPRINTF]
