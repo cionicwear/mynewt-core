@@ -119,7 +119,7 @@ int tc_hmac_update(TCHmacState_t ctx,
 		return TC_CRYPTO_FAIL;
 	}
 
-	(void)tc_sha256_update(&ctx->hash_state, (uint8_t*)data, data_length);
+	(void)tc_sha256_update(&ctx->hash_state, data, data_length);
 
 	return TC_CRYPTO_SUCCESS;
 }

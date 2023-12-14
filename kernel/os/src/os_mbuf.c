@@ -306,6 +306,7 @@ os_mbuf_append(struct os_mbuf *om, const void *data,  uint16_t len)
      * data into it, until data is exhausted.
      */
     while (remainder > 0) {
+		//change to temp instead of new due to conflict when compiling for c++
         temp = os_mbuf_get(omp, 0);
         if (!temp) {
             break;

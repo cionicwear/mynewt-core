@@ -154,6 +154,7 @@ scfg_handler_export(void (*func)(char *name, char *val),
 
     SCFG_FOREACH_SETTING(group, setting) {
         scfg_setting_id(group->handler.ch_name, setting->name, id_buf);
+		//change to is_private because there is a conflict when compiling code for c++
         if (setting->is_private) {
             val = "<set>";
         } else {
