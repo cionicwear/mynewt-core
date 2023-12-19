@@ -108,7 +108,7 @@ sensor_cmd_display_type(char **argv)
     int i;
     int rc;
     struct sensor *sensor;
-    long int type;
+    unsigned int type;
 
     rc = 0;
 

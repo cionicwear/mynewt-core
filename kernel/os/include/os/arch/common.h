@@ -60,8 +60,6 @@ struct os_task;
 
 #ifdef MN_OSX
 void os_arch_task_start(struct stack_frame *sf, int rc) __attribute__((aligned(8)));
-#else
-void os_arch_task_start(struct stack_frame *sf, int rc);
 #endif
 os_stack_t *os_arch_task_stack_init(struct os_task *, os_stack_t *, int);
 void os_arch_ctx_sw(struct os_task *);
