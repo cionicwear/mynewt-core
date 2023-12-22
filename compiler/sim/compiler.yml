@@ -36,8 +36,9 @@ compiler.ld.binfile: true
 compiler.ld.flags: -lm -Wl,--gc-sections
 
 # Linux.
-compiler.flags.base.LINUX: [-DMN_LINUX]
+compiler.flags.base.LINUX: [-DMN_LINUX, -Wno-missing-braces, -Wno-unused-variable, -Wno-sign-compare, -Wno-write-strings, -Wno-int-to-pointer-cast]
 compiler.ld.flags.LINUX: [-lutil]
+compiler.path.cpp.LINUX.OVERWRITE: "g++-5"
 
 # OS X.
 compiler.path.cpp.DARWIN.OVERWRITE: "aarch64-apple-darwin23-g++-13"
