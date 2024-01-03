@@ -314,7 +314,7 @@ os_memblock_from(const struct os_mempool *mp, const void *block_addr)
     uint32_t baddr32;
     uint32_t end;
 
-    #ifndef MN_OSX
+    #if !defined (MN_OSX) && !defined (MN_LINUX)
     static_assert(sizeof block_addr == sizeof baddr32,
                   "Pointer to void must be 32-bits.");
     baddr32 = (uint32_t)block_addr;
