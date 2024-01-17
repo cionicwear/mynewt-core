@@ -245,24 +245,23 @@ SECTIONS
         *(.stack*)
     } > DTCM
 
+    .ipc (NOLOAD):
+    { 
+        . = ALIGN(4);
+        *(.ipc*);
+            
+        . = ALIGN(4);
+    } >IPC
+
     .ipc_shmem (NOLOAD):
     { 
         . = ALIGN(4);
-        _sipc_shmem = .; 
+        __ipc_sshmem = .;
         *(.ipc_shmem*);
-            
         . = ALIGN(4);
-        _eipc_shmem = .;
-    } >SRAM4
+        __ipc_eshmem = .;
+    } >IPC
 
-    .ipc_async_shmem (NOLOAD):
-    { 
-        . = ALIGN(4);
-        _sipc_ashmem = .; 
-        *(.ipc_async_shmem*);
-        . = ALIGN(4);
-        _eipc_ashmem = .;
-    } >SRAM4
 
     /* Set stack top to end of DTCM; stack limit is bottom of stack */
     __StackTop = ORIGIN(DTCM) + LENGTH(DTCM);
