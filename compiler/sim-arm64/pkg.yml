@@ -6,7 +6,7 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-#
+# 
 #  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
@@ -17,13 +17,13 @@
 # under the License.
 #
 
-syscfg.defs:
-   HARDFLOAT:
-       description: 'Use hardware FPU'
-       value: 0
-   CPP_SUPPORT:
-       description: 'Use C++'
-       value: 0
-   UNITTEST:
-       description: 'Disable code if unit test enabled'
-       value: 0
+pkg.name: compiler/sim-arm64
+pkg.type: compiler
+pkg.description: Compiler definition for native g++ compiler.
+pkg.author: "Apache Mynewt <dev@mynewt.apache.org>"
+pkg.homepage: "http://mynewt.apache.org/"
+pkg.keywords:
+    - sim
+    - compiler
+    - gcc
+    - g++

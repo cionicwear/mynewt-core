@@ -52,9 +52,5 @@ bsp.flash_map:
             device: 0
             offset: 0x00008000
             size: 32kB
-        FLASH_AREA_RINGBUF:
-            user_id: 4
-            device: 1
-            offset: 0x3FE00000
-            size: 2048kB
+
     

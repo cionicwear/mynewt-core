@@ -20,7 +20,7 @@
 #if defined MN_LINUX
 #define sigsetjmp   __sigsetjmp
 #define CNAME(x)    x
-#elif defined MN_OSX
+#elif defined MN_OSX || defined (MN_OSX_ARM64)
 #define sigsetjmp   sigsetjmp
 #define CNAME(x)    _ ## x
 #elif defined MN_FreeBSD
@@ -30,7 +30,7 @@
 #error "unsupported platform"
 #endif
 
-#if defined MN_OSX
+#if defined MN_OSX_ARM64
 .section __TEXT,__text,regular,pure_instructions
 
 .balign 8

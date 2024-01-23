@@ -24,7 +24,7 @@
 #ifdef MN_LINUX
 #include <pty.h>
 #endif
-#ifdef MN_OSX
+#if defined (MN_OSX) || defined (MN_OSX_ARM64)
 #include <util.h>
 #endif
 #ifdef MN_FreeBSD

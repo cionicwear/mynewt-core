@@ -58,7 +58,7 @@ struct os_task;
 #define OS_ASSERT_CRITICAL()            (assert(os_arch_in_critical()))
 #endif
 
-#ifdef MN_OSX
+#ifdef MN_OSX_ARM64
 void os_arch_task_start(struct stack_frame *sf, int rc) __attribute__((aligned(8)));
 #endif
 os_stack_t *os_arch_task_stack_init(struct os_task *, os_stack_t *, int);

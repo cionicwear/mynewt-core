@@ -118,9 +118,7 @@ void os_reboot(int reason);
  */
 void os_system_reset(void);
 
-#if MYNEWT_VAL(UNITTEST)
 extern void os_mempool_module_init(void);
-#endif
 /**
  * Called before the watchod kick in. Must be defined in application code
  * 

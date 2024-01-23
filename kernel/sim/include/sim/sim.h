@@ -50,7 +50,7 @@ void sim_tick_idle(os_time_t ticks);
 
 
 
-#ifdef MN_OSX
+#ifdef MN_OSX_ARM64
 #define OS_PRINT_ASSERT_SIM(file, line, func, e) do \
 {\
 } while (0)
