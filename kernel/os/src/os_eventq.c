@@ -43,7 +43,7 @@ os_eventq_inited(const struct os_eventq *evq)
 void
 os_eventq_put(struct os_eventq *evq, struct os_event *ev)
 {
-     #if !MYNEWT_VAL(UNITTEST)
+#if !MYNEWT_VAL(UNITTEST)
     int resched;
     os_sr_t sr;
 
@@ -87,7 +87,7 @@ os_eventq_put(struct os_eventq *evq, struct os_event *ev)
     }
 
     os_trace_api_ret(OS_TRACE_ID_EVENTQ_PUT);
-    #endif
+#endif
 }
 
 struct os_event *

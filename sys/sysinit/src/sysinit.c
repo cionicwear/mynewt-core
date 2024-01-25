@@ -61,7 +61,7 @@ sysinit_end(void)
     sysinit_active = 0;
 }
 
-#if !SPLIT_LOADER && MYNEWT_VAL(UNITTEST)
+#ifdef MN_OSX_ARM64
 
 void
 sysinit_app(void)

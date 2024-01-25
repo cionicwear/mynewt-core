@@ -53,11 +53,11 @@ extern "C" {
 
 
 #if __STDC_VERSION__ >= 201112L || __cplusplus >= 201103L || __cpp_static_assert >= 200410
-    #ifdef __cplusplus
+#ifdef __cplusplus
     #  define cbor_static_assert(x)         static_assert(x, #x)
-    #else
+#else
     #  define cbor_static_assert(x)         _Static_assert(x, #x)
-    #endif
+#endif
 #elif !defined(__cplusplus) && defined(__GNUC__) && (__GNUC__ * 100 + __GNUC_MINOR__ >= 406)
 #  define cbor_static_assert(x)         _Static_assert(x, #x)
 #else

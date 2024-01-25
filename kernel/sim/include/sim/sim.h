@@ -48,8 +48,6 @@ void sim_restore_sr(os_sr_t osr);
 int sim_in_critical(void);
 void sim_tick_idle(os_time_t ticks);
 
-
-
 #ifdef MN_OSX_ARM64
 #define OS_PRINT_ASSERT_SIM(file, line, func, e) do \
 {\

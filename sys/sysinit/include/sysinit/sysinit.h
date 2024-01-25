@@ -121,7 +121,7 @@ void sysinit_app(void);
 } while (0)
 #endif
 
-#if MYNEWT_VAL(UNITTEST)
+#ifdef MN_OSX_ARM64
 void os_pkg_init(void);
 void config_pkg_init(void);
 void config_pkg_init_stage2(void);

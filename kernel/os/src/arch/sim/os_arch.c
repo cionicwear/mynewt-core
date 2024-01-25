@@ -30,9 +30,9 @@ CTASSERT(offsetof(struct stack_frame, sf_jb) == 4);
 void
 os_arch_task_start(struct stack_frame *sf, int rc)
 {
-    #if !MYNEWT_VAL(UNITTEST)
+#if !MYNEWT_VAL(UNITTEST)
     sim_task_start(sf, rc);
-    #endif
+#endif
 }
 
 os_stack_t *
@@ -62,27 +62,27 @@ os_arch_os_init(void)
 void
 os_arch_ctx_sw(struct os_task *next_t)
 {
-    #if !MYNEWT_VAL(UNITTEST)
+#if !MYNEWT_VAL(UNITTEST)
     sim_ctx_sw(next_t);
-    #endif
+#endif
 }
 
 os_sr_t
 os_arch_save_sr(void)
 {
-    #if !MYNEWT_VAL(UNITTEST)
+#if !MYNEWT_VAL(UNITTEST)
     return sim_save_sr();
-    #else
+#else
     return 0;
-    #endif
+#endif
 }
 
 void
 os_arch_restore_sr(os_sr_t osr)
 {
-    #if !MYNEWT_VAL(UNITTEST)
+#if !MYNEWT_VAL(UNITTEST)
     sim_restore_sr(osr);
-    #endif
+#endif
 }
 
 int
