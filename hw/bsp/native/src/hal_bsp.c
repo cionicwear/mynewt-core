@@ -124,12 +124,6 @@ void
 hal_bsp_deinit(void)
 {
 }
-#if MYNEWT_VAL(UNITTEST)
-void 
-hal_bsp_turn_off(void *arg)
-{
-}
-#endif
 
 void
 hal_bsp_init_trng(void)

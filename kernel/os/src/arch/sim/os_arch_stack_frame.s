@@ -20,7 +20,7 @@
 #if defined MN_LINUX
 #define sigsetjmp   __sigsetjmp
 #define CNAME(x)    x
-#elif defined MN_OSX || defined (MN_OSX_ARM64)
+#elif defined MN_OSX
 #define sigsetjmp   sigsetjmp
 #define CNAME(x)    _ ## x
 #elif defined MN_FreeBSD

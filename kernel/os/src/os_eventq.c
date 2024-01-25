@@ -43,7 +43,7 @@ os_eventq_inited(const struct os_eventq *evq)
 void
 os_eventq_put(struct os_eventq *evq, struct os_event *ev)
 {
-#if !MYNEWT_VAL(UNITTEST)
+#ifndef MN_OSX_ARM64
     int resched;
     os_sr_t sr;
 
