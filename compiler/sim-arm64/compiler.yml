@@ -41,12 +41,12 @@ compiler.ld.flags.LINUX: [-lutil, -lstdc++]
 compiler.path.cpp.LINUX.OVERWRITE: "g++-10"
 
 # OS X.
-compiler.path.cpp.DARWIN.OVERWRITE: "aarch64-apple-darwin23-g++-13"
-compiler.path.cc.DARWIN.OVERWRITE: "aarch64-apple-darwin23-g++-13"
-compiler.path.as.DARWIN.OVERWRITE: "aarch64-apple-darwin23-gcc-13"
+compiler.path.cpp.DARWIN.OVERWRITE: "g++-13"
+compiler.path.cc.DARWIN.OVERWRITE: "gcc-13"
+compiler.path.as.DARWIN.OVERWRITE: "gcc-13"
 compiler.path.objdump.DARWIN.OVERWRITE: "objdump"
 compiler.path.objcopy.DARWIN.OVERWRITE: "objcopy"
 compiler.flags.base.DARWIN: [-DMN_OSX, -DMN_OSX_ARM64, -Wno-missing-braces, -Wno-unused-variable, -Wno-sign-compare, -Wno-write-strings, -Wno-int-to-pointer-cast]
-compiler.ld.flags.DARWIN.OVERWRITE: -lm -lSystem -dead_strip
+compiler.ld.flags.DARWIN.OVERWRITE: -lstdc++ -dead_strip
 compiler.ld.resolve_circular_deps.DARWIN.OVERWRITE: false
 
