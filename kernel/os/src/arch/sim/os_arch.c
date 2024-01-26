@@ -19,6 +19,7 @@
 
 #include "os/mynewt.h"
 #include "sim/sim.h"
+#include <hal/hal_os_tick.h>
 
 /*
  * Assert that 'sf_mainsp' and 'sf_jb' are at the specific offsets where
@@ -43,25 +44,39 @@ os_arch_task_start(struct stack_frame *sf, int rc)
 os_stack_t *
 os_arch_task_stack_init(struct os_task *t, os_stack_t *stack_top, int size)
 {
+#ifndef MN_OSX_ARM64
     return sim_task_stack_init(t, stack_top, size);
+#else
+    return NULL;
+#endif
 }
 
 os_error_t
 os_arch_os_start(void)
 {
+#ifndef MN_OSX_ARM64
     return sim_os_start();
+#else
+    return 0;
+#endif
 }
 
 void
 os_arch_os_stop(void)
 {
+#ifndef MN_OSX_ARM64
     sim_os_stop();
+#endif
 }
 
 os_error_t
 os_arch_os_init(void)
 {
+#ifndef MN_OSX_ARM64
     return sim_os_init();
+#else
+    return 0;
+#endif
 }
 
 void
@@ -93,13 +108,19 @@ os_arch_restore_sr(os_sr_t osr)
 int
 os_arch_in_critical(void)
 {
+#ifndef MN_OSX_ARM64
     return sim_in_critical();
+#else
+    return 0;
+#endif
 }
 
 void
 os_tick_idle(os_time_t ticks)
 {
+#ifndef MN_OSX_ARM64
     sim_tick_idle(ticks);
+#endif
 }
 
 void

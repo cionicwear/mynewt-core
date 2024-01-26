@@ -36,7 +36,7 @@ compiler.ld.binfile: true
 compiler.ld.flags: -lm -Wl,--gc-sections
 
 # Linux.
-compiler.flags.base.LINUX: [-DMN_LINUX, -DMN_LINUX_CPP, -Wno-missing-braces, -Wno-unused-variable, -Wno-sign-compare, -Wno-write-strings, -Wno-int-to-pointer-cast]
+compiler.flags.base.LINUX: [-DMN_LINUX, -DMN_LINUX_AMD64, -Wno-missing-braces, -Wno-unused-variable, -Wno-sign-compare, -Wno-write-strings, -Wno-int-to-pointer-cast]
 compiler.ld.flags.LINUX: [-lutil, -lstdc++]
 compiler.path.cpp.LINUX.OVERWRITE: "g++-10"
 

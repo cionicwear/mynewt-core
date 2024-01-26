@@ -20,9 +20,10 @@
 #ifndef H_KERNEL_SIM_
 #define H_KERNEL_SIM_
 
-#ifdef __cplusplus
+#if defined (__cplusplus) && defined (MN_LINUX_AMD64)
 extern "C" {
 #endif
+
 
 #include <stdio.h>
 #include <setjmp.h>
@@ -69,10 +70,9 @@ void sim_tick_idle(os_time_t ticks);
                 (file), (line));                                            \
     }                                                                       \
 } while (0)
-
 #endif
 
-#ifdef __cplusplus
+#if defined (__cplusplus) && defined (MN_LINUX_AMD64)
 }
 #endif
 

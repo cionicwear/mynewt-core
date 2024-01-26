@@ -17,10 +17,6 @@
  * under the License.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
@@ -2243,7 +2239,3 @@ sensor_reset(struct sensor *sensor)
     sensor_unlock(sensor);
     return rc;
 }
-
-#ifdef __cplusplus
-}
-#endif
