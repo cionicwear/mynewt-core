@@ -25,7 +25,11 @@
  * os_arch_frame_init() expects them to be.
  */
 CTASSERT(offsetof(struct stack_frame, sf_mainsp) == 0);
+#ifdef MN_LINUX_AMD64
+CTASSERT(offsetof(struct stack_frame, sf_jb) == 8);
+#else
 CTASSERT(offsetof(struct stack_frame, sf_jb) == 4);
+#endif
 
 void
 os_arch_task_start(struct stack_frame *sf, int rc)
