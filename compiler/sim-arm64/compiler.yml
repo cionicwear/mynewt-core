@@ -25,7 +25,7 @@ compiler.path.archive: "ar"
 compiler.path.objdump: "objdump"
 compiler.path.objsize: "size"
 compiler.path.objcopy: "objcopy"
-compiler.flags.base: [ -Wall, -Werror, -ggdb, -ffunction-sections, -fdata-sections, -fno-common, -fpermissive -w]
+compiler.flags.base: [-Wall, -Werror, -ggdb, -ffunction-sections, -fdata-sections, -Wno-missing-braces, -Wno-unused-variable, -Wno-sign-compare, -Wno-write-strings, -Wno-int-to-pointer-cast, -fno-common, -fpermissive -w]
 compiler.ld.resolve_circular_deps: true
 
 compiler.flags.default: [compiler.flags.base, -O1]
@@ -36,7 +36,7 @@ compiler.ld.binfile: true
 compiler.ld.flags: -lm -Wl,--gc-sections
 
 # Linux.
-compiler.flags.base.LINUX: [-DMN_LINUX, -DMN_LINUX_AMD64, -Wno-missing-braces, -Wno-unused-variable, -Wno-sign-compare, -Wno-write-strings, -Wno-int-to-pointer-cast]
+compiler.flags.base.LINUX: [-DMN_LINUX, -DMN_LINUX_AMD64]
 compiler.ld.flags.LINUX: [-lutil, -lstdc++]
 compiler.path.cpp.LINUX.OVERWRITE: "g++-10"
 
@@ -46,7 +46,7 @@ compiler.path.cc.DARWIN.OVERWRITE: "gcc-13"
 compiler.path.as.DARWIN.OVERWRITE: "gcc-13"
 compiler.path.objdump.DARWIN.OVERWRITE: "objdump"
 compiler.path.objcopy.DARWIN.OVERWRITE: "objcopy"
-compiler.flags.base.DARWIN: [-DMN_OSX, -DMN_OSX_ARM64, -Wno-missing-braces, -Wno-unused-variable, -Wno-sign-compare, -Wno-write-strings, -Wno-int-to-pointer-cast]
+compiler.flags.base.DARWIN: [-DMN_OSX, -DMN_OSX_ARM64]
 compiler.ld.flags.DARWIN.OVERWRITE: -lstdc++ -dead_strip
 compiler.ld.resolve_circular_deps.DARWIN.OVERWRITE: false
 
