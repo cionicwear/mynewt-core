@@ -43,6 +43,10 @@ extern "C" {
 uint32_t stm32_hal_timer_get_freq(void *timx);
 void stm32_periph_create(void);
 
+int hal_rtc_init(void);
+int hal_set_rtc_date_time(uint32_t epoch);
+int32_t hat_get_rtc_epoch(void);
+
 #ifdef __cplusplus
 }
 #endif
