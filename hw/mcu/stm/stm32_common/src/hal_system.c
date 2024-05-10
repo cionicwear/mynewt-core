@@ -182,7 +182,8 @@ int hal_set_rtc_date_time(uint32_t epoch)
     return HAL_OK;
 }
 
-uint32_t hat_get_rtc_epoch(void)
+//cannot use mktime because of linking issues between arm gcc and apache core libc
+void hat_get_rtc_date_time(char* date)
 {
     RTC_TimeTypeDef sTime;
     RTC_DateTypeDef sDate;
@@ -190,7 +191,7 @@ uint32_t hat_get_rtc_epoch(void)
     HAL_RTC_GetTime(&hRTC_Handle, &sTime, RTC_FORMAT_BIN);
     HAL_RTC_GetDate(&hRTC_Handle, &sDate, RTC_FORMAT_BIN);
 
-    CILOG(INFO, SYSTEM , "%u-%u-%u:%u:%u:%u", sDate.Year, sDate.Month, sDate.Date, sTime.Hours, sTime.Minutes, sTime.Seconds);
+    sprintf(date, "%02d%02d%02d-%02d:%02d:%02d", sDate.Year, sDate.Month, sDate.Date, sTime.Hours, sTime.Minutes, sTime.Seconds);
 
-    return HAL_OK;
+    CILOG(INFO, SYSTEM , "%u%u%u:%u:%u:%u", sDate.Year, sDate.Month, sDate.Date, sTime.Hours, sTime.Minutes, sTime.Seconds);
 }

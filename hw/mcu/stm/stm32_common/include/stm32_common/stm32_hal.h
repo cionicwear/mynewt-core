@@ -45,7 +45,7 @@ void stm32_periph_create(void);
 
 int hal_rtc_init(void);
 int hal_set_rtc_date_time(uint32_t epoch);
-int32_t hat_get_rtc_epoch(void);
+void hat_get_rtc_date_time(char* date);
 
 #ifdef __cplusplus
 }
