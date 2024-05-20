@@ -66,7 +66,13 @@ SystemClock_Config(void)
      */
     __HAL_PWR_VOLTAGESCALING_CONFIG(MYNEWT_VAL(STM32_CLOCK_VOLTAGESCALING_CONFIG));
 
-    osc_init.OscillatorType = RCC_OSCILLATORTYPE_NONE;
+    /*  Enable access to RTC domain. 
+        This needs to be called before selecting the clock source in RTÇ
+    */
+#if MYNEWT_VAL(STM32_RTC_EN)
+    HAL_PWR_EnableBkUpAccess();
+#endif
+
     /*
      * LSI is used to clock the independent watchdog and optionally the RTC.
      * It can be disabled per user request, but is automatically enabled again
@@ -75,7 +81,7 @@ SystemClock_Config(void)
      * XXX currently the watchdog is not optional, so there's no point in
      * disabling LSI through syscfg.
      */
-    osc_init.OscillatorType |= RCC_OSCILLATORTYPE_LSI;
+    osc_init.OscillatorType = RCC_OSCILLATORTYPE_LSI;
 #if MYNEWT_VAL(STM32_CLOCK_LSI)
     osc_init.LSIState = RCC_LSI_ON;
 #else
@@ -92,6 +98,10 @@ SystemClock_Config(void)
     osc_init.LSEState = RCC_LSE_BYPASS;
 #else
     osc_init.LSEState = RCC_LSE_ON;
+#if MYNEWT_VAL(STM32_RTC_EN)
+    //This needs be set to High, otherwise, the TS will drift considerably
+     __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_HIGH);
+#endif
 #endif
 
     /*
@@ -280,6 +290,12 @@ SystemClock_Config(void)
 PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_RNG;
 PeriphClkInitStruct.RngClockSelection = RCC_RNGCLKSOURCE_PLL;
 
+#if MYNEWT_VAL(STM32_RTC_EN)
+//Enable RTC
+PeriphClkInitStruct.PeriphClockSelection |= RCC_PERIPHCLK_RTC;
+PeriphClkInitStruct.RTCClockSelection = MYNEWT_VAL(STM32_CLOCK_RTC);
+#endif
+
 #if MYNEWT_VAL(STM32_CLOCK_PLL3) || MYNEWT_VAL(STM32_CLOCK_PLL2)
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
     {
@@ -303,6 +319,11 @@ PeriphClkInitStruct.RngClockSelection = RCC_RNGCLKSOURCE_PLL;
 
   /* Enable SYSCFG clock mondatory for I/O Compensation Cell */
   __HAL_RCC_SYSCFG_CLK_ENABLE() ;
+
+#if MYNEWT_VAL(STM32_RTC_EN)
+    /* Enable RTC Clock */
+    __HAL_RCC_RTC_ENABLE();
+#endif
 
   /* Enables the I/O Compensation Cell */
   HAL_EnableCompensationCell();
