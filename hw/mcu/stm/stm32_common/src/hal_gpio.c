@@ -136,7 +136,7 @@ static struct gpio_irq_obj gpio_irq_handlers[16];
 
 struct ext_irqs
 {
-#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
+#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0) && !MYNEWT_VAL(MCU_STM32G0)
     volatile uint32_t irq0;
     volatile uint32_t irq1;
     volatile uint32_t irq2;
@@ -171,7 +171,7 @@ ext_irq_handler(int index)
     }
 }
 
-#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
+#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0) && !MYNEWT_VAL(MCU_STM32G0)
 /* External interrupt 0 */
 static void
 ext_irq0(void)
@@ -396,7 +396,7 @@ hal_gpio_pin_to_irq(int pin)
 
     index = MCU_GPIO_PIN_NUM(pin);
 
-#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
+#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0) && !MYNEWT_VAL(MCU_STM32G0)
     if (index <= 4) {
         irqn = EXTI0_IRQn + index;
     } else if (index <=  9) {
@@ -427,7 +427,7 @@ hal_gpio_set_nvic(IRQn_Type irqn)
     uint32_t isr;
 
     switch (irqn) {
-#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0)
+#if !MYNEWT_VAL(MCU_STM32L0) && !MYNEWT_VAL(MCU_STM32F0) && !MYNEWT_VAL(MCU_STM32G0)
     case EXTI0_IRQn:
         isr = (uint32_t)&ext_irq0;
         break;
@@ -837,7 +837,7 @@ hal_gpio_irq_enable(int pin)
     mask = GPIO_MASK(pin);
 
     __HAL_DISABLE_INTERRUPTS(ctx);
-#if MYNEWT_VAL(MCU_STM32L4) || MYNEWT_VAL(MCU_STM32WB) || MYNEWT_VAL(MCU_STM32H7)
+#if MYNEWT_VAL(MCU_STM32L4) || MYNEWT_VAL(MCU_STM32WB) || MYNEWT_VAL(MCU_STM32H7) || MYNEWT_VAL(MCU_STM32G0)
     EXTI->IMR1 |= mask;
 #else
     EXTI->IMR |= mask;
@@ -859,7 +859,7 @@ hal_gpio_irq_disable(int pin)
 
     mask = GPIO_MASK(pin);
     __HAL_DISABLE_INTERRUPTS(ctx);
-#if MYNEWT_VAL(MCU_STM32L4) || MYNEWT_VAL(MCU_STM32WB) || MYNEWT_VAL(MCU_STM32H7)
+#if MYNEWT_VAL(MCU_STM32L4) || MYNEWT_VAL(MCU_STM32WB) || MYNEWT_VAL(MCU_STM32H7) || MYNEWT_VAL(MCU_STM32G0)
     EXTI->IMR1 &= ~mask;
 #else
     EXTI->IMR &= ~mask;

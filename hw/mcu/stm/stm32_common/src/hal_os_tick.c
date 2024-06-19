@@ -83,10 +83,12 @@ os_tick_init(uint32_t os_ticks_per_sec, int prio)
      * Keep clocking debug even when CPU is sleeping, stopped or in standby.
      */
 #if !MYNEWT_VAL(MCU_STM32H7)
-#if !MYNEWT_VAL(MCU_STM32F0)
-    DBGMCU->CR |= (DBGMCU_CR_DBG_SLEEP | DBGMCU_CR_DBG_STOP | DBGMCU_CR_DBG_STANDBY);
-#else
+#if MYNEWT_VAL(MCU_STM32F0)
     DBGMCU->CR |= (DBGMCU_CR_DBG_STOP | DBGMCU_CR_DBG_STANDBY);
+#elif MYNEWT_VAL(MCU_STM32G0)
+    DBG->CR |= (DBG_CR_DBG_STOP | DBG_CR_DBG_STANDBY);
+#else
+    DBGMCU->CR |= (DBGMCU_CR_DBG_SLEEP | DBGMCU_CR_DBG_STOP | DBGMCU_CR_DBG_STANDBY);
 #endif
 #else
     DBGMCU->CR |= (DBGMCU_CR_DBG_SLEEPD1 | DBGMCU_CR_DBG_STOPD1 | DBGMCU_CR_DBG_STANDBYD1);

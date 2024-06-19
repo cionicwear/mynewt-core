@@ -460,7 +460,7 @@ stm32_spi_resolve_prescaler(uint8_t spi_num, uint32_t baudrate, uint32_t *presca
      * SPI ports from 0.
      */
     switch (spi_num) {
-#if !MYNEWT_VAL(MCU_STM32F0)
+#if !MYNEWT_VAL(MCU_STM32F0) && !MYNEWT_VAL(MCU_STM32G0)
     case 0:
     case 3:
     case 4:

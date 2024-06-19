@@ -53,3 +53,6 @@ pkg.deps.MCU_STM32L4:
 
 pkg.deps.MCU_STM32WB:
     - hw/bus/drivers/spi_stm32/stm32wbxx
+
+pkg.deps.MCU_STM32G0:
+    - hw/bus/drivers/spi_stm32/stm32g0xx
