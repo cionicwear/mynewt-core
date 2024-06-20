@@ -26,6 +26,8 @@
 /* Entry Point */
 ENTRY(Reset_Handler)
 
+_estack = ORIGIN(RAM) + LENGTH(RAM);
+
 SECTIONS
 {
     /* Reserve space at the start of the image for the header. */
