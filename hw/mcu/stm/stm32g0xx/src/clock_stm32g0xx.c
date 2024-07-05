@@ -127,6 +127,7 @@ SystemClock_Config(void)
         osc_init.HSICalibrationValue = MYNEWT_VAL(STM32_CLOCK_HSI_CALIBRATION);
     }
 
+#if MYNEWT_VAL(STM32_CLOCK_HSI48)
     /*
      * HSI48 can be used to drive USB/RNG
      */
@@ -136,6 +137,7 @@ SystemClock_Config(void)
     } else {
         osc_init.HSI48State = RCC_HSI48_OFF;
     }
+#endif // MYNEWT_VAL(STM32_CLOCK_HSI48)
 
     _Static_assert(!MYNEWT_VAL(STM32_CLOCK_PLL) || IS_RCC_PLLM_VALUE(MYNEWT_VAL(STM32_CLOCK_PLL_PLLM)),
                    "PLLM value is invalid");
@@ -193,7 +195,6 @@ SystemClock_Config(void)
 
     _Static_assert(IS_RCC_HCLK(MYNEWT_VAL(STM32_CLOCK_AHB_DIVIDER)), "AHB clock divider is invalid");
     _Static_assert(IS_RCC_PCLK(MYNEWT_VAL(STM32_CLOCK_APB1_DIVIDER)), "APB1 clock divider is invalid");
-    _Static_assert(IS_RCC_PCLK(MYNEWT_VAL(STM32_CLOCK_APB2_DIVIDER)), "APB2 clock divider is invalid");
 
     clk_init.AHBCLKDivider = MYNEWT_VAL(STM32_CLOCK_AHB_DIVIDER);
     clk_init.APB1CLKDivider = MYNEWT_VAL(STM32_CLOCK_APB1_DIVIDER);

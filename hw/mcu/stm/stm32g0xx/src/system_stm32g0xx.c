@@ -75,12 +75,7 @@
   * @{
   */
 
-
-#include <stdint.h>
-#include "bsp/stm32g0xx_hal_conf.h"
 #include "stm32g0xx.h"
-#include "mcu/cmsis_nvic.h"
-#include "mcu/stm32_hal.h"
 
 #if !defined  (HSE_VALUE)
 #define HSE_VALUE    (8000000UL)    /*!< Value of the External oscillator in Hz */
@@ -184,11 +179,6 @@
   * @{
   */
 
-/*
- * XXX BSP specific
- */
-void SystemClock_Config(void);
-
 /**
   * @brief  Setup the microcontroller system.
   * @param  None
@@ -197,41 +187,10 @@ void SystemClock_Config(void);
 
 void SystemInit(void)
 {
-//   /* Configure the Vector Table location -------------------------------------*/
-// #if defined(USER_VECT_TAB_ADDRESS)
-//   SCB->VTOR = VECT_TAB_BASE_ADDRESS | VECT_TAB_OFFSET; /* Vector Table Relocation */
-// #endif /* USER_VECT_TAB_ADDRESS */
-    /* Set MSION bit */
-    // RCC->CR |= (uint32_t)0x00000100U;
-
-    // /*
-    //  * Reset SW[1:0], HPRE[3:0], PPRE1[2:0], PPRE2[2:0], MCOSEL[2:0] and MCOPRE[2:0] bits
-    //  */
-    // RCC->CFGR &= (uint32_t) 0x88FF400CU;
-
-    // /* Reset HSION, HSIDIVEN, HSEON, CSSON and PLLON bits */
-    // RCC->CR &= (uint32_t)0xFEF6FFF6U;
-
-    // /* Reset HSI48ON  bit */
-    // RCC->CRRCR &= (uint32_t)0xFFFFFFFEU;
-
-    // /* Reset HSEBYP bit */
-    // RCC->CR &= (uint32_t)0xFFFBFFFFU;
-
-    // /* Reset PLLSRC, PLLMUL[3:0] and PLLDIV[1:0] bits */
-    // RCC->CFGR &= (uint32_t)0xFF02FFFFU;
-
-    // /* Disable all interrupts */
-    // RCC->CIER = 0x00000000U;
-
-    /* Configure System Clock */
-    // SystemClock_Config();
-
-    // /* Update SystemCoreClock global variable */
-    // SystemCoreClockUpdate();
-
-    /* Relocate the vector table */
-    NVIC_Relocate();
+  /* Configure the Vector Table location -------------------------------------*/
+#if defined(USER_VECT_TAB_ADDRESS)
+  SCB->VTOR = VECT_TAB_BASE_ADDRESS | VECT_TAB_OFFSET; /* Vector Table Relocation */
+#endif /* USER_VECT_TAB_ADDRESS */
 }
 
 /**

@@ -55,6 +55,9 @@ hal_watchdog_init(uint32_t expire_msecs)
 void
 hal_watchdog_enable(void)
 {
+#ifdef __HAL_RCC_DBGMCU_CLK_ENABLE
+    __HAL_RCC_DBGMCU_CLK_ENABLE();
+#endif
     FREEZE();
     HAL_IWDG_Init(&g_wdt_cfg);
 }

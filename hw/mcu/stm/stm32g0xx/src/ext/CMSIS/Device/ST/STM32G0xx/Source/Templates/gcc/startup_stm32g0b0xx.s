@@ -24,80 +24,84 @@
   ******************************************************************************
   */
 
-.syntax unified
-.cpu cortex-m0plus
-.fpu softvfp
-.thumb
 
-.global g_pfnVectors
-.global Default_Handler
+  .syntax unified
+  .cpu cortex-m0plus
+  .fpu softvfp
+  .thumb
+
+.global  g_pfnVectors
+.global  Default_Handler
 
 /* start address for the initialization values of the .data section.
 defined in linker script */
-.word _sidata
+.word  _sidata
 /* start address for the .data section. defined in linker script */
-.word _sdata
+.word  _sdata
 /* end address for the .data section. defined in linker script */
-.word _edata
+.word  _edata
 /* start address for the .bss section. defined in linker script */
-.word _sbss
+.word  _sbss
 /* end address for the .bss section. defined in linker script */
-.word _ebss
+.word  _ebss
 
-/**
- * @brief  This is the code that gets called when the processor first
- *          starts execution following a reset event. Only the absolutely
- *          necessary set is performed, after which the application
- *          supplied main() routine is called.
- * @param  None
- * @retval None
-*/
-
-  .section .text.Reset_Handler
-  .weak Reset_Handler
-  .type Reset_Handler, %function
+  .section  .text.Reset_Handler
+  .weak  Reset_Handler
+  .type  Reset_Handler, %function
 Reset_Handler:
-  ldr   r0, =_estack
-  mov   sp, r0          /* set stack pointer */
-
-/* Call the clock system initialization function.*/
-  bl  SystemInit
+   ldr   r0, =_estack
+   mov   sp, r0          /* set stack pointer */
 
 /* Copy the data segment initializers from flash to SRAM */
-  ldr r0, =_sdata
-  ldr r1, =_edata
-  ldr r2, =_sidata
-  movs r3, #0
-  b LoopCopyDataInit
+  movs  r1, #0
+  b  LoopCopyDataInit
 
 CopyDataInit:
-  ldr r4, [r2, r3]
-  str r4, [r0, r3]
-  adds r3, r3, #4
+  ldr  r3, =_sidata
+  ldr  r3, [r3, r1]
+  str  r3, [r0, r1]
+  adds  r1, r1, #4
 
 LoopCopyDataInit:
-  adds r4, r0, r3
-  cmp r4, r1
-  bcc CopyDataInit
-
+  ldr  r0, =_sdata
+  ldr  r3, =_edata
+  adds  r2, r0, r1
+  cmp  r2, r3
+  bcc  CopyDataInit
+  ldr  r2, =_sbss
+  b  LoopFillZerobss
 /* Zero fill the bss segment. */
-  ldr r2, =_sbss
-  ldr r4, =_ebss
-  movs r3, #0
-  b LoopFillZerobss
-
 FillZerobss:
+  movs  r3, #0
   str  r3, [r2]
   adds r2, r2, #4
 
 LoopFillZerobss:
-  cmp r2, r4
-  bcc FillZerobss
+  ldr  r3, = _ebss
+  cmp  r2, r3
+  bcc  FillZerobss
 
-/* Call static constructors */
-  bl __libc_init_array
-/* Call the application s entry point.*/
-  bl main
+/*
+ * mynewt specific corebss clearing.
+ */
+  ldr   r2, =__corebss_start__
+  b     LoopFillZeroCoreBss
+
+/* Zero fill the bss segment. */
+FillZeroCoreBss:
+  movs  r3, #0
+  str   r3, [r2]
+  adds  r2, r2, #4
+
+LoopFillZeroCoreBss:
+  ldr   r3, =__corebss_end__
+  cmp   r2, r3
+  bcc   FillZeroCoreBss
+
+/* Call the clock system initialization function.*/
+  bl  SystemInit
+/* Call the libc entry point.*/
+  bl  _start
 
 LoopForever:
   b LoopForever
@@ -112,11 +116,11 @@ LoopForever:
  * @param  None
  * @retval None
 */
-  .section .text.Default_Handler,"ax",%progbits
+    .section  .text.Default_Handler,"ax",%progbits
 Default_Handler:
 Infinite_Loop:
-  b Infinite_Loop
-  .size Default_Handler, .-Default_Handler
+  b  Infinite_Loop
+  .size  Default_Handler, .-Default_Handler
 
 /******************************************************************************
 *
@@ -125,10 +129,13 @@ Infinite_Loop:
 * 0x0000.0000.
 *
 ******************************************************************************/
-  .section .isr_vector,"a",%progbits
-  .type g_pfnVectors, %object
+  .section  .isr_vector,"a",%progbits
+  .type  g_pfnVectors, %object
+  .size  g_pfnVectors, .-g_pfnVectors
 
 g_pfnVectors:
+  .globl __isr_vector
+__isr_vector:
   .word _estack
   .word Reset_Handler
   .word NMI_Handler
@@ -175,8 +182,6 @@ g_pfnVectors:
   .word USART1_IRQHandler                 /* USART1                       */
   .word USART2_IRQHandler                 /* USART2                       */
   .word USART3_4_5_6_IRQHandler           /* USART3, USART4, USART5, USART6 */
-
-  .size g_pfnVectors, .-g_pfnVectors
 
 /*******************************************************************************
 *

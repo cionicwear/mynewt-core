@@ -192,7 +192,7 @@ extern "C" {
 #if defined(TIM17)
 #define LL_APB2_GRP1_PERIPH_TIM17          RCC_APBENR2_TIM17EN
 #endif /* TIM17 */
-#if defined(ADC)
+#if defined(ADC1)
 #define LL_APB2_GRP1_PERIPH_ADC            RCC_APBENR2_ADCEN
 #endif /* ADC */
 /**
