@@ -537,6 +537,44 @@ hal_timer_config(int num, uint32_t freq_hz)
     return 0;
 }
 
+int
+hal_timer_config_spec(int num, uint32_t freq_hz, uint8_t bits)
+{
+    struct stm32_hal_tmr *tmr;
+    TIM_Base_InitTypeDef init;
+    uint32_t prescaler;
+
+    if (num >= STM32_HAL_TIMER_MAX || !(tmr = stm32_tmr_devs[num])) {
+        return -1;
+    }
+    if (!IS_TIM_CC1_INSTANCE(tmr->sht_regs)) {
+        return -1;
+    }
+
+    prescaler = stm32_hal_timer_get_freq(tmr->sht_regs) / freq_hz;
+    if (prescaler > 0xffff) {
+        return -1;
+    }
+
+    memset(&init, 0, sizeof(init));
+    init.Period = (1ULL<<bits)-1;
+    init.Prescaler = prescaler - 1;
+    init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    init.CounterMode = TIM_COUNTERMODE_UP;
+
+    /*
+     * Set up to count overflow interrupts.
+     */
+    tmr->sht_regs->CR1 = TIM_CR1_URS;
+    tmr->sht_regs->DIER = TIM_DIER_UIE;
+
+    TIM_Base_SetConfig(tmr->sht_regs, &init);
+
+    tmr->sht_regs->SR = 0;
+    tmr->sht_regs->CR1 |= TIM_CR1_CEN;
+
+    return 0;
+}
 /**
  * hal timer deinit
  *
