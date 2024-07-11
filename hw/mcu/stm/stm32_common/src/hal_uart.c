@@ -1,3 +1,4 @@
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -132,22 +133,25 @@ static struct hal_uart_irq uart_irqs[4];
 static struct hal_uart_irq uart_irqs[3];
 #endif
 
-#if MYNEWT_VAL(MCU_STM32H7)
+#if MYNEWT_VAL(MCU_STM32G0)
+#define USART_CR1_RXNEIE    USART_CR1_RXNEIE_RXFNEIE
+#define USART_CR1_TXEIE     USART_CR1_TXEIE_TXFNFIE
+#endif
+
+#if !MYNEWT_VAL(STM32_HAL_UART_HAS_SR)
 #  define STATUS(x)     ((x)->ISR)
+#if MYNEWT_VAL(MCU_STM32H7) || MYNEWT_VAL(MCU_STM32G0)
 #  define RXNE          USART_ISR_RXNE_RXFNE
 #  define TXE           USART_ISR_TXE_TXFNF
-#  define TC            USART_ISR_TC
-#  define RXDR(x)       ((x)->RDR)
-#  define TXDR(x)       ((x)->TDR)
-#  define BAUD(x,y)     UART_DIV_SAMPLING16((x), (y), UART_PRESCALER_DIV1)
-#elif !MYNEWT_VAL(STM32_HAL_UART_HAS_SR)
-#  define STATUS(x)     ((x)->ISR)
+#else
 #  define RXNE          USART_ISR_RXNE
 #  define TXE           USART_ISR_TXE
+#endif
 #  define TC            USART_ISR_TC
 #  define RXDR(x)       ((x)->RDR)
 #  define TXDR(x)       ((x)->TDR)
-#if MYNEWT_VAL(MCU_STM32WB)
+#if MYNEWT_VAL(MCU_STM32WB) || MYNEWT_VAL(MCU_STM32H7) || MYNEWT_VAL(MCU_STM32U5) || MYNEWT_VAL(MCU_STM32G4) || \
+    MYNEWT_VAL(MCU_STM32G0)
 #  define BAUD(x,y)     UART_DIV_SAMPLING16((x), (y), UART_PRESCALER_DIV1)
 #else
 #  define BAUD(x,y)     UART_DIV_SAMPLING16((x), (y))
@@ -365,56 +369,49 @@ hal_uart_set_nvic(IRQn_Type irqn, struct hal_uart *uart)
     uint32_t isr;
     struct hal_uart_irq *ui = NULL;
 
-    switch (irqn) {
-    case USART1_IRQn:
+    switch ((uint32_t)uart->u_regs) {
+    case USART1_BASE:
         isr = (uint32_t)&uart_irq1;
         ui = &uart_irqs[0];
         break;
 #ifdef USART2_BASE
-    case USART2_IRQn:
+    case USART2_BASE:
         isr = (uint32_t)&uart_irq2;
         ui = &uart_irqs[1];
         break;
 #endif
 #ifdef USART3_BASE
-  #if !MYNEWT_VAL(MCU_STM32F0)
-    case USART3_IRQn:
+    case USART3_BASE:
         isr = (uint32_t)&uart_irq3;
         ui = &uart_irqs[2];
         break;
-  #else
-    case USART3_4_IRQn:
-        isr = (uint32_t)&uart_irq3;
-        ui = &uart_irqs[2];
-        break;
-  #endif
 #endif
 #ifdef UART4_BASE
-    case UART4_IRQn:
+    case UART4_BASE:
         isr = (uint32_t)&uart_irq4;
         ui = &uart_irqs[3];
         break;
 #endif
 #ifdef UART5_BASE
-    case UART5_IRQn:
+    case UART5_BASE:
         isr = (uint32_t)&uart_irq5;
         ui = &uart_irqs[4];
         break;
 #endif
 #ifdef USART6_BASE
-    case USART6_IRQn:
+    case USART6_BASE:
         isr = (uint32_t)&uart_irq6;
         ui = &uart_irqs[5];
         break;
 #endif
 #ifdef UART7_BASE
-    case UART7_IRQn:
+    case UART7_BASE:
         isr = (uint32_t)&uart_irq7;
         ui = &uart_irqs[6];
         break;
 #endif
 #ifdef UART8_BASE
-    case UART8_IRQn:
+    case UART8_BASE:
         isr = (uint32_t)&uart_irq8;
         ui = &uart_irqs[7];
         break;
@@ -550,15 +547,8 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
     *cfg->suc_rcc_reg |= cfg->suc_rcc_dev;
 
 #if !MYNEWT_VAL(MCU_STM32F1)
-    if (cfg->suc_pin_af) {
-        hal_gpio_init_af(cfg->suc_pin_tx, cfg->suc_pin_af, 0, 0);
-        hal_gpio_init_af(cfg->suc_pin_rx, cfg->suc_pin_af, 0, 0);
-    } else {
-#if MYNEWT_VAL(MCU_STM32H7)
-        hal_gpio_init_af(cfg->suc_pin_tx, cfg->suc_pin_af_tx, 0, 0);
-        hal_gpio_init_af(cfg->suc_pin_rx, cfg->suc_pin_af_rx, 0, 0);
-#endif 
-    }
+    hal_gpio_init_af(cfg->suc_pin_tx, cfg->suc_pin_af, 0, 0);
+    hal_gpio_init_af(cfg->suc_pin_rx, cfg->suc_pin_af, 0, 0);
     if (flow_ctl == HAL_UART_FLOW_CTL_RTS_CTS) {
         hal_gpio_init_af(cfg->suc_pin_rts, cfg->suc_pin_af, 0, 0);
         hal_gpio_init_af(cfg->suc_pin_cts, cfg->suc_pin_af, 0, 0);
@@ -574,46 +564,14 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
 #else
     if (cfg->suc_uart == USART1) {
 #endif
-#if MYNEWT_VAL(MCU_STM32F0)
+#if MYNEWT_VAL(MCU_STM32F0) || MYNEWT_VAL(MCU_STM32G0)
         u->u_regs->BRR = BAUD(HAL_RCC_GetPCLK1Freq(), baudrate);
-#else
-#if MYNEWT_VAL(STM32_UART_PLL)
-        uint32_t pclk;
-    
-        if(MYNEWT_VAL(STM32_UART_PLL) == 2){
-            PLL2_ClocksTypeDef pll2_clocks;
-            HAL_RCCEx_GetPLL2ClockFreq(&pll2_clocks);
-            pclk = pll2_clocks.PLL2_Q_Frequency;
-        }else if(MYNEWT_VAL(STM32_UART_PLL) == 3){
-            PLL3_ClocksTypeDef pll3_clocks;
-            HAL_RCCEx_GetPLL3ClockFreq(&pll3_clocks);
-            pclk = pll3_clocks.PLL3_Q_Frequency;
-        }
-        
-        u->u_regs->BRR = BAUD(pclk, baudrate);
 #else
         u->u_regs->BRR = BAUD(HAL_RCC_GetPCLK2Freq(), baudrate);
 #endif
-#endif
 
     } else {
-#if MYNEWT_VAL(STM32_UART_PLL)
-        uint32_t pclk;
-    
-        if(MYNEWT_VAL(STM32_UART_PLL) == 2){
-            PLL2_ClocksTypeDef pll2_clocks;
-            HAL_RCCEx_GetPLL2ClockFreq(&pll2_clocks);
-            pclk = pll2_clocks.PLL2_Q_Frequency;
-        }else if(MYNEWT_VAL(STM32_UART_PLL) == 3){
-            PLL3_ClocksTypeDef pll3_clocks;
-            HAL_RCCEx_GetPLL3ClockFreq(&pll3_clocks);
-            pclk = pll3_clocks.PLL3_Q_Frequency;
-        }
-        
-        u->u_regs->BRR = BAUD(pclk, baudrate);
-#else
         u->u_regs->BRR = BAUD(HAL_RCC_GetPCLK1Freq(), baudrate);
-#endif
     }
 
     (void)RXDR(u->u_regs);
