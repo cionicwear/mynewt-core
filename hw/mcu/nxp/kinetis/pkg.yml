@@ -34,3 +34,11 @@ pkg.ign_files.BSP_MK64F12:
 pkg.ign_files.BSP_MK8XF:
   - "hal_uart.c"
   - "hal_uart_nxp.h"
+
+pkg.ign_files.MCU_K32L3A6:
+  - "hal_i2c.c"
+  - "hal_i2c.h"
+  - "hal_spi.c"
+  - "hal_spi.h"
+  - "hal_uart.c"
+  - "hal_uart_nxp.h"

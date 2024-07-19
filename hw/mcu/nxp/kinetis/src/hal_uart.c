@@ -27,8 +27,13 @@
 #include "mcu/cmsis_nvic.h"
 #include "bsp/bsp.h"
 
+#if MYNEWT_VAL(MCU_K32L3A6)
+#include "mcu/frdm-k32l3a60_hal.h"
+#include "K32L3A60_cm4.h"
+#elif MYNEWT_VAL(MCU_MK64F12)
 #include "mcu/frdm-k64f_hal.h"
 #include "MK64F12.h"
+#endif
 #include "fsl_port.h"
 #include "fsl_uart.h"
 

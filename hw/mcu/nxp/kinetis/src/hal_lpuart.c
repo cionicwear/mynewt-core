@@ -359,8 +359,10 @@ hal_uart_config(int port,
     PORT_SetPinMux(u->p_base, u->u_pin_rx, kPORT_MuxAlt3);
     PORT_SetPinMux(u->p_base, u->u_pin_tx, kPORT_MuxAlt3);
 
+#if !MYNEWT_VAL(MCU_K32L3A6)
     /* UART CONFIG */
     CLOCK_SetLpuartClock(2U);
+#endif
 
     LPUART_GetDefaultConfig(&uconfig);
     uconfig.baudRate_Bps = speed;

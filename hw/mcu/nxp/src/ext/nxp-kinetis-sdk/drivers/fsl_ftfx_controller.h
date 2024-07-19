@@ -25,7 +25,9 @@
  * @name FTFx status
  * @{
  */
-/*! @brief FTFx driver status group. */
+
+/*! @cond output_undoc_content */
+/* FTFx driver status group. */
 #if defined(kStatusGroup_FlashDriver)
 #define kStatusGroupGeneric    kStatusGroup_Generic
 #define kStatusGroupFtfxDriver kStatusGroup_FlashDriver
@@ -36,6 +38,7 @@
 #define kStatusGroupGeneric    0
 #define kStatusGroupFtfxDriver 1
 #endif
+/*! @endcond */
 
 /*!
  * @brief FTFx driver status codes.
@@ -81,7 +84,7 @@ enum
     kStatus_FTFx_CommandOperationInProgress =
         MAKE_STATUS(kStatusGroupFtfxDriver, 21), /*!< The option of flash command is processing.*/
 };
-/*@}*/
+/*! @} */
 
 /*!
  * @name FTFx API key
@@ -98,7 +101,7 @@ enum _ftfx_driver_api_keys
 {
     kFTFx_ApiEraseKey = FOUR_CHAR_CODE('k', 'f', 'e', 'k') /*!< Key value used to validate all FTFx erase APIs.*/
 };
-/*@}*/
+/*! @} */
 
 /*!
  * @brief Enumeration for the FlexRAM load during reset option.
@@ -149,6 +152,14 @@ typedef enum _ftfx_flexram_function_option
     kFTFx_FlexramFuncOptAvailableAsRam     = 0xFFU, /*!< An option used to make FlexRAM available as RAM */
     kFTFx_FlexramFuncOptAvailableForEeprom = 0x00U  /*!< An option used to make FlexRAM available for EEPROM */
 } ftfx_flexram_func_opt_t;
+
+/*!
+ * @brief Enumeration for acceleration ram property.
+ */
+enum _flash_acceleration_ram_property
+{
+    kFLASH_AccelerationRamSize = 0x400U
+};
 
 #if defined(FSL_FEATURE_FLASH_HAS_SWAP_CONTROL_CMD) && FSL_FEATURE_FLASH_HAS_SWAP_CONTROL_CMD
 /*!
@@ -361,7 +372,7 @@ void FTFx_API_Init(ftfx_config_t *config);
 status_t FTFx_API_UpdateFlexnvmPartitionStatus(ftfx_config_t *config);
 #endif /* FSL_FEATURE_FLASH_HAS_FLEX_NVM */
 
-/*@}*/
+/*! @} */
 
 /*!
  * @name Erasing
@@ -464,7 +475,7 @@ status_t FTFx_CMD_EraseAllUnsecure(ftfx_config_t *config, uint32_t key);
  */
 status_t FTFx_CMD_EraseAllExecuteOnlySegments(ftfx_config_t *config, uint32_t key);
 
-/*@}*/
+/*! @} */
 
 /*!
  * @name Programming
@@ -571,7 +582,7 @@ status_t FTFx_CMD_ProgramPartition(ftfx_config_t *config,
                                    uint32_t flexnvmPartitionCode);
 #endif /* FSL_FEATURE_FLASH_HAS_PROGRAM_PARTITION_CMD */
 
-/*@}*/
+/*! @} */
 
 /*!
  * @name Reading
@@ -627,7 +638,7 @@ status_t FTFx_CMD_ReadResource(
     ftfx_config_t *config, uint32_t start, uint8_t *dst, uint32_t lengthInBytes, ftfx_read_resource_opt_t option);
 #endif /* FSL_FEATURE_FLASH_HAS_READ_RESOURCE_CMD */
 
-/*@}*/
+/*! @} */
 
 /*!
  * @name Verification
@@ -732,7 +743,7 @@ status_t FTFx_CMD_VerifyProgram(ftfx_config_t *config,
                                 uint32_t *failedAddress,
                                 uint32_t *failedData);
 
-/*@}*/
+/*! @} */
 
 /*!
  * @name Security
@@ -772,7 +783,7 @@ status_t FTFx_REG_GetSecurityState(ftfx_config_t *config, ftfx_security_state_t 
  */
 status_t FTFx_CMD_SecurityBypass(ftfx_config_t *config, const uint8_t *backdoorKey);
 
-/*@}*/
+/*! @} */
 
 /*!
  * @name FlexRAM
@@ -796,7 +807,7 @@ status_t FTFx_CMD_SecurityBypass(ftfx_config_t *config, const uint8_t *backdoorK
 status_t FTFx_CMD_SetFlexramFunction(ftfx_config_t *config, ftfx_flexram_func_opt_t option);
 #endif /* FSL_FEATURE_FLASH_HAS_SET_FLEXRAM_FUNCTION_CMD */
 
-/*@}*/
+/*! @} */
 
 /*!
  * @name Swap
@@ -827,7 +838,7 @@ status_t FTFx_CMD_SwapControl(ftfx_config_t *config,
                               ftfx_swap_state_config_t *returnInfo);
 #endif /* FSL_FEATURE_FLASH_HAS_SWAP_CONTROL_CMD */
 
-/*@}*/
+/*! @} */
 
 #if defined(__cplusplus)
 }

@@ -17,9 +17,8 @@
 #
 
 syscfg.defs:
-    BSP_MK8XF:
-        description: >
-          Set to indicate that BSP has NXP MK8xF
+    MCU_MK8xF:
+        description: MCUs are of MK8xf family
         value: 1
 
 syscfg.vals:

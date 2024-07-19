@@ -32,6 +32,9 @@ extern "C" {
 #include "MK81F25615.h"
 #elif MYNEWT_VAL(BSP_MK82F)
 #include "MK82F25615.h"
+#elif MYNEWT_VAL(BSP_K32L3A60)
+#include "K32L3A60_cm4.h"
+#include "K32L3A60_cm4_features.h"
 #else
 #error "Unsupported MCU"
 #endif

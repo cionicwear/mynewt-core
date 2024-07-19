@@ -19,7 +19,16 @@
 #include "hal/hal_system.h"
 #include "syscfg/syscfg.h"
 #include "mcu/kinetis_common.h"
+
+#if defined(FSL_FEATURE_SOC_RCM_COUNT) && (FSL_FEATURE_SOC_RCM_COUNT)
 #include "fsl_rcm.h"
+#elif defined(FSL_FEATURE_SOC_SMC_COUNT) && (FSL_FEATURE_SOC_SMC_COUNT > 1) /* MSMC */
+#include "fsl_msmc.h"
+#elif defined(FSL_FEATURE_SOC_ASMC_COUNT) && (FSL_FEATURE_SOC_ASMC_COUNT) /* ASMC */
+#include "fsl_asmc.h"
+#elif defined(FSL_FEATURE_SOC_CMC_COUNT) && (FSL_FEATURE_SOC_CMC_COUNT) /* CMC */
+#include "fsl_cmc.h"
+#endif
 
 enum hal_reset_reason
 hal_reset_cause(void)
@@ -30,19 +39,19 @@ hal_reset_cause(void)
     if (reason) {
         return reason;
     }
-    reg = (uint32_t) RCM;
+    reg = (uint32_t) SMC_GetPreviousResetSources(SMC0);
 
-    if (reg & (kRCM_SourceWdog | kRCM_SourceLockup)) {
+    if (reg & (kSMC_SourceWdog | kSMC_SourceLockup)) {
         reason = HAL_RESET_WATCHDOG;
-    } else if (reg & kRCM_SourceSw) {
+    } else if (reg & kSMC_SourceSoftware) {
         reason = HAL_RESET_SOFT;
-    } else if (reg & kRCM_SourcePin) {
+    } else if (reg & kSMC_SourcePin) {
         reason = HAL_RESET_PIN;
-    } else if (reg & kRCM_SourcePor) {
+    } else if (reg & kSMC_SourcePor) {
         reason = HAL_RESET_POR;
-    } else if (reg & kRCM_SourceWakeup) {
+    } else if (reg & kSMC_SourceWakeup) {
         reason = HAL_RESET_SYS_OFF_INT;
-    } else if (reg & kRCM_SourceLvd) {
+    } else if (reg & kSMC_SourceLvd) {
         reason = HAL_RESET_BROWNOUT;
     } else {
         reason = HAL_RESET_OTHER;

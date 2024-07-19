@@ -36,11 +36,19 @@ extern "C" {
                                MYNEWT_VAL(UART_3), \
                                MYNEWT_VAL(UART_4) }
 
+#if MYNEWT_VAL(MCU_K32L3A6)
+#define NXP_UART_CLOCKS      { kCLOCK_ScgFircAsyncDiv2Clk, \
+                               kCLOCK_ScgFircAsyncDiv2Clk, \
+                               kCLOCK_ScgFircAsyncDiv2Clk, \
+                               kCLOCK_ScgFircAsyncDiv2Clk, \
+                               kCLOCK_ScgFircAsyncDiv2Clk }
+#else
 #define NXP_UART_CLOCKS      { kCLOCK_Osc0ErClk, \
                                kCLOCK_Osc0ErClk, \
                                kCLOCK_Osc0ErClk, \
                                kCLOCK_Osc0ErClk, \
                                kCLOCK_Osc0ErClk }
+#endif
 
 #define NXP_UART_PORTS       { MYNEWT_VAL(UART_0_PORT), \
                                MYNEWT_VAL(UART_1_PORT), \

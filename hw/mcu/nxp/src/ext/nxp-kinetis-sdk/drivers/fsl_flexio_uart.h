@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2015-2016, Freescale Semiconductor, Inc.
- * Copyright 2016-2020 NXP
+ * Copyright 2016-2021 NXP
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef _FSL_FLEXIO_UART_H_
-#define _FSL_FLEXIO_UART_H_
+#ifndef FSL_FLEXIO_UART_H_
+#define FSL_FLEXIO_UART_H_
 
 #include "fsl_common.h"
 #include "fsl_flexio.h"
@@ -22,10 +22,10 @@
  ******************************************************************************/
 
 /*! @name Driver version */
-/*@{*/
-/*! @brief FlexIO UART driver version 2.2.0. */
-#define FSL_FLEXIO_UART_DRIVER_VERSION (MAKE_VERSION(2, 2, 0))
-/*@}*/
+/*! @{ */
+/*! @brief FlexIO UART driver version. */
+#define FSL_FLEXIO_UART_DRIVER_VERSION (MAKE_VERSION(2, 5, 0))
+/*! @} */
 
 /*! @brief Retry times for waiting flag. */
 #ifndef UART_RETRY_TIMES
@@ -43,7 +43,9 @@ enum
     kStatus_FLEXIO_UART_RxRingBufferOverrun =
         MAKE_STATUS(kStatusGroup_FLEXIO_UART, 5), /*!< UART RX software ring buffer overrun. */
     kStatus_FLEXIO_UART_RxHardwareOverrun = MAKE_STATUS(kStatusGroup_FLEXIO_UART, 6), /*!< UART RX receiver overrun. */
-    kStatus_FLEXIO_UART_Timeout           = MAKE_STATUS(kStatusGroup_FLEXIO_UART, 7)  /*!< UART times out. */
+    kStatus_FLEXIO_UART_Timeout           = MAKE_STATUS(kStatusGroup_FLEXIO_UART, 7), /*!< UART times out. */
+    kStatus_FLEXIO_UART_BaudrateNotSupport =
+        MAKE_STATUS(kStatusGroup_FLEXIO_UART, 8) /*!< Baudrate is not supported in current clock source */
 };
 
 /*! @brief FlexIO UART bit count per char. */
@@ -95,7 +97,16 @@ typedef struct _flexio_uart_config
 /*! @brief Define FlexIO UART transfer structure. */
 typedef struct _flexio_uart_transfer
 {
-    uint8_t *data;   /*!< Transfer buffer*/
+    /*
+     * Use separate TX and RX data pointer, because TX data is const data.
+     * The member data is kept for backward compatibility.
+     */
+    union
+    {
+        uint8_t *data;         /*!< The buffer of data to be transfer.*/
+        uint8_t *rxData;       /*!< The buffer to receive data. */
+        const uint8_t *txData; /*!< The buffer of data to be sent. */
+    };
     size_t dataSize; /*!< Transfer size*/
 } flexio_uart_transfer_t;
 
@@ -111,12 +122,12 @@ typedef void (*flexio_uart_transfer_callback_t)(FLEXIO_UART_Type *base,
 /*! @brief Define FLEXIO UART handle structure*/
 struct _flexio_uart_handle
 {
-    uint8_t *volatile txData;   /*!< Address of remaining data to send. */
-    volatile size_t txDataSize; /*!< Size of the remaining data to send. */
-    uint8_t *volatile rxData;   /*!< Address of remaining data to receive. */
-    volatile size_t rxDataSize; /*!< Size of the remaining data to receive. */
-    size_t txDataSizeAll;       /*!< Total bytes to be sent. */
-    size_t rxDataSizeAll;       /*!< Total bytes to be received. */
+    const uint8_t *volatile txData; /*!< Address of remaining data to send. */
+    volatile size_t txDataSize;     /*!< Size of the remaining data to send. */
+    uint8_t *volatile rxData;       /*!< Address of remaining data to receive. */
+    volatile size_t rxDataSize;     /*!< Size of the remaining data to receive. */
+    size_t txDataSizeAll;           /*!< Total bytes to be sent. */
+    size_t rxDataSizeAll;           /*!< Total bytes to be received. */
 
     uint8_t *rxRingBuffer;              /*!< Start address of the receiver ring buffer. */
     size_t rxRingBufferSize;            /*!< Size of the ring buffer. */
@@ -171,8 +182,8 @@ extern "C" {
  * @param base Pointer to the FLEXIO_UART_Type structure.
  * @param userConfig Pointer to the flexio_uart_config_t structure.
  * @param srcClock_Hz FlexIO source clock in Hz.
- * @retval kStatus_Success Configuration success
- * @retval kStatus_InvalidArgument Buadrate configuration out of range
+ * @retval kStatus_Success Configuration success.
+ * @retval kStatus_FLEXIO_UART_BaudrateNotSupport Baudrate is not supported for current clock source frequency.
 */
 status_t FLEXIO_UART_Init(FLEXIO_UART_Type *base, const flexio_uart_config_t *userConfig, uint32_t srcClock_Hz);
 
@@ -197,7 +208,7 @@ void FLEXIO_UART_Deinit(FLEXIO_UART_Type *base);
 */
 void FLEXIO_UART_GetDefaultConfig(flexio_uart_config_t *userConfig);
 
-/* @} */
+/*! @} */
 
 /*!
  * @name Status
@@ -226,7 +237,7 @@ uint32_t FLEXIO_UART_GetStatusFlags(FLEXIO_UART_Type *base);
 
 void FLEXIO_UART_ClearStatusFlags(FLEXIO_UART_Type *base, uint32_t mask);
 
-/* @} */
+/*! @} */
 
 /*!
  * @name Interrupts
@@ -253,7 +264,7 @@ void FLEXIO_UART_EnableInterrupts(FLEXIO_UART_Type *base, uint32_t mask);
  */
 void FLEXIO_UART_DisableInterrupts(FLEXIO_UART_Type *base, uint32_t mask);
 
-/* @} */
+/*! @} */
 
 /*!
  * @name DMA Control
@@ -312,7 +323,7 @@ static inline void FLEXIO_UART_EnableRxDMA(FLEXIO_UART_Type *base, bool enable)
     FLEXIO_EnableShifterStatusDMA(base->flexioBase, 1UL << base->shifterIndex[1], enable);
 }
 
-/* @} */
+/*! @} */
 
 /*!
  * @name Bus Operations
@@ -388,7 +399,7 @@ status_t FLEXIO_UART_WriteBlocking(FLEXIO_UART_Type *base, const uint8_t *txData
  */
 status_t FLEXIO_UART_ReadBlocking(FLEXIO_UART_Type *base, uint8_t *rxData, size_t rxSize);
 
-/* @} */
+/*! @} */
 
 /*!
  * @name Transactional
@@ -560,11 +571,18 @@ status_t FLEXIO_UART_TransferGetReceiveCount(FLEXIO_UART_Type *base, flexio_uart
  */
 void FLEXIO_UART_TransferHandleIRQ(void *uartType, void *uartHandle);
 
-/*@}*/
+/*!
+ * @brief Flush tx/rx shifters.
+ *
+ * @param base Pointer to the FLEXIO_UART_Type structure.
+ */
+void FLEXIO_UART_FlushShifters(FLEXIO_UART_Type *base);
+
+/*! @} */
 
 #if defined(__cplusplus)
 }
 #endif /*_cplusplus*/
-/*@}*/
+/*! @} */
 
-#endif /*_FSL_FLEXIO_UART_H_*/
+#endif /*FSL_FLEXIO_UART_H_*/

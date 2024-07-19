@@ -21,35 +21,39 @@
 #include <inttypes.h>
 #include <mcu/cortex_m4.h>
 
-/**
- * Boots the image described by the supplied image header.
- *
- * @param hdr                   The header for the image to boot.
- */
+// /**
+//  * Boots the image described by the supplied image header.
+//  *
+//  * @param hdr                   The header for the image to boot.
+//  */
 void
 hal_system_start(void *img_start)
 {
-    /* Turn off interrupts. */
-    __disable_irq();
-
-    /* Set the VTOR to default. */
-    SCB->VTOR = 0;
-
-    // Memory barriers for good measure.
-    __ISB();
-    __DSB();
+    uint32_t base0entry;
+    uint32_t jump_addr;
+    __attribute__((noreturn)) void (*fn)(void);
 
     /* First word contains initial MSP value. */
     __set_MSP(*(uint32_t *)img_start);
-    __set_PSP(*(uint32_t *)img_start);
 
     /* Second word contains address of entry point (Reset_Handler). */
-    void (*entry)(void) = (void (*)(void))*(uint32_t *)(img_start + 4);
+    base0entry = *(uint32_t *)(img_start + 4);
+    jump_addr = base0entry;
+    fn = (void *)jump_addr;
 
-    /* Jump to image. */
-    entry();
-
-    /* Should never reach this point */
-    while (1)
-        ;
+    fn();
 }
+
+// void __attribute__((naked))
+// hal_system_start(void *img_start)
+// {
+//     uint32_t *img_data = img_start;
+
+//     asm volatile (".syntax unified        \n"
+//                   /* 1st word is stack pointer */
+//                   "    msr  msp, %0       \n"
+//                   /* 2nd word is a reset handler (image entry) */
+//                   "    bx   %1            \n"
+//                   : /* no output */
+//                   : "r" (img_data[0]), "r" (img_data[1]));
+// }
