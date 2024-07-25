@@ -79,7 +79,15 @@ struct stm32_hal_spi_cfg {
         HAL_FLASH_Unlock();           \
     } while (0)
 #define FLASH_PROGRAM_TYPE FLASH_TYPEPROGRAM_DOUBLEWORD
-#define STM32_HAL_FLASH_CLEAR_ERRORS()
+#define STM32_HAL_FLASH_CLEAR_ERRORS()            \
+    do {                                          \
+        __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP |   \
+                FLASH_FLAG_OPERR |                \
+                FLASH_FLAG_WRPERR |               \
+                FLASH_FLAG_PGAERR |               \
+                FLASH_FLAG_SIZERR |               \
+                FLASH_FLAG_PGSERR);               \
+    } while (0)
 
 #ifdef __cplusplus
 }
