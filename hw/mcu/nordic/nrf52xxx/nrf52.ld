@@ -112,6 +112,14 @@ SECTIONS
         _fsm_evt_end = . ;
     } >FLASH
 
+     .cionic_ctrl :
+    {
+        _scctrl = .;
+        . = ALIGN(4);
+        KEEP(*(.cionic_ctrl*))
+        . = ALIGN(4);
+        _ecctrl = .;
+    } > FLASH
 
     .ARM.extab :
     {
