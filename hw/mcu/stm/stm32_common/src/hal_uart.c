@@ -447,6 +447,11 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
     if (!u || u->u_open) {
         return -1;
     }
+
+#if MYNEWT_VAL(MCU_STM32H7)
+    SCB_InvalidateICache();
+#endif
+
     cfg = u->u_cfg;
     assert(cfg);
 
