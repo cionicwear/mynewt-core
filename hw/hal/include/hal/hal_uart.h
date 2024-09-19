@@ -141,6 +141,8 @@ void hal_uart_start_rx(int uart);
  */
 void hal_uart_blocking_tx(int uart, uint8_t byte);
 
+int hal_uart_check_handler(int port) __attribute__((weak));
+
 #ifdef __cplusplus
 }
 #endif
