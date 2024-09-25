@@ -102,6 +102,33 @@ SECTIONS
         _ecctrl = .;
     } > FLASH
 
+    .fsm_state :
+    {
+        . = ALIGN(4);
+        _fsm_start = .;
+        KEEP(*(.fsm_state*))           /* fsm state */
+        . = ALIGN(4);
+        _fsm_end = . ;
+    } >FLASH
+
+    .fsm_trans :
+    {
+        . = ALIGN(4);
+        _fsm_trans_start = .;
+        KEEP(*(.fsm_trans))           /* fsm transition*/
+        . = ALIGN(4);
+        _fsm_trans_end = . ;
+    } >FLASH
+
+    .fsm_evt :
+    {
+        . = ALIGN(4);
+        _fsm_evt_start = .;
+        KEEP(*(.fsm_evt))           /* fsm event*/
+        . = ALIGN(4);
+        _fsm_evt_end = . ;
+    } >FLASH
+
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
@@ -245,24 +272,23 @@ SECTIONS
         *(.stack*)
     } > DTCM
 
+    .ipc (NOLOAD):
+    { 
+        . = ALIGN(4);
+        *(.ipc*);
+            
+        . = ALIGN(4);
+    } >IPC
+
     .ipc_shmem (NOLOAD):
     { 
         . = ALIGN(4);
-        _sipc_shmem = .; 
+        __ipc_sshmem = .;
         *(.ipc_shmem*);
-            
         . = ALIGN(4);
-        _eipc_shmem = .;
-    } >SRAM4
+        __ipc_eshmem = .;
+    } >IPC
 
-    .ipc_async_shmem (NOLOAD):
-    { 
-        . = ALIGN(4);
-        _sipc_ashmem = .; 
-        *(.ipc_async_shmem*);
-        . = ALIGN(4);
-        _eipc_ashmem = .;
-    } >SRAM4
 
     /* Set stack top to end of DTCM; stack limit is bottom of stack */
     __StackTop = ORIGIN(DTCM) + LENGTH(DTCM);
