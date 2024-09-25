@@ -36,7 +36,7 @@ typedef uint32_t os_stack_t;
 
 /* Stack sizes for common OS tasks */
 #define OS_SANITY_STACK_SIZE (64)
-#define OS_IDLE_STACK_SIZE (64)
+#define OS_IDLE_STACK_SIZE (MYNEWT_VAL(OS_IDLE_STACK_SZ))
 
 #define OS_ENTER_CRITICAL(__os_sr)          \
         do {                                \

@@ -85,6 +85,41 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
+    .fsm_state :
+    {
+        . = ALIGN(4);
+        _fsm_start = .;
+        KEEP(*(.fsm_state*))           /* fsm state */
+        . = ALIGN(4);
+        _fsm_end = . ;
+    } >FLASH
+
+    .fsm_trans :
+    {
+        . = ALIGN(4);
+        _fsm_trans_start = .;
+        KEEP(*(.fsm_trans))           /* fsm transition*/
+        . = ALIGN(4);
+        _fsm_trans_end = . ;
+    } >FLASH
+
+    .fsm_evt :
+    {
+        . = ALIGN(4);
+        _fsm_evt_start = .;
+        KEEP(*(.fsm_evt))           /* fsm event*/
+        . = ALIGN(4);
+        _fsm_evt_end = . ;
+    } >FLASH
+
+     .cionic_ctrl :
+    {
+        _scctrl = .;
+        . = ALIGN(4);
+        KEEP(*(.cionic_ctrl*))
+        . = ALIGN(4);
+        _ecctrl = .;
+    } > FLASH
 
     .ARM.extab :
     {
