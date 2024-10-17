@@ -363,7 +363,7 @@ uart_irq8(void)
 }
 #endif
 
-static void
+static int
 hal_uart_set_nvic(IRQn_Type irqn, struct hal_uart *uart)
 {
     uint32_t isr;
@@ -423,10 +423,28 @@ hal_uart_set_nvic(IRQn_Type irqn, struct hal_uart *uart)
 
     if (ui) {
         ui->ui_uart = uart;
-
         NVIC_SetVector(irqn, isr);
         NVIC_EnableIRQ(irqn);
+
+        if (NVIC_GetVector(irqn) != isr) {
+            //still pointing to wrong isr handler
+            return -2;
+        }
     }
+    return 0;
+}
+
+int hal_uart_check_handler(int port)
+{
+    if (port < 0 || port > 7) {
+        return -1;
+    }
+
+    if (NVIC_GetVector(USART1_IRQn) != (uint32_t)&uart_irq1) {
+        return -2;
+    }
+
+    return 0;
 }
 
 int
@@ -436,6 +454,7 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
     struct hal_uart *u;
     const struct stm32_uart_cfg *cfg;
     uint32_t cr1, cr2, cr3;
+    int rc = 0;
 #if MYNEWT_VAL(MCU_STM32F1)
     GPIO_InitTypeDef gpio;
 #endif
@@ -576,12 +595,12 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
 
     (void)RXDR(u->u_regs);
     (void)STATUS(u->u_regs);
-    hal_uart_set_nvic(cfg->suc_irqn, u);
+    rc = hal_uart_set_nvic(cfg->suc_irqn, u);
 
     u->u_regs->CR1 |= (USART_CR1_RXNEIE | USART_CR1_UE);
     u->u_open = 1;
 
-    return 0;
+    return rc;
 }
 
 int
