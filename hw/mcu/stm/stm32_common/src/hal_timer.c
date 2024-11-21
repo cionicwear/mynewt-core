@@ -35,6 +35,7 @@ void TIM_CCxChannelCmd(TIM_TypeDef *TIMx, uint32_t Channel, uint32_t ChannelStat
 
 #define STM32_OFLOW_VALUE       (0x10000UL)
 #define STM32_NSEC_PER_SEC      (1000000000UL)
+#define STM32_16BIT             ((1<<16) -1 )
 
 struct stm32_hal_tmr {
     TIM_TypeDef *sht_regs;   /* Pointer to timer registers */
@@ -54,6 +55,15 @@ struct stm32_hal_tmr stm32_tmr1;
 #if MYNEWT_VAL(TIMER_2)
 struct stm32_hal_tmr stm32_tmr2;
 #endif
+#if MYNEWT_VAL(TIMER_3)
+struct stm32_hal_tmr stm32_tmr3;
+#endif
+#if MYNEWT_VAL(TIMER_4)
+struct stm32_hal_tmr stm32_tmr4;
+#endif
+#if MYNEWT_VAL(TIMER_5)
+struct stm32_hal_tmr stm32_tmr5;
+#endif
 
 static struct stm32_hal_tmr *stm32_tmr_devs[STM32_HAL_TIMER_MAX] = {
 #if MYNEWT_VAL(TIMER_0)
@@ -71,11 +81,26 @@ static struct stm32_hal_tmr *stm32_tmr_devs[STM32_HAL_TIMER_MAX] = {
 #else
     NULL,
 #endif
+#if MYNEWT_VAL(TIMER_3)
+    &stm32_tmr3,
+#else
+    NULL,
+#endif
+#if MYNEWT_VAL(TIMER_4)
+    &stm32_tmr4,
+#else
+    NULL,
+#endif
+#if MYNEWT_VAL(TIMER_5)
+    &stm32_tmr5,
+#else
+    NULL,
+#endif
 };
 
 static uint32_t hal_timer_cnt(struct stm32_hal_tmr *tmr);
 
-#if (MYNEWT_VAL(TIMER_0) || MYNEWT_VAL(TIMER_1) || MYNEWT_VAL(TIMER_2))
+#if (MYNEWT_VAL(TIMER_0) || MYNEWT_VAL(TIMER_1) || MYNEWT_VAL(TIMER_2) || MYNEWT_VAL(TIMER_3))
 /*
  * Call expired timer callbacks, and reprogram timer with new expiry time.
  */
@@ -117,20 +142,26 @@ static void
 stm32_tmr_irq(struct stm32_hal_tmr *tmr)
 {
     uint32_t sr;
+    uint32_t sr_reg;
     uint32_t clr = 0;
 
-    sr = tmr->sht_regs->SR;
-    if (sr & TIM_SR_UIF) {
+    __HAL_DISABLE_INTERRUPTS(sr);
+    sr_reg = tmr->sht_regs->SR;
+    if (sr_reg & TIM_SR_UIF) {
         /*
          * Overflow interrupt
          */
-        tmr->sht_oflow += STM32_OFLOW_VALUE;
+        if (tmr->sht_regs->ARR == STM32_16BIT) {
+            /* Only handle 16bit timer overflow */
+            tmr->sht_oflow += STM32_OFLOW_VALUE;
+        }
         clr |= TIM_SR_UIF;
 #if MYNEWT_VAL(STM32_TIMER_AUTO_OFF_COUNT)
         tmr->sht_empty_run++;
 #endif
     }
-    if (sr & TIM_SR_CC1IF) {
+    __HAL_ENABLE_INTERRUPTS(sr);
+    if (sr_reg & TIM_SR_CC1IF) {
         /*
          * Capture event
          */
@@ -173,6 +204,30 @@ stm32_tmr2_irq(void)
 }
 #endif
 
+#if MYNEWT_VAL(TIMER_3)
+static void
+stm32_tmr3_irq(void)
+{
+    stm32_tmr_irq(&stm32_tmr3);
+}
+#endif
+
+#if MYNEWT_VAL(TIMER_4)
+static void
+stm32_tmr4_irq(void)
+{
+    stm32_tmr_irq(&stm32_tmr4);
+}
+#endif
+
+#if MYNEWT_VAL(TIMER_5)
+static void
+stm32_tmr5_irq(void)
+{
+    stm32_tmr_irq(&stm32_tmr5);
+}
+#endif
+
 static void
 stm32_tmr_reg_irq(IRQn_Type irqn, uint32_t func)
 {
@@ -202,6 +257,21 @@ stm32_hw_setup(int num, TIM_TypeDef *regs)
         func = (uint32_t)stm32_tmr2_irq;
         break;
 #endif
+#if MYNEWT_VAL(TIMER_3)
+    case 3:
+        func = (uint32_t)stm32_tmr3_irq;
+        break;
+#endif
+#if MYNEWT_VAL(TIMER_4)
+    case 4:
+        func = (uint32_t)stm32_tmr4_irq;
+        break;
+#endif
+#if MYNEWT_VAL(TIMER_5)
+    case 5:
+        func = (uint32_t)stm32_tmr5_irq;
+        break;
+#endif
     default:
         assert(0);
         return;
@@ -229,6 +299,12 @@ stm32_hw_setup(int num, TIM_TypeDef *regs)
     if (regs == TIM4) {
         stm32_tmr_reg_irq(STM32_HAL_TIMER_TIM4_IRQ, func);
         __HAL_RCC_TIM4_CLK_ENABLE();
+    }
+#endif
+#ifdef TIM5
+    if (regs == TIM5) {
+        stm32_tmr_reg_irq(STM32_HAL_TIMER_TIM5_IRQ, func);
+        __HAL_RCC_TIM5_CLK_ENABLE();
     }
 #endif
 #ifdef TIM6
@@ -340,6 +416,11 @@ stm32_hw_setdown(TIM_TypeDef *regs)
         __HAL_RCC_TIM4_CLK_DISABLE();
     }
 #endif
+#ifdef TIM5
+    if (regs == TIM5) {
+        __HAL_RCC_TIM5_CLK_DISABLE();
+    }
+#endif
 #ifdef TIM8
     if (regs == TIM8) {
         __HAL_RCC_TIM8_CLK_DISABLE();
@@ -437,6 +518,11 @@ hal_timer_init(int num, void *cfg)
 #ifdef TIM4
     if (regs == TIM4) {
         __HAL_DBGMCU_FREEZE_TIM4();
+    }
+#endif
+#ifdef TIM5
+    if (regs == TIM5) {
+        __HAL_DBGMCU_FREEZE_TIM5();
     }
 #endif
 #ifdef TIM8
@@ -537,6 +623,45 @@ hal_timer_config(int num, uint32_t freq_hz)
     return 0;
 }
 
+int
+hal_timer_config_spec(int num, uint32_t freq_hz, uint8_t bits)
+{
+    struct stm32_hal_tmr *tmr;
+    TIM_Base_InitTypeDef init;
+    uint32_t prescaler;
+
+    if (num >= STM32_HAL_TIMER_MAX || !(tmr = stm32_tmr_devs[num])) {
+        return -1;
+    }
+    if (!IS_TIM_CC1_INSTANCE(tmr->sht_regs)) {
+        return -1;
+    }
+
+    prescaler = stm32_hal_timer_get_freq(tmr->sht_regs) / freq_hz;
+    if (prescaler > 0xffff) {
+        return -1;
+    }
+
+    memset(&init, 0, sizeof(init));
+    init.Period = (1ULL<<bits)-1;
+    init.Prescaler = prescaler - 1;
+    init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    init.CounterMode = TIM_COUNTERMODE_UP;
+
+    /*
+     * Set up to count overflow interrupts.
+     */
+    tmr->sht_regs->CR1 = TIM_CR1_URS;
+    tmr->sht_regs->DIER = TIM_DIER_UIE;
+
+    TIM_Base_SetConfig(tmr->sht_regs, &init);
+
+    tmr->sht_regs->SR = 0;
+    tmr->sht_regs->CR1 |= TIM_CR1_CEN;
+
+    return 0;
+}
+
 /**
  * hal timer deinit
  *
@@ -605,7 +730,7 @@ hal_timer_cnt(struct stm32_hal_tmr *tmr)
          * Just overflowed
          */
         tmr->sht_oflow += STM32_OFLOW_VALUE;
-        tmr->sht_regs->SR &= ~TIM_SR_UIF;
+        tmr->sht_regs->SR = ~TIM_SR_UIF;
     }
     cnt = tmr->sht_oflow + tmr->sht_regs->CNT;
     __HAL_ENABLE_INTERRUPTS(sr);
