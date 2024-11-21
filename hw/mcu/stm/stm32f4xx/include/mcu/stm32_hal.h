@@ -84,6 +84,19 @@ struct stm32_hal_spi_cfg {
 #include "stm32f4xx_hal_def.h"
 #include "stm32f4xx_hal_flash.h"
 #include "stm32f4xx_hal_flash_ex.h"
+
+#define STM32_HAL_TIMER_MAX     (6)
+
+#define STM32_HAL_TIMER_TIM1_IRQ    TIM1_UP_TIM10_IRQn
+#define STM32_HAL_TIMER_TIM2_IRQ    TIM2_IRQn
+#define STM32_HAL_TIMER_TIM3_IRQ    TIM3_IRQn
+#define STM32_HAL_TIMER_TIM4_IRQ    TIM4_IRQn
+#define STM32_HAL_TIMER_TIM5_IRQ    TIM5_IRQn
+#define STM32_HAL_TIMER_TIM9_IRQ    TIM1_BRK_TIM9_IRQn
+#define STM32_HAL_TIMER_TIM10_IRQ   TIM1_UP_TIM10_IRQn
+#define STM32_HAL_TIMER_TIM11_IRQ   TIM1_TRG_COM_TIM11_IRQn
+
+
 #define STM32_HAL_FLASH_INIT()        \
     do {                              \
         HAL_FLASH_Unlock();           \
