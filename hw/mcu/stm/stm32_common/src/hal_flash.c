@@ -35,7 +35,7 @@
 #else
 #define FLASH_SECTOR_SIZE  FLASH_PAGE_SIZE
 #endif
-#elif defined(FLASH_SECTOR_SIZE)
+#elif defined(FLASH_SECTOR_SIZE) && !MYNEWT_VAL(MCU_STM32H7)
 #undef FLASH_IS_LINEAR
 #define FLASH_IS_LINEAR 1
 #endif
@@ -155,6 +155,67 @@ stm32_flash_write_linear(const struct hal_flash *dev, uint32_t address,
 }
 #endif
 
+#if MYNEWT_VAL(MCU_STM32H7)
+static int
+stm32_flash_write_256_aligned(const struct hal_flash *dev, uint32_t address,
+        const void *src, uint32_t num_bytes)
+{
+    const uint8_t *sptr;
+    uint32_t n_bytes = 0;
+	int32_t left = 0, to_write = 0, rc;
+	uint8_t tmp[32];
+
+    HAL_FLASH_Unlock();
+
+    sptr = src;
+	left = num_bytes;
+
+	while(left)
+	{
+		n_bytes = address % 32;
+		if(n_bytes)
+		{
+			// if data is not aligned on 256 bits we have to manually set 
+			// the proper address.
+			address = address - n_bytes;
+		}
+
+       
+		// Make sure the word we're about to write is not already written
+        // Writing twice to the same word location, would trig a ECC error
+        // This would rise a Bus Fault each time the MCU tries to read this word
+        memcpy(tmp, (uint8_t *)address, 32);
+        for(uint8_t i = 0 ; i < 32 ; i++){
+            if(tmp[i] != 0xff){
+                rc = -1;
+                break;
+            }
+        }
+
+		to_write = 32 - n_bytes;
+
+		if(to_write > left)
+			to_write = left;
+
+		memcpy(tmp+n_bytes, sptr, to_write);
+
+		left -= to_write;
+		sptr += to_write;
+
+		rc = HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, address, (uint64_t)((uint32_t) tmp));
+
+		if(rc)
+			break;
+
+		address += 0x20; // 256 bits
+	}
+
+	HAL_FLASH_Lock();
+
+    return rc;
+}
+#endif
+
 #if !FLASH_IS_LINEAR
 static int
 stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
@@ -162,15 +223,21 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
 {
     const uint8_t *sptr;
     uint32_t i;
-    int rc;
-    int inc = MYNEWT_VAL(MCU_FLASH_MIN_WRITE_SIZE);
-
-    sptr = src;
+    int rc = 0;
+    
     /*
      * Clear status of previous operation.
      */
     STM32_HAL_FLASH_CLEAR_ERRORS();
 
+#if MYNEWT_VAL(MCU_STM32H7)
+    (void) sptr;
+    (void) i;
+    rc = stm32_flash_write_256_aligned(dev, address, src, num_bytes);
+#else
+	int inc = MYNEWT_VAL(MCU_FLASH_MIN_WRITE_SIZE);
+    sptr = src;
+	
     for (i = 0; i < num_bytes; i += inc) {
         rc = HAL_FLASH_Program(FLASH_PROGRAM_TYPE, address, sptr[i]);
         if (rc != 0) {
@@ -179,8 +246,9 @@ stm32_flash_write_non_linear(const struct hal_flash *dev, uint32_t address,
 
         address += inc;
     }
+#endif
 
-    return 0;
+    return rc;
 }
 #endif
 
@@ -215,7 +283,7 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
             eraseinit.Banks = FLASH_BANK_1; /* Only used for mass erase */
 #elif defined STM32H7
 #if defined (DUAL_BANK)
-            eraseinit.Banks = IS_FLASH_PROGRAM_ADDRESS_BANK1(ADDRESS) ? FLASH_BANK_1 : FLASH_BANK_2;
+            eraseinit.Banks = IS_FLASH_PROGRAM_ADDRESS_BANK1(sector_address) ? FLASH_BANK_1 : FLASH_BANK_2;
 #else
             eraseinit.Banks = FLASH_BANK_1;
 #endif
