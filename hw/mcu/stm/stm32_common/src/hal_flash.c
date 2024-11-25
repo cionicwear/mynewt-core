@@ -274,7 +274,14 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
     FLASH_EraseInitTypeDef eraseinit;
     HAL_StatusTypeDef err;
     uint32_t SectorError;
-    int i;
+    int i, rc = 0;
+
+     /*
+     * Clear status of previous operation.
+     */
+    STM32_HAL_FLASH_CLEAR_ERRORS();
+
+    HAL_FLASH_Unlock();
 
     for (i = 0; i < dev->hf_sector_cnt; i++) {
         if (stm32_flash_sectors[i] == sector_address) {
@@ -294,13 +301,13 @@ stm32_flash_erase_sector(const struct hal_flash *dev, uint32_t sector_address)
 
             err = HAL_FLASHEx_Erase(&eraseinit, &SectorError);
             if (err) {
-                return -1;
-            }
-            return 0;
+                rc = -1;
+            } 
         }
     }
 
-    return -1;
+    HAL_FLASH_Lock();
+    return rc;
 }
 
 #else /* FLASH_IS_LINEAR */
