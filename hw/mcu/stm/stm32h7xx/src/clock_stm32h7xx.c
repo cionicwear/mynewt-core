@@ -98,10 +98,8 @@ SystemClock_Config(void)
     osc_init.LSEState = RCC_LSE_BYPASS;
 #else
     osc_init.LSEState = RCC_LSE_ON;
-#if MYNEWT_VAL(STM32_RTC_EN)
     //This needs be set to High, otherwise, the TS will drift considerably
      __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_HIGH);
-#endif
 #endif
 
     /*
